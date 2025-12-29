@@ -17,7 +17,7 @@
     };
   };
 
-  outputs = inputs@{ self, nixpkgs, nixos-core, home-manager, hm-terminal, ... }:  let
+  outputs = inputs@{ self, nixpkgs, nixos-core, home-manager, nix-terminal, ... }:  let
     system = "x86_64-linux";
   in {
     nixosConfigurations.wsl = nixpkgs.lib.nixosSystem {
