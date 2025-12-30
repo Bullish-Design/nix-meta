@@ -4,7 +4,7 @@
   inputs = {
     nixpkgs.url = "github:NixOS/nixpkgs/nixos-unstable";
 
-    nixos-core.url = "github:Bullish-Design/nixos-core";
+    nixos-core.url = "github:Bullish-Design/nixos-core/main";
 
     home-manager = {
       url = "github:nix-community/home-manager";
@@ -12,7 +12,7 @@
     };
 
     nix-terminal = {
-      url = "github:Bullish-Design/nix-terminal";
+      url = "github:Bullish-Design/nix-terminal/main";
       inputs.nixpkgs.follows = "nixpkgs";
     };
   };
