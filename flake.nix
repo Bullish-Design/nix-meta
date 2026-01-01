@@ -36,9 +36,15 @@
           home-manager.useUserPackages = true;
 
           home-manager.users.nixos = { ... }: {
-            imports = [ nix-terminal.homeManagerModules.terminal ];
+            imports = [ 
+              nix-terminal.homeManagerModules.terminal 
+            ];
+            
             home.stateVersion = "25.05";
+            
+            # Home Manager flags:
             programs.home-manager.enable = true;
+            programs.nix-terminal.enable = true;
           };
         })
       ];
