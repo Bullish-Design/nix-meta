@@ -38,6 +38,7 @@
           home-manager.users.nixos = { ... }: {
             imports = [ 
               nix-terminal.homeManagerModules.terminal 
+              nix-terminal.homeManagerModules.nixbuild
             ];
             
             home.stateVersion = "25.05";
@@ -45,6 +46,14 @@
             # Home Manager flags:
             programs.home-manager.enable = true;
             programs.nix-terminal.enable = true;
+
+            # Enable nixbuild with defaults
+            programs.nixbuild = {
+              enable = true;
+              outputDir = "/home/nixos/.nixbuild-logs";
+              keepLast = 10;
+              enableRecording = true;
+            };
           };
         })
       ];
