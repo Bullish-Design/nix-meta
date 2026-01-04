@@ -1,5 +1,5 @@
 {
-  description = "Modular NixOS bootstrap (remote GitHub rebuild, git+https inputs)";
+  description = "Modular NixOS configurations with centralized settings";
 
   inputs = {
     nixpkgs.url = "github:NixOS/nixpkgs/nixos-unstable";
@@ -17,46 +17,26 @@
     };
   };
 
-  outputs = inputs@{ self, nixpkgs, nixos-core, home-manager, nix-terminal, ... }:
-  let
-    system = "x86_64-linux";
-  in {
-    nixosConfigurations.wsl = nixpkgs.lib.nixosSystem {
-      inherit system;
-      modules = [
-        nixos-core.nixosModules.wsl-upstream
-        nixos-core.nixosModules.wsl
-        nixos-core.nixosModules.common
+  outputs = inputs@{ self, nixpkgs, ... }:
+    let
+      inherit (nixpkgs) lib;
+      system = "x86_64-linux";
 
-        home-manager.nixosModules.home-manager
-        ({ ... }: {
-          system.stateVersion = "25.05";
+      # Import profile builders
+      profiles = import ./profiles inputs;
 
-          home-manager.useGlobalPkgs = true;
-          home-manager.useUserPackages = true;
-
-          home-manager.users.nixos = { ... }: {
-            imports = [ 
-              nix-terminal.homeManagerModules.terminal 
-              nix-terminal.homeManagerModules.nixbuild
-            ];
-            
-            home.stateVersion = "25.05";
-            
-            # Home Manager flags:
-            programs.home-manager.enable = true;
-            programs.nix-terminal.enable = true;
-
-            # Enable nixbuild with defaults
-            programs.nixbuild = {
-              enable = true;
-              outputDir = "/home/nixos/.nixbuild-logs";
-              keepLast = 10;
-              enableRecording = true;
-            };
-          };
-        })
-      ];
+      # Helper to build machine configs
+      mkMachine = name: profileModules: lib.nixosSystem {
+        inherit system;
+        specialArgs = { inherit inputs; };
+        modules = [ (./machines + "/${name}.nix") ] ++ profileModules;
+      };
+    in
+    {
+      nixosConfigurations = {
+        wsl = mkMachine "wsl" [ profiles.developer ];
+        desktop = mkMachine "desktop" [ profiles.developer profiles.gui ];
+        server = mkMachine "server" [ profiles.minimal ];
+      };
     };
-  };
 }
