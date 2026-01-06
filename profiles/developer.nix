@@ -126,7 +126,9 @@ in
         enable = true;
         baseDir = "/home/nixos/code";
         maxConcurrent = 5;
-        useSsh = true;
+        timeout = 300;
+        useSsh = false;
+        # configFormat = "yaml";
 
         accounts = [
           {
