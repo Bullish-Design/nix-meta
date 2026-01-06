@@ -32,6 +32,7 @@ in
       imports = [
         nix-terminal.homeManagerModules.terminal
         nix-terminal.homeManagerModules.nixbuild
+        nix-terminal.homeManagerModules.repoman
       ];
 
       home.stateVersion = "25.05";
@@ -119,6 +120,27 @@ in
         keepLast = 10;
         enableRecording = true;
         defaultAction = "test";
+      };
+
+      programs.repoman = {
+        enable = true;
+        baseDir = "/home/nixos/code";
+        maxConcurrent = 5;
+        useSsh = true;
+
+        accounts = [
+          {
+            name = "Bullish-Design";
+            repos = [
+              "nix-meta"
+              "nixos-core"
+              "nix-terminal"
+              "nixvim"
+              "terminal-state"
+              "devman"
+            ];
+          }
+        ];
       };
     };
   };

@@ -16,7 +16,7 @@ in
     experimentalFeatures = [ "nix-command" "flakes" ];
     systemPackages = with pkgs; [
       git
-      vim
+      #vim
     ];
   };
 }

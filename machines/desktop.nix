@@ -9,7 +9,6 @@
   home-manager.users.nixos = {
     programs.nix-terminal.extraPackages = with pkgs; [
       docker-compose
-      kubernetes-helm
     ];
   };
 }
