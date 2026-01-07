@@ -1,0 +1,10 @@
+# .sops.yaml
+# Replace the age key below with your target system's converted SSH host key.
+keys:
+  - &host_key age1exampleexampleexampleexampleexampleexampleexampleex
+
+creation_rules:
+  - path_regex: secrets/secrets\.yaml$
+    key_groups:
+      - age:
+          - *host_key

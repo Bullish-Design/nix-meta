@@ -2,12 +2,13 @@ inputs:
 { pkgs, ... }:
 
 let
-  inherit (inputs) nixos-core nix-terminal home-manager;
+  inherit (inputs) nixos-core nix-terminal home-manager sops-nix;
 in
 {
   imports = [
     nixos-core.nixosModules.common
     home-manager.nixosModules.home-manager
+    sops-nix.nixosModules.sops
   ];
 
   # System configuration
@@ -28,11 +29,12 @@ in
     useGlobalPkgs = true;
     useUserPackages = true;
 
-    users.nixos = { ... }: {
+    users.nixos = { config, ... }: {
       imports = [
         nix-terminal.homeManagerModules.terminal
         nix-terminal.homeManagerModules.nixbuild
         nix-terminal.homeManagerModules.repoman
+        sops-nix.homeManagerModules.sops
       ];
 
       home.stateVersion = "25.05";
@@ -122,12 +124,28 @@ in
         defaultAction = "test";
       };
 
+      sops = {
+        defaultSopsFile = ../secrets/secrets.yaml;
+      };
+
+      sops.secrets."github_ssh_key" = {
+        path = "${config.home.homeDirectory}/.ssh/github";
+        mode = "0600";
+      };
+
+      programs.ssh = {
+        enable = true;
+        matchBlocks."github.com" = {
+          identityFile = config.sops.secrets.github_ssh_key.path;
+        };
+      };
+
       programs.repoman = {
         enable = true;
         baseDir = "/home/nixos/code";
         maxConcurrent = 5;
         timeout = 300;
-        useSsh = false;
+        useSsh = true;
         # configFormat = "yaml";
 
         accounts = [
@@ -145,5 +163,10 @@ in
         ];
       };
     };
+  };
+
+  sops = {
+    defaultSopsFile = ../secrets/secrets.yaml;
+    age.sshKeyPaths = [ "/etc/ssh/ssh_host_ed25519_key" ];
   };
 }
