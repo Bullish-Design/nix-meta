@@ -11,8 +11,18 @@
       inputs.nixpkgs.follows = "nixpkgs";
     };
 
+    # Dev: local path so the tower gets nix-terminal's zelligate HM wrapper +
+    # bumped zellij pin before they are published. repoman fleet flake-update
+    # rewrites these to git+…?ref=<tag> at publish.
     nix-terminal = {
-      url = "git+https://github.com/Bullish-Design/nix-terminal.git?ref=main";
+      url = "path:/home/andrew/Documents/Projects/nix-terminal";
+      inputs.nixpkgs.follows = "nixpkgs";
+    };
+
+    # zelligate's own flake — for nixosModules.zelligate (system Tailscale Serve).
+    # The HM side arrives via nix-terminal's wrapper; this input is the system half.
+    zelligate = {
+      url = "path:/home/andrew/Documents/Projects/zelligate";
       inputs.nixpkgs.follows = "nixpkgs";
     };
   };
