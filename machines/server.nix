@@ -35,6 +35,11 @@ in
 
   console.keyMap = "us";
 
+  # Install terminfo for all terminals so SSH sessions from any client (e.g. the
+  # framework's kitty → TERM=xterm-kitty) resolve cleanly. Host-agnostic — could
+  # move to nixos-core.base later.
+  environment.enableAllTerminfo = true;
+
   # ── Server housekeeping (carried from the box's prior config) ───────────────
   zramSwap.enable = true; # 32 GB RAM box
   nix.gc = {
