@@ -6,17 +6,17 @@ let
 in
 {
   imports = [
-    nixos-core.nixosModules.common
+    nixos-core.nixosModules.base
   ];
 
   system.stateVersion = "25.05";
 
-  nixos-core.common = {
+  nixos-core.base = {
+    enable = true;
     enableFlakes = true;
     experimentalFeatures = [ "nix-command" "flakes" ];
     systemPackages = with pkgs; [
       git
-      #vim
     ];
   };
 }

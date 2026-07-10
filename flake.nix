@@ -11,20 +11,10 @@
       inputs.nixpkgs.follows = "nixpkgs";
     };
 
-    # Dev: local path so the tower gets nix-terminal's zelligate HM wrapper +
-    # bumped zellij pin before they are published. repoman fleet flake-update
-    # rewrites these to git+…?ref=<tag> at publish.
-    nix-terminal = {
-      url = "path:/home/andrew/Documents/Projects/nix-terminal";
-      inputs.nixpkgs.follows = "nixpkgs";
-    };
-
-    # zelligate's own flake — for nixosModules.zelligate (system Tailscale Serve).
-    # The HM side arrives via nix-terminal's wrapper; this input is the system half.
-    zelligate = {
-      url = "path:/home/andrew/Documents/Projects/zelligate";
-      inputs.nixpkgs.follows = "nixpkgs";
-    };
+    # NOTE: the nix-terminal / zelligate `path:` inputs were removed for the
+    # minimal `server` bring-up — those absolute laptop paths don't exist on the
+    # box and would break the on-box build. They come back (as git inputs) in
+    # Phase C when the workspace daemon is layered on from the server itself.
   };
 
   outputs = inputs@{ self, nixpkgs, ... }:
@@ -44,8 +34,9 @@
     in
     {
       nixosConfigurations = {
-        wsl = mkMachine "wsl" [ profiles.developer ];
-        desktop = mkMachine "desktop" [ profiles.developer profiles.gui ];
+        # Minimal headless server (Dell Precision 5820). The wsl/desktop skeleton
+        # hosts were retired for this bring-up; grow the fleet back out from the
+        # box via `nixos-rebuild switch --flake .#server`.
         server = mkMachine "server" [ profiles.minimal ];
       };
     };
