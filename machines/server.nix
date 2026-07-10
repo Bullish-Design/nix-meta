@@ -22,9 +22,11 @@ in
   };
 
   # Remote SSH is key-only (base sets PasswordAuthentication = false). Console
-  # access on the box is unaffected. Add your public key for remote login — paste
-  # it here, or fill from the box in Phase B: `cat ~/.ssh/id_ed25519.pub`.
+  # access on the box is unaffected. These are the framework laptop's keys:
+  # id_ed25519 (default identity → plain `ssh server` works) + the dedicated
+  # NixOS key.
   users.users.${user}.openssh.authorizedKeys.keys = [
-    # "ssh-ed25519 AAAA... andrew@framework"
+    "ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAIEtXr8bHPY+hfPDaQaYAhfnaayVSuWH3+KYC6CR8ETnc flora-runpod"
+    "ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAICesVdfKGESibctJ+Au8HQ+6exX3BpLdPm192bBsCec9 BullishDesignLLC@gmail.com"
   ];
 }
