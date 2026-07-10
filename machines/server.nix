@@ -6,27 +6,65 @@ let
 in
 {
   imports = [
-    # Hardware config (bootloader + root/boot filesystems). Phase B: overwrite
-    # machines/hardware/server.nix with the running box's real
-    # /etc/nixos/hardware-configuration.nix, then `nixos-rebuild switch`.
     ./hardware/server.nix
   ];
 
-  # ── Base tier (nixos-core.base) owns: nix flakes, the user account, zsh,
-  # networking, ssh (key-only), tailscale, docker, locale/time. profiles.minimal
-  # enables it; here we only set the per-host identity. ────────────────────────
+  # ── Bootloader: systemd-boot on the EFI partition at /boot (UEFI) ───────────
+  # (These live here, not in the generated hardware file, per NixOS convention.)
+  boot.loader.systemd-boot.enable = true;
+  boot.loader.systemd-boot.configurationLimit = 10;
+  boot.loader.efi.canTouchEfiVariables = true;
+  boot.loader.efi.efiSysMountPoint = "/boot";
+  boot.loader.timeout = 5;
+
+  # Dell/Intel platform exposes the NVMe root via Intel VMD (BIOS "RAID On" mode
+  # for Windows compat) — keep vmd in the initrd so root is visible at boot.
+  boot.initrd.kernelModules = [ "vmd" ];
+  boot.supportedFilesystems = [ "btrfs" "ntfs" "vfat" ];
+  hardware.enableRedistributableFirmware = true;
+
+  # ── Host identity ───────────────────────────────────────────────────────────
+  # base tier (profiles.minimal) owns nix flakes, the user account, zsh,
+  # networking, ssh (key-only), tailscale, docker, locale/time. Set only the
+  # per-host bits here.
   nixos-core.base = {
     hostName = "server";
     username = user;
     # tailscale.enable defaults true; run `tailscale up` once on the box.
   };
 
+  console.keyMap = "us";
+
+  # ── Server housekeeping (carried from the box's prior config) ───────────────
+  zramSwap.enable = true; # 32 GB RAM box
+  nix.gc = {
+    automatic = true;
+    dates = "weekly";
+    options = "--delete-older-than 14d";
+  };
+  nix.optimise.automatic = true;
+
+  # stateVersion tracks the box's original install — do NOT bump casually.
+  system.stateVersion = "26.05";
+
   # Remote SSH is key-only (base sets PasswordAuthentication = false). Console
-  # access on the box is unaffected. These are the framework laptop's keys:
-  # id_ed25519 (default identity → plain `ssh server` works) + the dedicated
-  # NixOS key.
+  # access on the box is unaffected. These are the framework laptop's keys.
   users.users.${user}.openssh.authorizedKeys.keys = [
     "ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAIEtXr8bHPY+hfPDaQaYAhfnaayVSuWH3+KYC6CR8ETnc andrew@framework"
     "ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAICesVdfKGESibctJ+Au8HQ+6exX3BpLdPm192bBsCec9 andrew@framework-nixos"
   ];
+
+  # Optional shared NTFS data drive. nofail = won't block boot if absent/dirty.
+  fileSystems."/mnt/shared" = {
+    device = "/dev/disk/by-label/SHARED";
+    fsType = "ntfs3";
+    options = [
+      "nofail"
+      "x-systemd.automount"
+      "uid=1000"
+      "gid=100"
+      "umask=022"
+      "windows_names"
+    ];
+  };
 }

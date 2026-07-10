@@ -9,7 +9,8 @@ in
     nixos-core.nixosModules.base
   ];
 
-  system.stateVersion = "25.05";
+  # system.stateVersion is per-host (tracks each box's install) — set in the
+  # machine module, not this shared profile.
 
   nixos-core.base = {
     enable = true;
