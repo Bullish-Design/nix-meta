@@ -7,7 +7,7 @@
     nixos-core.url = "git+https://github.com/Bullish-Design/nixos-core.git?ref=main";
 
     nix-paseo = {
-      url = "path:/home/andrew/Documents/Projects/nix-paseo";
+      url = "git+file:///home/andrew/Documents/Projects/nix-paseo?ref=main";
       inputs.nixpkgs.follows = "nixpkgs";
     };
 

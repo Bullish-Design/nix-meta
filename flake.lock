@@ -491,14 +491,18 @@
         "paseo": "paseo"
       },
       "locked": {
-        "lastModified": 1783812483,
-        "narHash": "sha256-NnBZ9USl43UAtWkr8tUda4jfGoBCL+mZbAVHiAOLmOc=",
-        "path": "/home/andrew/Documents/Projects/nix-paseo",
-        "type": "path"
+        "lastModified": 1783812479,
+        "narHash": "sha256-9QKlmN9ZoaHMcm7ToateRBh9pGjd791lUIvem77j4nI=",
+        "ref": "main",
+        "rev": "9cfe7392a5c57cc1fe95e5d44adfcce56b46f847",
+        "revCount": 6,
+        "type": "git",
+        "url": "file:///home/andrew/Documents/Projects/nix-paseo"
       },
       "original": {
-        "path": "/home/andrew/Documents/Projects/nix-paseo",
-        "type": "path"
+        "ref": "main",
+        "type": "git",
+        "url": "file:///home/andrew/Documents/Projects/nix-paseo"
       }
     },
     "nix-secrets": {
