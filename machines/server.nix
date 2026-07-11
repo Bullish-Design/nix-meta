@@ -1,4 +1,4 @@
-{ inputs, ... }:
+{ inputs, pkgs, ... }:
 
 let
   # The account that owns ~/Documents/Projects on the box.
@@ -7,6 +7,11 @@ in
 {
   imports = [
     ./hardware/server.nix
+
+    # Phase C — the zelligate workspace daemon. Both modules are authored in the
+    # zelligate repo (all config lives there); the server only imports + enables.
+    inputs.home-manager.nixosModules.home-manager
+    inputs.zelligate.nixosModules.zelligate
   ];
 
   # ── Bootloader: systemd-boot on the EFI partition at /boot (UEFI) ───────────
@@ -54,10 +59,61 @@ in
 
   # Remote SSH is key-only (base sets PasswordAuthentication = false). Console
   # access on the box is unaffected. These are the framework laptop's keys.
-  users.users.${user}.openssh.authorizedKeys.keys = [
-    "ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAIEtXr8bHPY+hfPDaQaYAhfnaayVSuWH3+KYC6CR8ETnc andrew@framework"
-    "ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAICesVdfKGESibctJ+Au8HQ+6exX3BpLdPm192bBsCec9 andrew@framework-nixos"
-  ];
+  # `linger` (Phase C) keeps the zelligate systemd USER service running with
+  # nobody logged in — WITHOUT it the daemon never starts on a headless boot.
+  # Both settings share one attrset: a dynamic key (`${user}`) can't be split
+  # across two separate `users.users.${user}.…` statements.
+  users.users.${user} = {
+    openssh.authorizedKeys.keys = [
+      "ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAIEtXr8bHPY+hfPDaQaYAhfnaayVSuWH3+KYC6CR8ETnc andrew@framework"
+      "ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAICesVdfKGESibctJ+Au8HQ+6exX3BpLdPm192bBsCec9 andrew@framework-nixos"
+    ];
+    linger = true;
+  };
+
+  # ── Phase C: zelligate workspace daemon ─────────────────────────────────────
+  # The daemon (`zelligated`) runs as a systemd USER service under `${user}`,
+  # scanning ~/Documents/Projects for opted-in repos and serving each as a Zellij
+  # web terminal on loopback. A system-level Tailscale-Serve module (below) bridges
+  # the tailnet to those loopback ports. All wiring is imported from the zelligate
+  # flake; nothing here is authored — we only enable and inject the box-specific
+  # bits (the user, the package, the zellij binary, the public host).
+
+  # Home-Manager is greenfield on this host (minimal carries none). Enable it for
+  # the login user just enough to run the zelligate user service.
+  home-manager = {
+    useGlobalPkgs = true;
+    useUserPackages = true;
+
+    users.${user} = { ... }: {
+      imports = [ inputs.zelligate.homeManagerModules.zelligate ];
+
+      home.stateVersion = "25.05";
+
+      services.zelligate = {
+        enable = true;
+        package = inputs.zelligate.packages.${pkgs.system}.default;
+        # No owned zellij pin in the fleet yet; nixpkgs-unstable ships 0.44.3,
+        # whose `web` subcommand has the token interface zelligate drives.
+        zellijPackage = pkgs.zellij;
+        # TODO(publicHost): set to the tower's full MagicDNS name
+        # "server.<your-tailnet>.ts.net" once known. "server" (the MagicDNS short
+        # name) already resolves for tailnet devices with MagicDNS enabled, so the
+        # index's http://server:<port> links work today; the FQDN is more robust.
+        publicHost = "server";
+      };
+    };
+  };
+
+  # System-level Tailscale-Serve wiring (needs root; tailscaled itself is already
+  # enabled by nixos-core.base, so we don't re-enable it here). Dynamic mode: a
+  # status.json watcher reconciles Serve rules to the live repo ports.
+  zelligate = {
+    enable = true;
+    user = user;
+    serveMode = "dynamic";
+    tailscale.enable = false; # base tier already owns services.tailscale
+  };
 
   # Optional shared NTFS data drive. nofail = won't block boot if absent/dirty.
   fileSystems."/mnt/shared" = {

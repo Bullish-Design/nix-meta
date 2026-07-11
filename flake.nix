@@ -21,10 +21,17 @@
       inputs.nixpkgs.follows = "nixpkgs";
     };
 
-    # NOTE: the nix-terminal / zelligate `path:` inputs were removed for the
-    # minimal `server` bring-up — those absolute laptop paths don't exist on the
-    # box and would break the on-box build. They come back (as git inputs) in
-    # Phase C when the workspace daemon is layered on from the server itself.
+    # Phase C: the workspace daemon (zelligate) is layered onto the server.
+    # zelligate is a private repo, pulled over the SSH input form (same
+    # convention as nix-secrets above), NOT a laptop `path:`. It exposes the two
+    # modules the server imports directly (nix-meta authors nothing): a
+    # Home-Manager user-service module and a system-level Tailscale-Serve module.
+    # nix-terminal stays OUT of the server input set to keep the tower lean —
+    # its zelligate wrapper is for the interactive laptop/desktop hosts.
+    zelligate = {
+      url = "git+ssh://git@github.com/Bullish-Design/zelligate.git?ref=main";
+      inputs.nixpkgs.follows = "nixpkgs";
+    };
   };
 
   outputs = inputs@{ self, nixpkgs, ... }:
