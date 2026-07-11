@@ -94,14 +94,11 @@ in
         };
       };
 
-      # Server-only: disable the loci editor stack. nix-nvim pulls loci via
-      # loci.nvim → loci-core (a PRIVATE repo — 404 on unauthenticated archive
-      # fetch) → knappy (a laptop `path:` input absent on the box). Both only
-      # evaluate when loci is on, so turning it off gives the box the full
-      # loci-less neovim now. The lua `require("loci")` self-guards. Re-enable
-      # once loci-core is reachable headless and knappy is de-path:'d upstream.
-      # (Laptop hosts keep the default loci.enable = true.)
-      nix-nvim.neovim.loci.enable = false;
+      # loci is on (nix-nvim's default). It used to be force-disabled here
+      # because the stack pulled loci-core (private → github: 404 headless) and
+      # knappy (a laptop `path:`); both are now fetched over git+ssh
+      # (loci-core@57c83f4, knappy via git+ssh, shipped in loci.nvim@v0.1.2), so
+      # the server resolves the full loci stack with its authorized SSH key.
     };
   };
 }
