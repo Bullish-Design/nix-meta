@@ -517,11 +517,11 @@
         "zelligate": "zelligate"
       },
       "locked": {
-        "lastModified": 1783790249,
-        "narHash": "sha256-m9lj3fm2A1FkkHKKzwIaLXjsYdDE9nm4NMKqry3jo/w=",
+        "lastModified": 1783791033,
+        "narHash": "sha256-0vtjIiPnt86TJXOjJoJYwOhra1X2tOzomBiGt7YwUQ8=",
         "ref": "main",
-        "rev": "d174fc577508b00bc9fd5a263494d18a25428cf7",
-        "revCount": 53,
+        "rev": "3d67b5b56070caa0f11ce754821a924b568c9322",
+        "revCount": 54,
         "type": "git",
         "url": "https://github.com/Bullish-Design/nix-terminal.git"
       },
