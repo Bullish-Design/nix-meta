@@ -26,10 +26,18 @@
     # convention as nix-secrets above), NOT a laptop `path:`. It exposes the two
     # modules the server imports directly (nix-meta authors nothing): a
     # Home-Manager user-service module and a system-level Tailscale-Serve module.
-    # nix-terminal stays OUT of the server input set to keep the tower lean —
-    # its zelligate wrapper is for the interactive laptop/desktop hosts.
     zelligate = {
       url = "git+ssh://git@github.com/Bullish-Design/zelligate.git?ref=main";
+      inputs.nixpkgs.follows = "nixpkgs";
+    };
+
+    # The interactive terminal environment (zsh/atuin/starship/nvim/tmux) — the
+    # rich shell you get over SSH and inside zelligate web terminals. The tower
+    # is a host worked IN directly, which is exactly this flake's purpose, so it
+    # belongs in the server set. Fetched as a git input (public repo, like
+    # nixos-core) — NOT the old laptop `path:` that broke the on-box build.
+    nix-terminal = {
+      url = "git+https://github.com/Bullish-Design/nix-terminal.git?ref=main";
       inputs.nixpkgs.follows = "nixpkgs";
     };
   };
@@ -54,7 +62,10 @@
         # Minimal headless server (Dell Precision 5820). The wsl/desktop skeleton
         # hosts were retired for this bring-up; grow the fleet back out from the
         # box via `nixos-rebuild switch --flake .#server`.
-        server = mkMachine "server" [ profiles.minimal profiles.gpu-compute profiles.agent profiles.secrets ];
+        # profiles.terminal restored: nix-terminal now consumes nix-nvim (the
+        # loci-rich config promoted from ~/.dotfiles/nvim) instead of the retired,
+        # broken nixvim input.
+        server = mkMachine "server" [ profiles.minimal profiles.terminal profiles.gpu-compute profiles.agent profiles.secrets ];
       };
     };
 }

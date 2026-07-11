@@ -12,6 +12,11 @@ inputs:
   # Agent tooling (Claude Code) for on-box SSH work — stacked on `minimal`.
   agent = import ./agent.nix inputs;
 
+  # Interactive terminal environment (nix-terminal: zsh/atuin/starship/nvim/tmux)
+  # for hosts worked in directly over SSH + zelligate web terminals. Bootstraps
+  # Home Manager for the base username and configures programs.nix-terminal.
+  terminal = import ./terminal.nix inputs;
+
   # Declarative secrets (sops-nix): the box decrypts with its own SSH host key.
   secrets = import ./secrets.nix inputs;
 }
