@@ -69,6 +69,10 @@ in
       "ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAICesVdfKGESibctJ+Au8HQ+6exX3BpLdPm192bBsCec9 andrew@framework-nixos"
     ];
     linger = true;
+    # Serial access to the Waveshare ESP32-S3 wired on /dev/ttyACM0 (root:dialout).
+    # Host-scoped: only `server` has the board attached. Merges (list-concat) with
+    # base.nix's [ "networkmanager" "wheel" "docker" ]. (008/interplay HIL host.)
+    extraGroups = [ "dialout" ];
   };
 
   # ── Phase C: zelligate workspace daemon ─────────────────────────────────────
