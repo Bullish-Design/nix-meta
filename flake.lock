@@ -37,6 +37,28 @@
         "url": "https://github.com/nix-community/home-manager.git"
       }
     },
+    "nix-secrets": {
+      "inputs": {
+        "nixpkgs": [
+          "nixpkgs"
+        ],
+        "sops-nix": "sops-nix"
+      },
+      "locked": {
+        "lastModified": 1783733643,
+        "narHash": "sha256-hIvbYNZzv+7vmt+EdNWMzrAQmXirK8/uerPgSGf13v8=",
+        "ref": "main",
+        "rev": "c989fbdbc0a6a3fbb81eed6f753f933120d0d32c",
+        "revCount": 5,
+        "type": "git",
+        "url": "ssh://git@github.com/Bullish-Design/nix-secrets.git"
+      },
+      "original": {
+        "ref": "main",
+        "type": "git",
+        "url": "ssh://git@github.com/Bullish-Design/nix-secrets.git"
+      }
+    },
     "nixos-core": {
       "inputs": {
         "nixos-wsl": "nixos-wsl",
@@ -115,8 +137,30 @@
     "root": {
       "inputs": {
         "home-manager": "home-manager",
+        "nix-secrets": "nix-secrets",
         "nixos-core": "nixos-core",
         "nixpkgs": "nixpkgs_2"
+      }
+    },
+    "sops-nix": {
+      "inputs": {
+        "nixpkgs": [
+          "nix-secrets",
+          "nixpkgs"
+        ]
+      },
+      "locked": {
+        "lastModified": 1782165805,
+        "narHash": "sha256-478kKQBvK6SYTOdN2h9jhKJv94nbXRbFMfuL1WshErg=",
+        "owner": "Mic92",
+        "repo": "sops-nix",
+        "rev": "56b24064fdcaedca53553b1a6d607fd23b613a24",
+        "type": "github"
+      },
+      "original": {
+        "owner": "Mic92",
+        "repo": "sops-nix",
+        "type": "github"
       }
     }
   },

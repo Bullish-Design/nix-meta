@@ -11,4 +11,7 @@ inputs:
 
   # Agent tooling (Claude Code) for on-box SSH work — stacked on `minimal`.
   agent = import ./agent.nix inputs;
+
+  # Declarative secrets (sops-nix): the box decrypts with its own SSH host key.
+  secrets = import ./secrets.nix inputs;
 }
