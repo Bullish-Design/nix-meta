@@ -491,8 +491,8 @@
         "paseo": "paseo"
       },
       "locked": {
-        "lastModified": 1783811999,
-        "narHash": "sha256-UHC00jdGG2T6uGtNb6Io3JiptqABzyQXeukWrKafUKw=",
+        "lastModified": 1783812483,
+        "narHash": "sha256-NnBZ9USl43UAtWkr8tUda4jfGoBCL+mZbAVHiAOLmOc=",
         "path": "/home/andrew/Documents/Projects/nix-paseo",
         "type": "path"
       },
