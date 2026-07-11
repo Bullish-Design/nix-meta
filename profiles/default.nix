@@ -8,4 +8,7 @@ inputs:
 
   # Headless NVIDIA CUDA layer (Phase C) — stacked on top of `minimal`.
   gpu-compute = import ./gpu-compute.nix inputs;
+
+  # Agent tooling (Claude Code) for on-box SSH work — stacked on `minimal`.
+  agent = import ./agent.nix inputs;
 }

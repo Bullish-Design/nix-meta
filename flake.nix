@@ -37,7 +37,7 @@
         # Minimal headless server (Dell Precision 5820). The wsl/desktop skeleton
         # hosts were retired for this bring-up; grow the fleet back out from the
         # box via `nixos-rebuild switch --flake .#server`.
-        server = mkMachine "server" [ profiles.minimal profiles.gpu-compute ];
+        server = mkMachine "server" [ profiles.minimal profiles.gpu-compute profiles.agent ];
       };
     };
 }
