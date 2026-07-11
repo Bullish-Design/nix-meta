@@ -96,11 +96,11 @@ in
         # No owned zellij pin in the fleet yet; nixpkgs-unstable ships 0.44.3,
         # whose `web` subcommand has the token interface zelligate drives.
         zellijPackage = pkgs.zellij;
-        # TODO(publicHost): set to the tower's full MagicDNS name
-        # "server.<your-tailnet>.ts.net" once known. "server" (the MagicDNS short
-        # name) already resolves for tailnet devices with MagicDNS enabled, so the
-        # index's http://server:<port> links work today; the FQDN is more robust.
-        publicHost = "server";
+        # The tower's Tailscale MagicDNS FQDN — the index builds each repo's
+        # http://<publicHost>:<port> launcher link from this, so it must be a name
+        # remote tailnet devices resolve. Verified reachable: a tailnet peer gets
+        # HTTP 200 on http://server.tail770f47.ts.net:8122.
+        publicHost = "server.tail770f47.ts.net";
       };
     };
   };
