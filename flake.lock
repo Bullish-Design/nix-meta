@@ -483,6 +483,24 @@
         "type": "github"
       }
     },
+    "nix-paseo": {
+      "inputs": {
+        "nixpkgs": [
+          "nixpkgs"
+        ],
+        "paseo": "paseo"
+      },
+      "locked": {
+        "lastModified": 1783811999,
+        "narHash": "sha256-UHC00jdGG2T6uGtNb6Io3JiptqABzyQXeukWrKafUKw=",
+        "path": "/home/andrew/Documents/Projects/nix-paseo",
+        "type": "path"
+      },
+      "original": {
+        "path": "/home/andrew/Documents/Projects/nix-paseo",
+        "type": "path"
+      }
+    },
     "nix-secrets": {
       "inputs": {
         "nixpkgs": [
@@ -673,6 +691,27 @@
         "type": "github"
       }
     },
+    "paseo": {
+      "inputs": {
+        "nixpkgs": [
+          "nix-paseo",
+          "nixpkgs"
+        ]
+      },
+      "locked": {
+        "lastModified": 1783808860,
+        "narHash": "sha256-TZFyRMlhfkRQiWJgOFRXmU8emuNUHtJhcznQJLIIUpw=",
+        "owner": "getpaseo",
+        "repo": "paseo",
+        "rev": "92d70666018180e2ba0431ec976b7b3666723a50",
+        "type": "github"
+      },
+      "original": {
+        "owner": "getpaseo",
+        "repo": "paseo",
+        "type": "github"
+      }
+    },
     "repoman": {
       "inputs": {
         "nixpkgs": [
@@ -697,6 +736,7 @@
     "root": {
       "inputs": {
         "home-manager": "home-manager",
+        "nix-paseo": "nix-paseo",
         "nix-secrets": "nix-secrets",
         "nix-terminal": "nix-terminal",
         "nixos-core": "nixos-core",

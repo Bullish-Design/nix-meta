@@ -12,6 +12,7 @@ in
     # zelligate repo (all config lives there); the server only imports + enables.
     inputs.home-manager.nixosModules.home-manager
     inputs.zelligate.nixosModules.zelligate
+    inputs.nix-paseo.nixosModules.paseo
   ];
 
   # ── Bootloader: systemd-boot on the EFI partition at /boot (UEFI) ───────────
@@ -36,6 +37,22 @@ in
     hostName = "server";
     username = user;
     # tailscale.enable defaults true; run `tailscale up` once on the box.
+  };
+
+  nix-paseo.paseo = {
+    enable = true;
+
+    user = "andrew";
+    group = "users";
+    workspaceRoot = "/home/andrew/Documents/Projects";
+
+    tailnet = {
+      enable = true;
+      hostname = "server.tail770f47.ts.net";
+    };
+
+    # Temporary bootstrap posture. Do not add sops password plumbing yet.
+    authentication.requirePassword = false;
   };
 
   console.keyMap = "us";
