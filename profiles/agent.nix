@@ -9,6 +9,10 @@ inputs:
   # promote into nixos-core.base (fleet-wide) or drop later.
   environment.systemPackages = with pkgs; [
     claude-code
+    # zellij: terminal multiplexer so long agent runs survive an SSH drop
+    # (network switch / laptop sleep) — reattach with `zellij attach`. Also the
+    # fleet-standard multiplexer, a precursor to the zelligate workspace daemon.
+    zellij
   ];
 
   # The binary lives read-only in the Nix store, so its self-updater can never
