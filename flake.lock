@@ -875,11 +875,11 @@
         ]
       },
       "locked": {
-        "lastModified": 1783776514,
-        "narHash": "sha256-cGoqCYpBktrYzXircQEU6E0UxCApyaPN01hIH2H7EP0=",
+        "lastModified": 1783829588,
+        "narHash": "sha256-ijDuZoWtgn4q2e6Cv/xWU9o0GNs/HNP3SB2smwOb9Qo=",
         "ref": "main",
-        "rev": "c509ce339f3966e2981c6802bd0b7a194543cbfc",
-        "revCount": 32,
+        "rev": "32d0a2cdae509466706e3663dc8d17ada6f088ba",
+        "revCount": 36,
         "type": "git",
         "url": "ssh://git@github.com/Bullish-Design/zelligate.git"
       },
