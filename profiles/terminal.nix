@@ -47,6 +47,10 @@ in
         # start with yazi; add more here as they earn a spot.
         extraPackages = with pkgs; [
           yazi
+          # gh: GitHub CLI for repo/PR automation that git-over-SSH can't do
+          # (create repos, open/merge PRs, gists). Authenticate once with
+          # `gh auth login`. This box is andrew's dev machine.
+          gh
         ];
 
         zsh = {
