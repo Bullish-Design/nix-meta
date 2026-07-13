@@ -1,10 +1,10 @@
 inputs:
 {
-  # Only `minimal` + `gpu-compute` are wired for the server. `developer` and `gui`
-  # remain on disk as dormant skeleton (they still reference the old
-  # `nixos-core.common` namespace + the nix-terminal input); re-export them once
-  # they're ported to the `nixos-core.base` module.
   minimal = import ./minimal.nix inputs;
+
+  # Additive user-level developer workflow. It expects the base tier for the
+  # username SSOT and composes with (but does not reconfigure) `terminal`.
+  developer = import ./developer.nix inputs;
 
   # Headless NVIDIA CUDA layer (Phase C) — stacked on top of `minimal`.
   gpu-compute = import ./gpu-compute.nix inputs;
@@ -16,6 +16,9 @@ inputs:
   # for hosts worked in directly over SSH + zelligate web terminals. Bootstraps
   # Home Manager for the base username and configures programs.nix-terminal.
   terminal = import ./terminal.nix inputs;
+
+  # Retained as an unconsumed graphical skeleton until a desktop host returns.
+  gui = import ./gui.nix inputs;
 
   # Declarative secrets (sops-nix): the box decrypts with its own SSH host key.
   secrets = import ./secrets.nix inputs;

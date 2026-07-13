@@ -39,6 +39,30 @@ in
     # tailscale.enable defaults true; run `tailscale up` once on the box.
   };
 
+  # Developer workflow policy is host-owned: the shared profile provides the
+  # tools and user-relative defaults, while this box chooses its organization
+  # checkout set. The root matches paseo/zelligate's opt-in workspace scan.
+  nix-meta.developer = {
+    nixbuild.outputDir = "/home/${user}/.nixbuild-logs";
+    repoman = {
+      baseDir = "/home/${user}/Documents/Projects";
+      accounts = [
+        {
+          name = "Bullish-Design";
+          repos = [
+            "nix-meta"
+            "nixos-core"
+            "nix-terminal"
+            "nixvim"
+            "terminal-state"
+            "devman"
+            "gitman"
+          ];
+        }
+      ];
+    };
+  };
+
   nix-paseo.paseo = {
     enable = true;
 
@@ -47,8 +71,14 @@ in
     workspaceRoot = "/home/andrew/Documents/Projects";
 
     tailnet = {
-      enable = true;
+      # Tailscale Serve terminates TLS at :8443 and proxies to Paseo's loopback
+      # listener. Browser microphone APIs require this HTTPS secure context.
+      enable = false;
       hostname = "server.tail770f47.ts.net";
+      https = {
+        enable = true;
+        port = 8443;
+      };
     };
 
     # Temporary bootstrap posture. Do not add sops password plumbing yet.
@@ -87,10 +117,34 @@ in
     ];
     linger = true;
     # Serial access to the Waveshare ESP32-S3 wired on /dev/ttyACM0 (root:dialout).
-    # Host-scoped: only `server` has the board attached. Merges (list-concat) with
-    # base.nix's [ "networkmanager" "wheel" "docker" ]. (008/interplay HIL host.)
-    extraGroups = [ "dialout" ];
+    # `adbusers`: USB access to the plugged-in Android phone for adb (09/servomat
+    # HIL host; programs.adb.enable below installs the group + udev rules).
+    # Host-scoped: only `server` has this hardware attached. Merges (list-concat)
+    # with base.nix's [ "networkmanager" "wheel" "docker" ]. (008/interplay +
+    # 009/servomat HIL host.)
+    extraGroups = [ "dialout" "adbusers" ];
   };
+
+  # Android debugging over USB for the plugged-in phone (009/servomat round-trip
+  # host) — the exact analog of `dialout` for the ESP32 board above.
+  #
+  # `programs.adb` and `pkgs.android-udev-rules` were BOTH removed upstream
+  # (nixpkgs 26.11), superseded by systemd's built-in `uaccess`. But `uaccess`
+  # grants the *active local seat* user only; this box is driven headless over
+  # SSH / the paseo agent (all sessions have SEAT=-), so uaccess grants nothing.
+  # We therefore author a group-based rule ourselves: the phone's USB node
+  # becomes adbusers:0660 and any adbusers member (andrew, above) opens it
+  # without root. Host-scoped: only `server` has a phone attached.
+  #
+  # adb itself is NOT installed system-wide — like mpremote/esptool for 008, the
+  # tool is pinned in servomat's devenv.nix; this rule only grants the access.
+  users.groups.adbusers = { };
+  services.udev.extraRules = ''
+    # Android ADB: USB device nodes for known handset vendors → adbusers:0660.
+    # 04e8 = Samsung (the attached Galaxy, serial R5CN704TT9P); 18d1 = Google.
+    SUBSYSTEM=="usb", ATTR{idVendor}=="04e8", MODE="0660", GROUP="adbusers"
+    SUBSYSTEM=="usb", ATTR{idVendor}=="18d1", MODE="0660", GROUP="adbusers"
+  '';
 
   # ── Phase C: zelligate workspace daemon ─────────────────────────────────────
   # The daemon (`zelligated`) runs as a systemd USER service under `${user}`,

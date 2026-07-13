@@ -1,4 +1,8 @@
-{ inputs, ... }:
+{ config, inputs, ... }:
+
+let
+  username = config.nixos-core.base.username;
+in
 
 {
   imports = [
@@ -10,7 +14,7 @@
   nixos-core.wsl.enable = true;
 
   # WSL-specific overrides
-  home-manager.users.nixos = {
+  home-manager.users.${username} = {
     programs.nix-terminal.zsh.aliases = {
       # Add WSL-specific aliases
       explorer = "explorer.exe";

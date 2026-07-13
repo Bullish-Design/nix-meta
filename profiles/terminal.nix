@@ -5,8 +5,8 @@ let
   inherit (inputs) nix-terminal home-manager;
 
   # Username SSOT — read the base tier's value (set per-host in the machine
-  # module) so this profile never hardcodes "andrew"/"nixos" and composes onto
-  # whatever host imports it.
+  # module) so this profile never hardcodes a user and composes onto whatever
+  # host imports it.
   username = config.nixos-core.base.username;
 in
 {
@@ -44,13 +44,9 @@ in
 
         # corePackages defaults to the modern CLI kit (ripgrep/fd/bat/eza/fzf/…).
         # extraPackages is where day-to-day terminal apps for this box live —
-        # start with yazi; add more here as they earn a spot.
+        # start with yazi; developer-only tooling belongs in developer.nix.
         extraPackages = with pkgs; [
           yazi
-          # gh: GitHub CLI for repo/PR automation that git-over-SSH can't do
-          # (create repos, open/merge PRs, gists). Authenticate once with
-          # `gh auth login`. This box is andrew's dev machine.
-          gh
         ];
 
         zsh = {

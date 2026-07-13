@@ -14,7 +14,7 @@ flake.nix
     │
     ├── profiles/           # Composable configuration sets
     │   ├── default.nix     # Profile exports
-    │   ├── developer.nix   # Full dev environment
+    │   ├── developer.nix   # Additive developer workflow
     │   ├── minimal.nix     # Bare essentials
     │   └── gui.nix         # Desktop additions
     │
@@ -81,10 +81,10 @@ in
 
 ### Modifying User Configuration
 
-User config lives in profiles under `home-manager.users.<username>`:
+User config lives in profiles under `home-manager.users.${config.nixos-core.base.username}`:
 
 ```nix
-home-manager.users.nixos = { ... }: {
+home-manager.users.${config.nixos-core.base.username} = { ... }: {
   imports = [
     nix-terminal.homeManagerModules.terminal
   ];
@@ -100,7 +100,7 @@ home-manager.users.nixos = { ... }: {
 
 - **Profiles are composable**: Design for `[ profiles.a profiles.b ]` usage
 - **Machines are minimal**: Only hardware and overrides, not full config
-- **Username is `nixos`**: Hardcoded in current profiles
+- **Username SSOT**: Read `config.nixos-core.base.username` in shared profiles
 - **Single system arch**: Currently `x86_64-linux` only
 
 ## Integration Points
@@ -109,7 +109,7 @@ home-manager.users.nixos = { ... }: {
 
 | Input | Usage |
 |-------|-------|
-| `nixos-core` | `nixosModules.common`, `nixosModules.wsl` |
+| `nixos-core` | `nixosModules.base`, `nixosModules.wsl` |
 | `nix-terminal` | `homeManagerModules.terminal`, `homeManagerModules.nixbuild` |
 | `home-manager` | `nixosModules.home-manager` |
 
@@ -127,11 +127,14 @@ Order matters - later profiles can override earlier ones.
 ### Add package to developer profile
 Update `profiles/developer.nix`:
 ```nix
-programs.nix-terminal.extraPackages = with pkgs; [
+config.nix-meta.developer.packages = with pkgs; [
   # existing...
   newpackage
 ];
 ```
+
+`repoman` is supplied by the developer profile. `gitman` runs from its pinned
+repository environment: `devenv --dir ~/Documents/Projects/gitman shell -- gitman status`.
 
 ### Add shell alias for all machines
 Update `profiles/developer.nix` under `zsh.aliases`:
@@ -145,7 +148,7 @@ aliases = {
 ### Add machine-specific alias
 Update `machines/<machine>.nix`:
 ```nix
-home-manager.users.nixos.programs.nix-terminal.zsh.aliases = {
+home-manager.users.${config.nixos-core.base.username}.programs.nix-terminal.zsh.aliases = {
   specific = "command";
 };
 ```

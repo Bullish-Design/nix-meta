@@ -491,11 +491,11 @@
         "paseo": "paseo"
       },
       "locked": {
-        "lastModified": 1783819229,
-        "narHash": "sha256-tcCA25RvD2BfNTYOYwOpsDEbqHO5DEFJvjZGnGCw6cE=",
+        "lastModified": 1783956491,
+        "narHash": "sha256-DWWdgNsKVPhFu4m6t8fPqHiObn+y6tfM99ZZVOxRFRs=",
         "ref": "main",
-        "rev": "1fdbfa688600f54161f22d5d39828e8dbac60ca5",
-        "revCount": 7,
+        "rev": "3425c9bba858ea5db587467a0a89056994c56d94",
+        "revCount": 8,
         "type": "git",
         "url": "file:///home/andrew/Documents/Projects/nix-paseo"
       },

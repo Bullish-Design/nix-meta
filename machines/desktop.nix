@@ -1,4 +1,8 @@
-{ inputs, pkgs, ... }:
+{ config, inputs, pkgs, ... }:
+
+let
+  username = config.nixos-core.base.username;
+in
 
 {
   imports = [
@@ -6,7 +10,7 @@
   ];
 
   # Desktop-specific package additions
-  home-manager.users.nixos = {
+  home-manager.users.${username} = {
     programs.nix-terminal.extraPackages = with pkgs; [
       docker-compose
     ];

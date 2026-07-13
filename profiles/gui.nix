@@ -2,8 +2,8 @@ inputs:
 { pkgs, ... }:
 
 {
-  # GUI-specific packages and settings
-  nixos-core.common.systemPackages = with pkgs; [
+  # Dormant graphical profile. System packages are configured directly.
+  environment.systemPackages = with pkgs; [
     firefox
     kitty
   ];

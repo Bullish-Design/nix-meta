@@ -1,149 +1,132 @@
 inputs:
-{ pkgs, ... }:
+{ config, lib, pkgs, ... }:
 
 let
-  inherit (inputs) nixos-core nix-terminal home-manager;
+  inherit (inputs) home-manager nix-terminal;
+
+  cfg = config.nix-meta.developer;
+  username = config.nixos-core.base.username;
+  homeDir = "/home/${username}";
 in
 {
-  imports = [
-    nixos-core.nixosModules.common
-    home-manager.nixosModules.home-manager
-  ];
+  imports = [ home-manager.nixosModules.home-manager ];
 
-  # System configuration
-  system.stateVersion = "25.05";
+  options.nix-meta.developer = {
+    enable = lib.mkEnableOption "the shared developer workflow";
 
-  # Configure nixos-core
-  nixos-core.common = {
-    enableFlakes = true;
-    experimentalFeatures = [ "nix-command" "flakes" ];
-    systemPackages = with pkgs; [
-      git
-      vim
-    ];
-  };
-
-  # Home Manager configuration
-  home-manager = {
-    useGlobalPkgs = true;
-    useUserPackages = true;
-
-    users.nixos = { ... }: {
-      imports = [
-        nix-terminal.homeManagerModules.terminal
-        nix-terminal.homeManagerModules.nixbuild
-        nix-terminal.homeManagerModules.repoman
+    packages = lib.mkOption {
+      type = lib.types.listOf lib.types.package;
+      default = with pkgs; [
+        gh
+        nodejs
+        python3
+        # Gitman owns its Python/pyjutsu runtime through its own pinned devenv;
+        # keep the launcher available from every developer profile.
+        devenv
       ];
+      description = "Developer tools installed for the configured base user, including Gitman's devenv launcher.";
+    };
 
-      home.stateVersion = "25.05";
-      programs.home-manager.enable = true;
-
-      # Configure nix-terminal
-      programs.nix-terminal = {
-        enable = true;
-
-        # Core packages
-        corePackages = with pkgs; [
-          tree
-          jq
-          ripgrep
-          fd
-          bat
-          eza
-          fzf
-          htop
-          curl
-          wget
-        ];
-
-        extraPackages = with pkgs; [
-          nodejs
-          python3
-        ];
-
-        # Git settings
-        enableGit = true;
-        gitDefaultBranch = "main";
-        gitPullRebase = true;
-
-        # Zsh configuration
-        zsh = {
-          enable = true;
-          theme = "starship";
-          enableAutosuggestions = true;
-          enableSyntaxHighlighting = true;
-          enableCompletion = true;
-
-          # Define all aliases
-          aliases = {
-            # Navigation
-            ll = "ls -lah";
-            la = "ls -A";
-            l = "ls -CF";
-            ".." = "cd ..";
-            "..." = "cd ../..";
-
-            # Git shortcuts
-            gst = "git status";
-            gd = "git diff";
-            gc = "git commit";
-            gp = "git push";
-            gl = "git log --oneline --graph --decorate";
-
-            # Tools
-            grep = "grep --color=auto";
-            vim = "nvim";
-          };
-
-          historySize = 50000;
-          extraConfig = ''
-            # Custom zsh config here
-          '';
-        };
-
-        # Atuin configuration
-        atuin = {
-          enable = true;
-          searchMode = "fuzzy";
-          style = "auto";
-          autoSync = false;
-        };
-
-        # Starship prompt (using defaults, can override)
-        # starshipSettings = { ... };
+    nixbuild = {
+      enable = lib.mkOption {
+        type = lib.types.bool;
+        default = true;
+        description = "Enable nixbuild for the configured developer user.";
       };
 
-      # Configure nixbuild
-      programs.nixbuild = {
-        enable = true;
-        outputDir = "/home/nixos/.nixbuild-logs";
-        keepLast = 10;
-        enableRecording = true;
-        defaultAction = "test";
+      outputDir = lib.mkOption {
+        type = lib.types.nullOr lib.types.str;
+        default = null;
+        description = "Directory for nixbuild logs; null derives a user-relative default.";
+      };
+    };
+
+    repoman = {
+      enable = lib.mkOption {
+        type = lib.types.bool;
+        default = true;
+        description = "Enable repoman for the configured developer user.";
       };
 
-      programs.repoman = {
-        enable = true;
-        baseDir = "/home/nixos/code";
-        maxConcurrent = 5;
-        timeout = 300;
-        useSsh = false;
-        # configFormat = "yaml";
+      baseDir = lib.mkOption {
+        type = lib.types.nullOr lib.types.str;
+        default = null;
+        description = "Repository checkout root; null derives ~/Documents/Projects.";
+      };
 
-        accounts = [
-          {
-            name = "Bullish-Design";
-            repos = [
-              "nix-meta"
-              "nixos-core"
-              "nix-terminal"
-              "nixvim"
-              "terminal-state"
-              "devman"
-            ];
-          }
-        ];
+      accounts = lib.mkOption {
+        type = lib.types.listOf lib.types.attrs;
+        default = [ ];
+        description = "Per-host repoman account and repository policy.";
+      };
+
+      useSsh = lib.mkOption {
+        type = lib.types.bool;
+        default = true;
+        description = "Use SSH remotes for repoman operations.";
+      };
+
+      maxConcurrent = lib.mkOption {
+        type = lib.types.int;
+        default = 5;
+        description = "Maximum concurrent repoman git operations.";
+      };
+
+      timeout = lib.mkOption {
+        type = lib.types.int;
+        default = 300;
+        description = "Repoman operation timeout in seconds.";
       };
     };
   };
+
+  config = lib.mkMerge [
+    # Importing the profile opts a host in by default; a host can still set this
+    # false explicitly when sharing a profile list with a non-developer machine.
+    { nix-meta.developer.enable = lib.mkDefault true; }
+
+    (lib.mkIf cfg.enable {
+      # This is deliberately independent of `terminal`: it can merge with that
+      # profile's HM user module without re-owning shell, git, or terminal config.
+      home-manager = {
+        useGlobalPkgs = lib.mkDefault true;
+        useUserPackages = lib.mkDefault true;
+        backupFileExtension = lib.mkDefault "hm-backup";
+
+        users.${username} = { ... }: {
+          imports = [
+            nix-terminal.homeManagerModules.nixbuild
+            nix-terminal.homeManagerModules.repoman
+          ];
+
+          home.stateVersion = lib.mkDefault "25.05";
+
+          # Keep this separate from `programs.nix-terminal`: developer tooling
+          # remains additive even when a host chooses a different shell profile.
+          home.packages = cfg.packages;
+
+          programs.nixbuild = {
+            enable = cfg.nixbuild.enable;
+            outputDir = if cfg.nixbuild.outputDir == null
+              then "${homeDir}/.nixbuild-logs"
+              else cfg.nixbuild.outputDir;
+            defaultAction = "test";
+            keepLast = 10;
+            enableRecording = true;
+          };
+
+          programs.repoman = {
+            enable = cfg.repoman.enable;
+            baseDir = if cfg.repoman.baseDir == null
+              then "${homeDir}/Documents/Projects"
+              else cfg.repoman.baseDir;
+            accounts = cfg.repoman.accounts;
+            useSsh = cfg.repoman.useSsh;
+            maxConcurrent = cfg.repoman.maxConcurrent;
+            timeout = cfg.repoman.timeout;
+          };
+        };
+      };
+    })
+  ];
 }
