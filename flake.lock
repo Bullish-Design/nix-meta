@@ -610,11 +610,11 @@
         "nixpkgs": "nixpkgs"
       },
       "locked": {
-        "lastModified": 1783730097,
-        "narHash": "sha256-SoIw1jYXOic1nh7xI1OKxjA7aqS8UiSvLxGc1J0ZmkI=",
+        "lastModified": 1783994937,
+        "narHash": "sha256-i+Gcsxm/soexFkfxhcaHj0qIR4g+9HKpEWsnop2E1Rc=",
         "ref": "main",
-        "rev": "0462846d9d762a4ac06f8d843ffade21376b079e",
-        "revCount": 13,
+        "rev": "f78256828a42b6c19442760dba34d95861776bdd",
+        "revCount": 15,
         "type": "git",
         "url": "https://github.com/Bullish-Design/nixos-core.git"
       },
