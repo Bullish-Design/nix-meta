@@ -470,11 +470,11 @@
         "nixpkgs-neovim": "nixpkgs-neovim"
       },
       "locked": {
-        "lastModified": 1783957598,
-        "narHash": "sha256-cg7Jwmv4OpVQ0TYF9gMItaVj8+VrxCnL13HmyLzQ6b0=",
+        "lastModified": 1783974074,
+        "narHash": "sha256-1MJnUaGIrdQZDpx/RZGWmeladAqqHimpHyYGOm0Rmmc=",
         "owner": "Bullish-Design",
         "repo": "nix-nvim",
-        "rev": "03f79a2d6d36ea1c6e4f97dec6b1df22d52ab02d",
+        "rev": "249acc1f41b62c2b30f246f97f542b38b3e8094d",
         "type": "github"
       },
       "original": {
@@ -539,11 +539,11 @@
         "zelligate": "zelligate"
       },
       "locked": {
-        "lastModified": 1783967242,
-        "narHash": "sha256-8tbb5mbgEN64agzYOwrb9B9bKE4TudqIFMPMkoeWxlM=",
+        "lastModified": 1784000589,
+        "narHash": "sha256-vOc2RAdePNOqv/pzdP/+QfOqstQ6fSzO8perr2G58jk=",
         "ref": "main",
-        "rev": "e9892327396e099d3cd22571849c1d5df409891e",
-        "revCount": 55,
+        "rev": "46567fe76434ebd0fae91bf084b23cfd24036be2",
+        "revCount": 57,
         "type": "git",
         "url": "https://github.com/Bullish-Design/nix-terminal.git"
       },
@@ -745,6 +745,8 @@
         "nix-terminal": "nix-terminal",
         "nixos-core": "nixos-core",
         "nixpkgs": "nixpkgs_2",
+        "shellij": "shellij",
+        "structured-agents": "structured-agents",
         "zelligate": "zelligate_2"
       }
     },
@@ -771,6 +773,26 @@
         "type": "github"
       }
     },
+    "shellij": {
+      "inputs": {
+        "home-manager": [
+          "home-manager"
+        ],
+        "nixpkgs": [
+          "nixpkgs"
+        ]
+      },
+      "locked": {
+        "lastModified": 1783998000,
+        "narHash": "sha256-CFE/z8cQBK4NYglKZyChR6B2cGg+utgtjcTL19Mt3wk=",
+        "path": "/home/andrew/Documents/Projects/shellij",
+        "type": "path"
+      },
+      "original": {
+        "path": "/home/andrew/Documents/Projects/shellij",
+        "type": "path"
+      }
+    },
     "sops-nix": {
       "inputs": {
         "nixpkgs": [
@@ -790,6 +812,18 @@
         "owner": "Mic92",
         "repo": "sops-nix",
         "type": "github"
+      }
+    },
+    "structured-agents": {
+      "locked": {
+        "lastModified": 1784000267,
+        "narHash": "sha256-gv2mrK8r9S86xbPNe6nyFacosDg7Gp4sgJZxqx8MBlw=",
+        "path": "/home/andrew/Documents/Projects/structured-agents-v2",
+        "type": "path"
+      },
+      "original": {
+        "path": "/home/andrew/Documents/Projects/structured-agents-v2",
+        "type": "path"
       }
     },
     "systems": {

@@ -45,6 +45,21 @@
       url = "git+https://github.com/Bullish-Design/nix-terminal.git?ref=main";
       inputs.nixpkgs.follows = "nixpkgs";
     };
+
+    # Shellij is developed on this server and supplies the Home Manager module
+    # for durable project workbenches.
+    shellij = {
+      url = "path:/home/andrew/Documents/Projects/shellij";
+      inputs.nixpkgs.follows = "nixpkgs";
+      inputs.home-manager.follows = "home-manager";
+    };
+
+    # Native vLLM service module. Keep its source with the structured-agents
+    # deployment, while making it a declared input so pure flake evaluation can
+    # import it during `nixos-rebuild switch`.
+    structured-agents = {
+      url = "path:/home/andrew/Documents/Projects/structured-agents-v2";
+    };
   };
 
   outputs = inputs@{ self, nixpkgs, ... }:

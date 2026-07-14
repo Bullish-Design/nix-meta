@@ -2,7 +2,7 @@ inputs:
 { config, lib, pkgs, ... }:
 
 let
-  inherit (inputs) home-manager nix-terminal;
+  inherit (inputs) home-manager nix-terminal shellij;
 
   cfg = config.nix-meta.developer;
   username = config.nixos-core.base.username;
@@ -97,6 +97,7 @@ in
           imports = [
             nix-terminal.homeManagerModules.nixbuild
             nix-terminal.homeManagerModules.repoman
+            shellij.homeManagerModules.default
           ];
 
           home.stateVersion = lib.mkDefault "25.05";
@@ -104,6 +105,11 @@ in
           # Keep this separate from `programs.nix-terminal`: developer tooling
           # remains additive even when a host chooses a different shell profile.
           home.packages = cfg.packages;
+
+          programs.shellij = {
+            enable = true;
+            projectsRoot = "${homeDir}/Documents/Projects";
+          };
 
           programs.nixbuild = {
             enable = cfg.nixbuild.enable;

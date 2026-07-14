@@ -13,6 +13,7 @@ in
     inputs.home-manager.nixosModules.home-manager
     inputs.zelligate.nixosModules.zelligate
     inputs.nix-paseo.nixosModules.paseo
+    inputs.structured-agents.nixosModules.structuredAgentsVllm
   ];
 
   # ── Bootloader: systemd-boot on the EFI partition at /boot (UEFI) ───────────
@@ -83,6 +84,15 @@ in
 
     # Temporary bootstrap posture. Do not add sops password plumbing yet.
     authentication.requirePassword = false;
+  };
+
+  # Private native vLLM endpoint: its process binds only to 127.0.0.1:8000.
+  # Tailscale Serve on HTTPS 443 is configured only after local verification.
+  services.structuredAgentsVllm = {
+    enable = true;
+    repositoryPath = "/home/andrew/Documents/Projects/structured-agents-v2";
+    user = user;
+    group = "users";
   };
 
   console.keyMap = "us";
