@@ -130,7 +130,6 @@ in
     dates = "weekly";
     options = "--delete-older-than 14d";
   };
-  nix.optimise.automatic = true;
 
   # stateVersion tracks the box's original install — do NOT bump casually.
   system.stateVersion = "26.05";

@@ -20,4 +20,11 @@ in
       git
     ];
   };
+
+  # Deduplicate identical store files during a quiet, predictable window. This
+  # applies to every machine that composes the minimal base profile.
+  nix.optimise = {
+    automatic = true;
+    dates = [ "02:00" ];
+  };
 }
