@@ -491,11 +491,11 @@
         "paseo": "paseo"
       },
       "locked": {
-        "lastModified": 1783956491,
-        "narHash": "sha256-DWWdgNsKVPhFu4m6t8fPqHiObn+y6tfM99ZZVOxRFRs=",
+        "lastModified": 1784127657,
+        "narHash": "sha256-c9iH50C7MTe/WWF0wjnF4wY9OICGEOSLrUvR/gJ3wTk=",
         "ref": "main",
-        "rev": "3425c9bba858ea5db587467a0a89056994c56d94",
-        "revCount": 8,
+        "rev": "f416aeccf9807b0e3a954f7d49545906df946a36",
+        "revCount": 10,
         "type": "git",
         "url": "file:///home/andrew/Documents/Projects/nix-paseo"
       },
@@ -783,14 +783,17 @@
         ]
       },
       "locked": {
-        "lastModified": 1783998000,
-        "narHash": "sha256-CFE/z8cQBK4NYglKZyChR6B2cGg+utgtjcTL19Mt3wk=",
-        "path": "/home/andrew/Documents/Projects/shellij",
-        "type": "path"
+        "lastModified": 1784128744,
+        "narHash": "sha256-rEasR+OGP2P3A03iRhCpxVP5YEpIxefOcGzbY7drtac=",
+        "ref": "refs/heads/main",
+        "rev": "53ee5c3d899df3389c6931f90b349fffcba681ae",
+        "revCount": 4,
+        "type": "git",
+        "url": "file:///home/andrew/Documents/Projects/shellij"
       },
       "original": {
-        "path": "/home/andrew/Documents/Projects/shellij",
-        "type": "path"
+        "type": "git",
+        "url": "file:///home/andrew/Documents/Projects/shellij"
       }
     },
     "sops-nix": {
@@ -816,14 +819,17 @@
     },
     "structured-agents": {
       "locked": {
-        "lastModified": 1784000267,
-        "narHash": "sha256-gv2mrK8r9S86xbPNe6nyFacosDg7Gp4sgJZxqx8MBlw=",
-        "path": "/home/andrew/Documents/Projects/structured-agents-v2",
-        "type": "path"
+        "lastModified": 1784128777,
+        "narHash": "sha256-iMawRy39/WrgzKUG1Gf4o8F+SDmtKrDhYRn56osp8bU=",
+        "ref": "refs/heads/main",
+        "rev": "76fd10abc79ccdb0744269071514f9861cfc273b",
+        "revCount": 22,
+        "type": "git",
+        "url": "file:///home/andrew/Documents/Projects/structured-agents-v2"
       },
       "original": {
-        "path": "/home/andrew/Documents/Projects/structured-agents-v2",
-        "type": "path"
+        "type": "git",
+        "url": "file:///home/andrew/Documents/Projects/structured-agents-v2"
       }
     },
     "systems": {

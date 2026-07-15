@@ -47,18 +47,20 @@
     };
 
     # Shellij is developed on this server and supplies the Home Manager module
-    # for durable project workbenches.
+    # for durable project workbenches. Use Git source filtering so generated
+    # devenv state is never copied into the Nix store as part of this input.
     shellij = {
-      url = "path:/home/andrew/Documents/Projects/shellij";
+      url = "git+file:///home/andrew/Documents/Projects/shellij";
       inputs.nixpkgs.follows = "nixpkgs";
       inputs.home-manager.follows = "home-manager";
     };
 
-    # Native vLLM service module. Keep its source with the structured-agents
-    # deployment, while making it a declared input so pure flake evaluation can
-    # import it during `nixos-rebuild switch`.
+    # Native inference service modules. Use the local Git source form so Nix
+    # snapshots only Git-tracked source files; a raw path input would recursively
+    # copy generated deployment environments (currently tens of gigabytes) into
+    # the store on every content change.
     structured-agents = {
-      url = "path:/home/andrew/Documents/Projects/structured-agents-v2";
+      url = "git+file:///home/andrew/Documents/Projects/structured-agents-v2";
     };
   };
 
