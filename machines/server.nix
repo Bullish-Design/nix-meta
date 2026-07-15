@@ -14,6 +14,7 @@ in
     inputs.zelligate.nixosModules.zelligate
     inputs.nix-paseo.nixosModules.paseo
     inputs.structured-agents.nixosModules.structuredAgentsVllm
+    inputs.structured-agents.nixosModules.structuredAgentsLlamaCpp
   ];
 
   # ── Bootloader: systemd-boot on the EFI partition at /boot (UEFI) ───────────
@@ -74,6 +75,7 @@ in
     tailnet = {
       # Tailscale Serve terminates TLS at :8443 and proxies to Paseo's loopback
       # listener. Browser microphone APIs require this HTTPS secure context.
+      # HTTPS Serve is configured below; keep Paseo loopback-only otherwise.
       enable = false;
       hostname = "server.tail770f47.ts.net";
       https = {
@@ -93,6 +95,20 @@ in
     repositoryPath = "/home/andrew/Documents/Projects/structured-agents-v2";
     user = user;
     group = "users";
+  };
+
+  # Keep the independent llama.cpp API on loopback :8001, but do not publish
+  # its browser UI through Tailscale HTTPS :8443. Paseo owns that public port.
+  services.structuredAgentsLlamaCpp = {
+    enable = true;
+    repositoryPath = "/home/andrew/Documents/Projects/structured-agents-v2";
+    user = user;
+    group = "users";
+    publishViaTailscale = false;
+    # The 1–5 client MTP sweep needs simultaneous decode slots rather than a
+    # single queued slot. The fixed 16k total context gives each of five slots
+    # roughly 3,276 tokens, covering this profile's 1,536-token responses.
+    parallelSlots = 5;
   };
 
   console.keyMap = "us";
