@@ -41,6 +41,11 @@ in
     # tailscale.enable defaults true; run `tailscale up` once on the box.
   };
 
+  # Accept SSH only from the tailnet.  The daemon is enabled by the shared base
+  # profile; this host rule makes Framework → server transfers possible without
+  # opening port 22 on the LAN or public interfaces.
+  networking.firewall.interfaces.tailscale0.allowedTCPPorts = [ 22 ];
+
   # Developer workflow policy is host-owned: the shared profile provides the
   # tools and user-relative defaults, while this box chooses its organization
   # checkout set. The root matches paseo/zelligate's opt-in workspace scan.
