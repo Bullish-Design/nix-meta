@@ -116,7 +116,32 @@ in
     parallelSlots = 5;
   };
 
-  console.keyMap = "us";
+  # Keep the physical boot/login console lightweight, but make it comfortable
+  # to use when a monitor is attached: a larger Terminus font and a muted dark
+  # palette improve legibility without needing a graphical desktop.
+  console = {
+    keyMap = "us";
+    font = "ter-v32n";
+    packages = [ pkgs.terminus_font ];
+    colors = [
+      "1d2021" # black
+      "cc241d" # red
+      "98971a" # green
+      "d79921" # yellow
+      "458588" # blue
+      "b16286" # magenta
+      "689d6a" # cyan
+      "a89984" # white
+      "928374" # bright black
+      "fb4934" # bright red
+      "b8bb26" # bright green
+      "fabd2f" # bright yellow
+      "83a598" # bright blue
+      "d3869b" # bright magenta
+      "8ec07c" # bright cyan
+      "ebdbb2" # bright white
+    ];
+  };
 
   # Install terminfo for all terminals so SSH sessions from any client (e.g. the
   # framework's kitty → TERM=xterm-kitty) resolve cleanly. Host-agnostic — could

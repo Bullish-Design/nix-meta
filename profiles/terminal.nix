@@ -43,10 +43,13 @@ in
         enableGit = false;
 
         # corePackages defaults to the modern CLI kit (ripgrep/fd/bat/eza/fzf/…).
-        # extraPackages is where day-to-day terminal apps for this box live —
-        # start with yazi; developer-only tooling belongs in developer.nix.
+        # extraPackages is where day-to-day terminal apps for this box live.
+        # Television is a TUI fuzzy finder, so it works directly in SSH and
+        # zelligate terminal sessions; developer-only tooling belongs in
+        # developer.nix.
         extraPackages = with pkgs; [
           yazi
+          television
         ];
 
         zsh = {
