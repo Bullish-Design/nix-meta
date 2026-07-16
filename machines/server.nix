@@ -117,11 +117,11 @@ in
   };
 
   # Keep the physical boot/login console lightweight, but make it comfortable
-  # to use when a monitor is attached: a larger Terminus font and a muted dark
+  # to use when a monitor is attached: a readable Terminus font and a muted dark
   # palette improve legibility without needing a graphical desktop.
   console = {
     keyMap = "us";
-    font = "ter-v32n";
+    font = "ter-v24n";
     packages = [ pkgs.terminus_font ];
     colors = [
       "1d2021" # black
