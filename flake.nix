@@ -41,8 +41,21 @@
     # is a host worked IN directly, which is exactly this flake's purpose, so it
     # belongs in the server set. Fetched as a git input (public repo, like
     # nixos-core) — NOT the old laptop `path:` that broke the on-box build.
+    # The codex/claude collision is now fixed at the SOURCE: nix-meta overrides
+    # nix-terminal's transitive `devman` input with a devman that no longer
+    # bundles the LLM CLIs (see the `devman` input + follows below). So this
+    # points at plain github main again — no lowPrio branch needed.
     nix-terminal = {
       url = "git+https://github.com/Bullish-Design/nix-terminal.git?ref=main";
+      inputs.nixpkgs.follows = "nixpkgs";
+      # Consume the LLM-free devman (drops the home.packages claude/codex clash).
+      inputs.devman.follows = "devman";
+    };
+
+    # devman with codex/claude dropped from devman-tools (nix-apps single-owns
+    # the LLM CLIs). Local branch until pushed; then repoint to github main.
+    devman = {
+      url = "git+file:///home/andrew/Documents/Projects/devman?ref=no-llm-tools";
       inputs.nixpkgs.follows = "nixpkgs";
     };
 
@@ -62,6 +75,36 @@
     structured-agents = {
       url = "git+file:///home/andrew/Documents/Projects/structured-agents-v2";
     };
+
+    # ── framework laptop (desktop tier) inputs ────────────────────────────────
+    # The wayland shell HM modules (niri/noctalia/walker/workspace-groups). Its
+    # own inputs (noctalia/walker/nirinit/niri-sidebar-ext) stay at nix-desktop's
+    # lock; only nixpkgs is unified.
+    # NOTE: temporarily pinned to a LOCAL branch that commits the noctalia
+    # wallpaper asset (untracked on github main → missing store path at eval).
+    # Repoint to github main once nix-desktop commits+pushes the wallpaper.
+    nix-desktop = {
+      url = "git+file:///home/andrew/Documents/Projects/nix-desktop?ref=migration-wallpaper-asset";
+      inputs.nixpkgs.follows = "nixpkgs";
+    };
+
+    # GUI application bundles (browsers/creative/office/media/llmCli/notes/
+    # editors). Local-only repo (no GitHub remote yet) — consumed over git+file
+    # from main. It owns the obsidian + claude-code pins; those must NOT follow.
+    nix-apps = {
+      url = "git+file:///home/andrew/Documents/Projects/nix-apps?ref=main";
+      inputs.nixpkgs.follows = "nixpkgs";
+    };
+
+    # Session-restore daemon (services.nirinit) — GAP-C owner for the graphical
+    # tier. Also provides the niri startup restore the dotfiles' base.kdl calls.
+    nirinit = {
+      url = "github:amaanq/nirinit";
+      inputs.nixpkgs.follows = "nixpkgs";
+    };
+
+    # Personal sandbox-fork host module (/cortex/fornix btrfs). Framework only.
+    fornix-host.url = "github:Bullish-Design/fornix?dir=nix/fornix-host";
   };
 
   outputs = inputs@{ self, nixpkgs, ... }:
@@ -88,6 +131,15 @@
         # loci-rich config promoted from ~/.dotfiles/nvim) instead of the retired,
         # broken nixvim input.
         server = mkMachine "server" [ profiles.minimal profiles.terminal profiles.developer profiles.gpu-compute profiles.agent profiles.secrets ];
+
+        # The framework laptop — migration target. Walks the UI ladder to the
+        # desktop tier: base (minimal) → terminal → graphical → desktop. Built
+        # (not switched) alongside ~/.dotfiles until parity is proven.
+        # NOTE: declarative kitty + zellij config is NOT yet covered — the pinned
+        # nix-terminal (main) has no kitty/zellij module (those live on the
+        # wave2 branch's nix-terminal.* split). Deferred to the fleet-wide
+        # nix-terminal namespace reconciliation.
+        framework = mkMachine "framework" [ profiles.minimal profiles.terminal profiles.graphical profiles.desktop ];
       };
     };
 }

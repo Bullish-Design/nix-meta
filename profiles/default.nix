@@ -17,8 +17,17 @@ inputs:
   # Home Manager for the base username and configures programs.nix-terminal.
   terminal = import ./terminal.nix inputs;
 
-  # Retained as an unconsumed graphical skeleton until a desktop host returns.
+  # Retained as an unconsumed graphical skeleton (GNOME). Superseded for the
+  # niri laptop by graphical + desktop below; kept for reference.
   gui = import ./gui.nix inputs;
+
+  # Graphical system tier (niri): nixos-core.desktop + input-kanata +
+  # cross-compile + nirinit (GAP-C owner). System half of the wayland desktop.
+  graphical = import ./graphical.nix inputs;
+
+  # Desktop HM tier: nix-desktop shell (niri/noctalia/walker/workspace-groups)
+  # + nix-apps GUI bundles + solaar. Stacks on graphical + terminal.
+  desktop = import ./desktop.nix inputs;
 
   # Declarative secrets (sops-nix): the box decrypts with its own SSH host key.
   secrets = import ./secrets.nix inputs;
