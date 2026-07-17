@@ -46,11 +46,11 @@
         ]
       },
       "locked": {
-        "lastModified": 1784157477,
-        "narHash": "sha256-eluLGU+dZ7AzGowwsNjNZ4R9lHcs3eZnof3XHKwSWeM=",
+        "lastModified": 1784251880,
+        "narHash": "sha256-Lm9c8DZJHCkd6HcEEOwyh3cooo/hgqWFju1sn+Lq6lo=",
         "owner": "sadjow",
         "repo": "claude-code-nix",
-        "rev": "1c3cb70c212d7f2ea4decab4a65697b6f6268442",
+        "rev": "d316ee38bc9966215bd487f9733ae75d483b6363",
         "type": "github"
       },
       "original": {
@@ -117,11 +117,11 @@
         "rust-overlay": "rust-overlay"
       },
       "locked": {
-        "lastModified": 1784142617,
-        "narHash": "sha256-mN/bY/kthTv86mIVH4trz6NJAfRglO2x4wImvTGkFZ8=",
+        "lastModified": 1784290246,
+        "narHash": "sha256-nWoViSJMuOhepRwWZdUjDFzKgeceWaLh98eqs3DAvMM=",
         "owner": "cachix",
         "repo": "devenv",
-        "rev": "4ed83c00354d5a6b4cece8aa8c55028b4e4421e4",
+        "rev": "3cb14fd0b4b6a15511ffd2cf901bc377773e1006",
         "type": "github"
       },
       "original": {
@@ -146,12 +146,12 @@
         "rev": "e445be027a23e6064bb28a5e1ae5d6e65cd032ab",
         "revCount": 92,
         "type": "git",
-        "url": "file:///home/andrew/Documents/Projects/devman"
+        "url": "https://github.com/Bullish-Design/devman.git"
       },
       "original": {
         "ref": "no-llm-tools",
         "type": "git",
-        "url": "file:///home/andrew/Documents/Projects/devman"
+        "url": "https://github.com/Bullish-Design/devman.git"
       }
     },
     "elephant": {
@@ -640,12 +640,12 @@
         "rev": "46d4524feb68943a6f626b004e048204e9b1a8e3",
         "revCount": 2,
         "type": "git",
-        "url": "file:///home/andrew/Documents/Projects/nix-apps"
+        "url": "https://github.com/Bullish-Design/nix-apps.git"
       },
       "original": {
         "ref": "main",
         "type": "git",
-        "url": "file:///home/andrew/Documents/Projects/nix-apps"
+        "url": "https://github.com/Bullish-Design/nix-apps.git"
       }
     },
     "nix-desktop": {
@@ -666,12 +666,12 @@
         "rev": "13736e0e81b55840aa0eeb05220de2b0aba473ac",
         "revCount": 3,
         "type": "git",
-        "url": "file:///home/andrew/Documents/Projects/nix-desktop"
+        "url": "https://github.com/Bullish-Design/nix-desktop.git"
       },
       "original": {
         "ref": "migration-wallpaper-asset",
         "type": "git",
-        "url": "file:///home/andrew/Documents/Projects/nix-desktop"
+        "url": "https://github.com/Bullish-Design/nix-desktop.git"
       }
     },
     "nix-nvim": {

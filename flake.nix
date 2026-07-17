@@ -53,9 +53,9 @@
     };
 
     # devman with codex/claude dropped from devman-tools (nix-apps single-owns
-    # the LLM CLIs). Local branch until pushed; then repoint to github main.
+    # the LLM CLIs). On branch no-llm-tools until folded into devman main.
     devman = {
-      url = "git+file:///home/andrew/Documents/Projects/devman?ref=no-llm-tools";
+      url = "git+https://github.com/Bullish-Design/devman.git?ref=no-llm-tools";
       inputs.nixpkgs.follows = "nixpkgs";
     };
 
@@ -80,19 +80,17 @@
     # The wayland shell HM modules (niri/noctalia/walker/workspace-groups). Its
     # own inputs (noctalia/walker/nirinit/niri-sidebar-ext) stay at nix-desktop's
     # lock; only nixpkgs is unified.
-    # NOTE: temporarily pinned to a LOCAL branch that commits the noctalia
-    # wallpaper asset (untracked on github main → missing store path at eval).
-    # Repoint to github main once nix-desktop commits+pushes the wallpaper.
+    # On branch migration-wallpaper-asset: it tracks the noctalia wallpaper asset
+    # that is untracked on main (→ missing store path at eval). Fold into main.
     nix-desktop = {
-      url = "git+file:///home/andrew/Documents/Projects/nix-desktop?ref=migration-wallpaper-asset";
+      url = "git+https://github.com/Bullish-Design/nix-desktop.git?ref=migration-wallpaper-asset";
       inputs.nixpkgs.follows = "nixpkgs";
     };
 
     # GUI application bundles (browsers/creative/office/media/llmCli/notes/
-    # editors). Local-only repo (no GitHub remote yet) — consumed over git+file
-    # from main. It owns the obsidian + claude-code pins; those must NOT follow.
+    # editors). It owns the obsidian + claude-code pins; those must NOT follow.
     nix-apps = {
-      url = "git+file:///home/andrew/Documents/Projects/nix-apps?ref=main";
+      url = "git+https://github.com/Bullish-Design/nix-apps.git?ref=main";
       inputs.nixpkgs.follows = "nixpkgs";
     };
 
