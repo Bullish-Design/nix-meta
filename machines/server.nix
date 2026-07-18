@@ -11,7 +11,14 @@ in
     # Phase C — the zelligate workspace daemon. Both modules are authored in the
     # zelligate repo (all config lives there); the server only imports + enables.
     inputs.home-manager.nixosModules.home-manager
-    inputs.zelligate.nixosModules.zelligate
+    # DISABLED 2026-07-18: zelligate temporarily removed (not in use). Its
+    # per-repo `devenv shell zelligate-manifest` scan was re-realizing every
+    # workspace repo's devenv on each cycle — many failing/timing out — churning
+    # /nix/store and each repo's .devenv dir. See the zelligate repo's
+    # .scratch/projects/08-devenv-scan-store-churn writeup. Re-enable by
+    # uncommenting this import plus the home-manager and system `zelligate`
+    # blocks below.
+    # inputs.zelligate.nixosModules.zelligate
     inputs.nix-paseo.nixosModules.paseo
     inputs.structured-agents.nixosModules.structuredAgentsVllm
     inputs.structured-agents.nixosModules.structuredAgentsLlamaCpp
@@ -44,7 +51,7 @@ in
   # Accept SSH only from the tailnet.  The daemon is enabled by the shared base
   # profile; this host rule makes Framework → server transfers possible without
   # opening port 22 on the LAN or public interfaces.
-  networking.firewall.interfaces.tailscale0.allowedTCPPorts = [ 22 ];
+  networking.firewall.interfaces.tailscale0.allowedTCPPorts = [ 22 8077 ];
 
   # Developer workflow policy is host-owned: the shared profile provides the
   # tools and user-relative defaults, while this box chooses its organization
@@ -180,6 +187,34 @@ in
     extraGroups = [ "dialout" "adbusers" ];
   };
 
+  # ── Declarative SSH for root's flake fetches ────────────────────────────────
+  # `sudo nixos-rebuild` evaluates the flake *as root*, so every git+ssh:// input
+  # (nix-secrets, zelligate, and loci-core pulled in transitively via
+  # nix-terminal) is fetched over root's SSH — which otherwise has no known_hosts
+  # and no key of its own, giving an interactive host-key prompt followed by
+  # `Permission denied (publickey)`. Two declarative pieces replace hand-editing
+  # /root/.ssh: both land in /etc/ssh (fleet-wide, root included).
+  programs.ssh = {
+    # 1. Pin GitHub's host key so the eval never stops at an interactive
+    #    "authenticity of host 'github.com' can't be established" prompt.
+    knownHosts.github = {
+      hostNames = [ "github.com" ];
+      publicKey = "ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAIOMqqnkVzrm0SdG6UOoqKLsabgH5C9okWi0dh2l9GKJl";
+    };
+
+    # 2. Authenticate to GitHub with ${user}'s existing key (root can read it) so
+    #    the private git+ssh inputs resolve during the rebuild. Written to the
+    #    global /etc/ssh/ssh_config, so it also covers ${user}'s own git-over-SSH
+    #    (same key, already in use). Swap to a dedicated /root/.ssh deploy key
+    #    later if root should have independent, separately-revocable access.
+    extraConfig = ''
+      Host github.com
+        User git
+        IdentityFile /home/${user}/.ssh/id_ed25519
+        IdentitiesOnly yes
+    '';
+  };
+
   # Android debugging over USB for the plugged-in phone (009/servomat round-trip
   # host) — the exact analog of `dialout` for the ESP32 board above.
   #
@@ -209,41 +244,46 @@ in
   # flake; nothing here is authored — we only enable and inject the box-specific
   # bits (the user, the package, the zellij binary, the public host).
 
-  # Home-Manager is greenfield on this host (minimal carries none). Enable it for
-  # the login user just enough to run the zelligate user service.
-  home-manager = {
-    useGlobalPkgs = true;
-    useUserPackages = true;
-
-    users.${user} = { ... }: {
-      imports = [ inputs.zelligate.homeManagerModules.zelligate ];
-
-      home.stateVersion = "25.05";
-
-      services.zelligate = {
-        enable = true;
-        package = inputs.zelligate.packages.${pkgs.system}.default;
-        # No owned zellij pin in the fleet yet; nixpkgs-unstable ships 0.44.3,
-        # whose `web` subcommand has the token interface zelligate drives.
-        zellijPackage = pkgs.zellij;
-        # The tower's Tailscale MagicDNS FQDN — the index builds each repo's
-        # http://<publicHost>:<port> launcher link from this, so it must be a name
-        # remote tailnet devices resolve. Verified reachable: a tailnet peer gets
-        # HTTP 200 on http://server.tail770f47.ts.net:8122.
-        publicHost = "server.tail770f47.ts.net";
-      };
-    };
-  };
+  # DISABLED 2026-07-18: zelligate user service commented out (not in use).
+  # profiles.developer already bootstraps home-manager for ${user}, so this
+  # host-local block existed only to run the zelligate daemon. Re-enable
+  # alongside the import and system `zelligate` block to restore the workspace
+  # daemon. (See .scratch/projects/08-devenv-scan-store-churn in the zelligate
+  # repo for why it was pulled.)
+  # home-manager = {
+  #   useGlobalPkgs = true;
+  #   useUserPackages = true;
+  #
+  #   users.${user} = { ... }: {
+  #     imports = [ inputs.zelligate.homeManagerModules.zelligate ];
+  #
+  #     home.stateVersion = "25.05";
+  #
+  #     services.zelligate = {
+  #       enable = true;
+  #       package = inputs.zelligate.packages.${pkgs.system}.default;
+  #       # No owned zellij pin in the fleet yet; nixpkgs-unstable ships 0.44.3,
+  #       # whose `web` subcommand has the token interface zelligate drives.
+  #       zellijPackage = pkgs.zellij;
+  #       # The tower's Tailscale MagicDNS FQDN — the index builds each repo's
+  #       # http://<publicHost>:<port> launcher link from this, so it must be a name
+  #       # remote tailnet devices resolve. Verified reachable: a tailnet peer gets
+  #       # HTTP 200 on http://server.tail770f47.ts.net:8122.
+  #       publicHost = "server.tail770f47.ts.net";
+  #     };
+  #   };
+  # };
 
   # System-level Tailscale-Serve wiring (needs root; tailscaled itself is already
   # enabled by nixos-core.base, so we don't re-enable it here). Dynamic mode: a
   # status.json watcher reconciles Serve rules to the live repo ports.
-  zelligate = {
-    enable = true;
-    user = user;
-    serveMode = "dynamic";
-    tailscale.enable = false; # base tier already owns services.tailscale
-  };
+  # DISABLED 2026-07-18: see the import + home-manager blocks above.
+  # zelligate = {
+  #   enable = true;
+  #   user = user;
+  #   serveMode = "dynamic";
+  #   tailscale.enable = false; # base tier already owns services.tailscale
+  # };
 
   # Optional shared NTFS data drive. nofail = won't block boot if absent/dirty.
   fileSystems."/mnt/shared" = {
