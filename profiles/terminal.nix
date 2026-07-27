@@ -27,8 +27,11 @@ in
     # ~/.gitconfig is untouched regardless — enableGit is off below.
     backupFileExtension = lib.mkDefault "hm-backup";
 
-    users.${username} = { ... }: {
-      imports = [ nix-terminal.homeManagerModules.terminal ];
+    users.${username} = { config, pkgs, lib, ... }: {
+      imports = [
+        nix-terminal.homeManagerModules.terminal
+        inputs.atuout.homeManagerModules.atuout
+      ];
 
       # Set as a default so a machine that pins its own stateVersion (the server
       # does) wins without a conflicting-definition error.
@@ -50,6 +53,7 @@ in
         extraPackages = with pkgs; [
           yazi
           television
+          superfile
         ];
 
         zsh = {
@@ -96,6 +100,43 @@ in
           autoSync = false;
         };
       };
+
+      # ── atuout: durable Atuin command-output capture ──────────────────────
+      # atuout harvests Atuin's native OSC-133 output captures into a per-user
+      # SQLite store. It requires a capture-capable atuin daemon (>= 18.18.0-beta.2)
+      # and a shell wrapped by `atuin pty-proxy`. nix-terminal enables atuin above
+      # with the modern history widget; here we add the three things atuout needs.
+
+      # Swap the nixpkgs atuin (18.16.1, no capture service) for the flake build
+      # that ships PR #3510's Semantic gRPC service. atuin's own atuin.nix sets
+      # `name` but no `version`; HM's atuin module reads `package.version`
+      # (versionAtLeast for the socket dir), so add it back via overrideAttrs.
+      programs.atuin.package =
+        inputs.atuin.packages.${pkgs.stdenv.hostPlatform.system}.atuin.overrideAttrs
+          (_: { version = "18.18.0-beta.2"; });
+
+      # Run the atuin daemon as a systemd user service (HM manages it). atuout
+      # talks to it over the Unix socket below. Pin socket_path so atuin and
+      # atuout agree deterministically (atuout reads it from atuin's config.toml,
+      # falling back to this same default if unset).
+      programs.atuin.daemon.enable = true;
+      programs.atuin.settings.daemon.socket_path =
+        "${config.home.homeDirectory}/.local/share/atuin/atuin.sock";
+
+      # pty-proxy init MUST run before atuout's harvest hook. Its emitted code
+      # `exec`s the shell into the proxy PTY (setting ATUIN_PTY_PROXY_ACTIVE) and
+      # re-sources zshrc; atuout's init (mkOrder 1500, from its HM module) then
+      # fires on that second pass. mkBefore lands this at the very top of the
+      # interactive init. This is separate from — and complements — the normal
+      # `atuin init zsh` history widget that enableZshIntegration still emits.
+      programs.zsh.initContent = lib.mkBefore ''
+        if command -v atuin >/dev/null 2>&1; then
+          eval "$(atuin pty-proxy init zsh)"
+        fi
+      '';
+
+      # atuout package + single reconciler systemd user service + its zsh eval.
+      programs.atuout.enable = true;
 
       # loci is on (nix-nvim's default). It used to be force-disabled here
       # because the stack pulled loci-core (private → github: 404 headless) and

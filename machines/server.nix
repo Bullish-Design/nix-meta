@@ -22,6 +22,10 @@ in
     inputs.nix-paseo.nixosModules.paseo
     inputs.structured-agents.nixosModules.structuredAgentsVllm
     inputs.structured-agents.nixosModules.structuredAgentsLlamaCpp
+
+    # fornix sandbox substrate: the btrfs cortex volume fornix snapshots
+    # sandboxes on. All wiring lives in the fornix-host module; we only enable.
+    inputs.fornix-host.nixosModules.default
   ];
 
   # ── Bootloader: systemd-boot on the EFI partition at /boot (UEFI) ───────────
@@ -122,6 +126,20 @@ in
     # roughly 3,276 tokens, covering this profile's 1,536-token responses.
     parallelSlots = 5;
   };
+
+  # ── fornix sandbox substrate ────────────────────────────────────────────────
+  # Provision /cortex/fornix as a btrfs loopback owned by andrew and mounted
+  # user_subvol_rm_allowed, so fornix's unprivileged `fork`/`clean` (btrfs
+  # subvolume snapshot/delete) work and subvolume teardown succeeds.
+  services.fornix-host = {
+    enable = true;
+    user = user;
+  };
+
+  # Delegate the memory cgroup controller (alongside the defaults) to the per-user
+  # systemd manager, so fornix's user-scoped sandboxes can set memory limits.
+  # Without this `fornix doctor` FAILs with "memory controller not delegated".
+  systemd.services."user@".serviceConfig.Delegate = "cpu io memory pids";
 
   # Keep the physical boot/login console lightweight, but make it comfortable
   # to use when a monitor is attached: a readable Terminus font and a muted dark

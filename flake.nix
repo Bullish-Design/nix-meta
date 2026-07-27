@@ -4,6 +4,11 @@
   inputs = {
     nixpkgs.url = "github:NixOS/nixpkgs/nixos-unstable";
 
+    # Pi changes rapidly and is used by Paseo as an external CLI. Keep its
+    # package evaluation on an independently locked nixpkgs commit, so routine
+    # system nixpkgs bumps cannot change the Pi binary unexpectedly.
+    pi-nixpkgs.url = "github:NixOS/nixpkgs/567a49d1913ce81ac6e9582e3553dd90a955875f";
+
     nixos-core.url = "git+https://github.com/Bullish-Design/nixos-core.git?ref=main";
 
     nix-paseo = {
@@ -54,6 +59,33 @@
       inputs.nixpkgs.follows = "nixpkgs";
       inputs.home-manager.follows = "home-manager";
     };
+
+    # Atuin built with the native command-output capture service (PR #3510).
+    # atuout REQUIRES this — nixpkgs-unstable ships only 18.16.1 and latest
+    # stable (18.17.1) predates the Semantic gRPC service; the capability first
+    # lands in v18.18.0-beta.2. The atuin repo ships its own flake (packages.atuin,
+    # built via fenix for rustc >= 1.97), so we consume it directly — no overlay,
+    # no cargoHash. Bump this tag to adopt a newer capture-capable atuin.
+    atuin = {
+      url = "github:atuinsh/atuin/v18.18.0-beta.2";
+      inputs.nixpkgs.follows = "nixpkgs";
+    };
+
+    # atuout: durable archiver for Atuin's native command-output captures. Local
+    # Git source (like shellij) so generated devenv/mypy state never enters the
+    # store. Exposes packages.atuout + homeManagerModules.atuout, so terminal.nix
+    # authors only the glue (pty-proxy init ordering + daemon toggle).
+    atuout = {
+      url = "git+file:///home/andrew/Documents/Projects/atuout";
+      inputs.nixpkgs.follows = "nixpkgs";
+    };
+
+    # fornix sandbox substrate. Provisions the btrfs cortex volume that fornix
+    # forks sandboxes on (loopback image at /cortex/fornix, mounted
+    # user_subvol_rm_allowed and owned by andrew). Private GitHub repo, and the
+    # module lives in a subdir with its own flake.nix, so consume it as a local
+    # path input rather than a git+ssh URL.
+    fornix-host.url = "path:/home/andrew/Documents/Projects/fornix/nix/fornix-host";
 
     # Native inference service modules. Use the local Git source form so Nix
     # snapshots only Git-tracked source files; a raw path input would recursively
