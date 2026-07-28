@@ -103,8 +103,8 @@ in
     # Temporary bootstrap posture. Do not add sops password plumbing yet.
     authentication.requirePassword = false;
     # Pi inherits this runtime-only API credential when Paseo launches it.
-    authentication.environmentFile =
-      config.sops.templates."paseo-deepseek.env".path;
+    # authentication.environmentFile =
+    #   config.sops.templates."paseo-deepseek.env".path;
   };
 
   # Private native vLLM endpoint: its process binds only to 127.0.0.1:8000.
