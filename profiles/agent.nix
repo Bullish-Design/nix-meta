@@ -1,5 +1,5 @@
 inputs:
-{ config, pkgs, ... }:
+{ config, lib, pkgs, ... }:
 
 let
   system = pkgs.stdenv.hostPlatform.system;
@@ -31,6 +31,15 @@ in
   # a subprocess. Its package comes from pi-nixpkgs rather than the host's main
   # nixpkgs pin, letting Pi be upgraded and rolled back independently.
   home-manager.users.${username} = {
+    # Direct SSH shells need the same runtime credential as the Paseo service.
+    # The file is created by sops-nix at activation and is never copied to the
+    # Nix store or Home Manager's generated configuration.
+    programs.zsh.initContent = lib.mkAfter ''
+      if [[ -r /run/secrets/deepseek-api-key ]]; then
+        export DEEPSEEK_API_KEY="$(< /run/secrets/deepseek-api-key)"
+      fi
+    '';
+
     programs.pi-coding-agent = {
       enable = true;
       package = piPkgs.pi-coding-agent;

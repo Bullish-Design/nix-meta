@@ -625,11 +625,11 @@
         "sops-nix": "sops-nix"
       },
       "locked": {
-        "lastModified": 1783779406,
-        "narHash": "sha256-KWyj8HbKLVdQyRjR11W3Y2GcRqSP163etcApxkf+C20=",
+        "lastModified": 1785250586,
+        "narHash": "sha256-ieCE6SmN7E3KfM6+wQM7mXKyOXEIDFEhreR5htu5kIY=",
         "ref": "main",
-        "rev": "2ea54980e55c31bfc3852fc03c56ab31f5846bce",
-        "revCount": 6,
+        "rev": "f2549fa835dfe7c7449406cdecb65ae4b962e457",
+        "revCount": 7,
         "type": "git",
         "url": "ssh://git@github.com/Bullish-Design/nix-secrets.git"
       },

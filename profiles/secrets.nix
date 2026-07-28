@@ -17,10 +17,31 @@ in
   # declared secret to /run/secrets/<name> at activation.
   nix-secrets.secrets.enable = true;
 
-  # Incremental activation: only tailscale-auth-key has material + a consumer
-  # today. Grow this per phase (attic → nix-cache, github → CI/push, hf → vLLM)
-  # as real secrets are provisioned. The full naming SSOT stays in nix-secrets.
-  nix-secrets.secrets.activeNames = [ "tailscale-auth-key" ];
+  # Incremental activation: only secrets with encrypted material are enabled
+  # here. The full naming SSOT stays in nix-secrets.
+  nix-secrets.secrets.activeNames = [
+    "tailscale-auth-key"
+    "deepseek-api-key"
+  ];
+
+  # Pi runs both in interactive shells and as a Paseo subprocess.  Keep the
+  # decrypted source readable only by its service/user, then render the form
+  # systemd expects without ever placing the value in the Nix store.
+  nix-secrets.secrets.secrets."deepseek-api-key" = {
+    owner = config.nixos-core.base.username;
+    group = "users";
+    mode = "0400";
+    restartUnits = [ "paseo.service" ];
+  };
+
+  sops.templates."paseo-deepseek.env" = {
+    owner = config.nixos-core.base.username;
+    group = "users";
+    mode = "0400";
+    content = ''
+      DEEPSEEK_API_KEY=${config.sops.placeholder."deepseek-api-key"}
+    '';
+  };
 
   # Consume tailscale-auth-key for declarative tailnet re-auth. The provider owns
   # the secret *declaration*; nixos-core.base owns the *service* wiring — the
