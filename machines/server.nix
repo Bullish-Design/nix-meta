@@ -26,6 +26,11 @@ in
     # fornix sandbox substrate: the btrfs cortex volume fornix snapshots
     # sandboxes on. All wiring lives in the fornix-host module; we only enable.
     inputs.fornix-host.nixosModules.default
+
+    # Personal SilverBullet notes server, published over Tailscale Serve at
+    # https://server.<tailnet>.ts.net/notes. Defaults target this box (andrew /
+    # ~/Notes / :443 /notes); we only enable below.
+    inputs.silverbullet-server.nixosModules.default
   ];
 
   # ── Bootloader: systemd-boot on the EFI partition at /boot (UEFI) ───────────
@@ -130,12 +135,26 @@ in
     parallelSlots = 5;
   };
 
+  # ── Personal SilverBullet notes server ──────────────────────────────────────
+  # Runs on loopback :3000, published by Tailscale Serve at
+  # https://server.tail770f47.ts.net/notes. Open auth (no SB_USER/token) — the
+  # tailnet ACL is the whole perimeter; scope server:443 to your own devices.
+  # Space = ~/Notes (btrfs), git-snapshotted on a timer, group-shared to the
+  # dedicated `silverbullet` service user. All defaults target this box, so we
+  # only flip enable.
+  services.silverbulletServer.enable = true;
+
   # ── fornix sandbox substrate ────────────────────────────────────────────────
   # Provision /cortex/fornix as a btrfs loopback owned by andrew and mounted
   # user_subvol_rm_allowed, so fornix's unprivileged `fork`/`clean` (btrfs
   # subvolume snapshot/delete) work and subvolume teardown succeeds.
+  # Temporarily disabled (2026-08-01): forgelab is now a plain checkout at
+  # ~/Documents/Projects/forgelab, no longer inside the cortex volume. The
+  # fornix-host mount unit also has a boot ordering-cycle bug (see FIXME in
+  # fornix/nix/fornix-host/module.nix). Re-enable once that's fixed if you want
+  # fornix sandboxes back.
   services.fornix-host = {
-    enable = true;
+    enable = false;
     user = user;
   };
 

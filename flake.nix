@@ -94,6 +94,18 @@
     structured-agents = {
       url = "git+file:///home/andrew/Documents/Projects/structured-agents-v2";
     };
+
+    # Personal SilverBullet server (notes PKM) published over Tailscale Serve at
+    # https://server.<tailnet>.ts.net/notes. A self-contained flake exporting one
+    # NixOS module; runtime packages resolve from this system's pkgs, so `follows`
+    # keeps it on our nixpkgs (its own nixpkgs input is only for its checks).
+    # Private repo → SSH input form (same convention as nix-secrets/zelligate), so
+    # no GitHub token is needed to fetch it. Its own nixpkgs input is only for its
+    # checks; `follows` keeps the fleet on one nixpkgs.
+    silverbullet-server = {
+      url = "git+ssh://git@github.com/Bullish-Design/silverbullet-server.git?ref=main";
+      inputs.nixpkgs.follows = "nixpkgs";
+    };
   };
 
   outputs = inputs@{ self, nixpkgs, ... }:

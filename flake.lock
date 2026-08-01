@@ -31,11 +31,11 @@
         ]
       },
       "locked": {
-        "lastModified": 1784913053,
-        "narHash": "sha256-LCqs4m225gtt3s74dENzWo2VTJeuBm+OdXD8sviQSow=",
+        "lastModified": 1785270954,
+        "narHash": "sha256-7wRJfB/9IWb8YvGlnCpu16GhhcJhZVOvcosPT+eWo0U=",
         "ref": "refs/heads/main",
-        "rev": "0bc5e81dce51888fb8889846b548a0d5bf2f16a9",
-        "revCount": 21,
+        "rev": "fcd096482a99adc5bfe73e2f4dae991a516b00ef",
+        "revCount": 22,
         "type": "git",
         "url": "file:///home/andrew/Documents/Projects/atuout"
       },
@@ -878,6 +878,7 @@
         "nixpkgs": "nixpkgs_2",
         "pi-nixpkgs": "pi-nixpkgs",
         "shellij": "shellij",
+        "silverbullet-server": "silverbullet-server",
         "structured-agents": "structured-agents",
         "zelligate": "zelligate_2"
       }
@@ -943,6 +944,27 @@
       "original": {
         "type": "git",
         "url": "file:///home/andrew/Documents/Projects/shellij"
+      }
+    },
+    "silverbullet-server": {
+      "inputs": {
+        "nixpkgs": [
+          "nixpkgs"
+        ]
+      },
+      "locked": {
+        "lastModified": 1785453730,
+        "narHash": "sha256-pvUgffu/fugDG3WYnSEcEwDDsHuH0VVLCaWITckLdRg=",
+        "ref": "main",
+        "rev": "15acb43cad8c12767689a622b7515db13e2fcaff",
+        "revCount": 3,
+        "type": "git",
+        "url": "ssh://git@github.com/Bullish-Design/silverbullet-server.git"
+      },
+      "original": {
+        "ref": "main",
+        "type": "git",
+        "url": "ssh://git@github.com/Bullish-Design/silverbullet-server.git"
       }
     },
     "sops-nix": {
