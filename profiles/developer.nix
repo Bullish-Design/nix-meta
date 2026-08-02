@@ -2,7 +2,7 @@ inputs:
 { config, lib, pkgs, ... }:
 
 let
-  inherit (inputs) home-manager nix-terminal shellij;
+  inherit (inputs) home-manager nix-terminal;
 
   cfg = config.nix-meta.developer;
   username = config.nixos-core.base.username;
@@ -97,7 +97,8 @@ in
           imports = [
             nix-terminal.homeManagerModules.nixbuild
             nix-terminal.homeManagerModules.repoman
-            shellij.homeManagerModules.default
+            # DISABLED 2026-08-01 with the shellij input (see flake.nix note).
+            # shellij.homeManagerModules.default
           ];
 
           home.stateVersion = lib.mkDefault "25.05";
@@ -106,10 +107,11 @@ in
           # remains additive even when a host chooses a different shell profile.
           home.packages = cfg.packages;
 
-          programs.shellij = {
-            enable = true;
-            projectsRoot = "${homeDir}/Documents/Projects";
-          };
+          # DISABLED 2026-08-01 with the shellij input (see flake.nix note).
+          # programs.shellij = {
+          #   enable = true;
+          #   projectsRoot = "${homeDir}/Documents/Projects";
+          # };
 
           programs.nixbuild = {
             enable = cfg.nixbuild.enable;

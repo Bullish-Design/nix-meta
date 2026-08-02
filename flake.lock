@@ -892,7 +892,6 @@
         "nixos-core": "nixos-core",
         "nixpkgs": "nixpkgs_2",
         "pi-nixpkgs": "pi-nixpkgs",
-        "shellij": "shellij",
         "silverbullet-server": "silverbullet-server"
       }
     },
@@ -934,28 +933,6 @@
         "owner": "oxalica",
         "repo": "rust-overlay",
         "type": "github"
-      }
-    },
-    "shellij": {
-      "inputs": {
-        "home-manager": [
-          "home-manager"
-        ],
-        "nixpkgs": [
-          "nixpkgs"
-        ]
-      },
-      "locked": {
-        "dirtyRev": "41e28db0398d5e568a81375e20c862fcfd8c2ae7-dirty",
-        "dirtyShortRev": "41e28db-dirty",
-        "lastModified": 1784661266,
-        "narHash": "sha256-2/GGrVUHtqNG8e1F28I85EdMnu48RzYLiC2sFu8/vC0=",
-        "type": "git",
-        "url": "file:///home/andrew/Documents/Projects/shellij"
-      },
-      "original": {
-        "type": "git",
-        "url": "file:///home/andrew/Documents/Projects/shellij"
       }
     },
     "silverbullet-server": {

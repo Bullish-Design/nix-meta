@@ -57,11 +57,15 @@
     # Shellij is developed on this server and supplies the Home Manager module
     # for durable project workbenches. Use Git source filtering so generated
     # devenv state is never copied into the Nix store as part of this input.
-    shellij = {
-      url = "git+file:///home/andrew/Documents/Projects/shellij";
-      inputs.nixpkgs.follows = "nixpkgs";
-      inputs.home-manager.follows = "home-manager";
-    };
+    # DISABLED 2026-08-01: input commented out (WIP repo kept the lock dirty,
+    # which breaks reproducible rebuilds). The developer profile's import +
+    # programs.shellij block are disabled alongside; re-lock cleanly when the
+    # workbench is ready.
+    # shellij = {
+    #   url = "git+file:///home/andrew/Documents/Projects/shellij";
+    #   inputs.nixpkgs.follows = "nixpkgs";
+    #   inputs.home-manager.follows = "home-manager";
+    # };
 
     # Atuin built with the native command-output capture service (PR #3510).
     # atuout REQUIRES this — nixpkgs-unstable ships only 18.16.1 and the latest
