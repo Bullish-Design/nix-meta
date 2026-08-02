@@ -36,10 +36,13 @@
     # convention as nix-secrets above), NOT a laptop `path:`. It exposes the two
     # modules the server imports directly (nix-meta authors nothing): a
     # Home-Manager user-service module and a system-level Tailscale-Serve module.
-    zelligate = {
-      url = "git+ssh://git@github.com/Bullish-Design/zelligate.git?ref=main";
-      inputs.nixpkgs.follows = "nixpkgs";
-    };
+    # DISABLED 2026-08-01: input commented out. The server's zelligate import
+    # was already disabled 2026-07-18 (devenv scan store churn); uncomment the
+    # input + the server import/blocks together to restore Phase C.
+    # zelligate = {
+    #   url = "git+ssh://git@github.com/Bullish-Design/zelligate.git?ref=main";
+    #   inputs.nixpkgs.follows = "nixpkgs";
+    # };
 
     # The interactive terminal environment (zsh/atuin/starship/nvim/tmux) — the
     # rich shell you get over SSH and inside zelligate web terminals. The tower
@@ -61,13 +64,14 @@
     };
 
     # Atuin built with the native command-output capture service (PR #3510).
-    # atuout REQUIRES this — nixpkgs-unstable ships only 18.16.1 and latest
+    # atuout REQUIRES this — nixpkgs-unstable ships only 18.16.1 and the latest
     # stable (18.17.1) predates the Semantic gRPC service; the capability first
-    # lands in v18.18.0-beta.2. The atuin repo ships its own flake (packages.atuin,
-    # built via fenix for rustc >= 1.97), so we consume it directly — no overlay,
-    # no cargoHash. Bump this tag to adopt a newer capture-capable atuin.
+    # landed in v18.18.0-beta.2 and shipped stable in v18.18.1. The atuin repo
+    # ships its own flake (packages.atuin, built via fenix for rustc >= 1.97),
+    # so we consume it directly — no overlay, no cargoHash. Bump this tag to
+    # adopt a newer capture-capable atuin.
     atuin = {
-      url = "github:atuinsh/atuin/v18.18.0-beta.2";
+      url = "github:atuinsh/atuin/v18.18.1";
       inputs.nixpkgs.follows = "nixpkgs";
     };
 
@@ -91,9 +95,13 @@
     # snapshots only Git-tracked source files; a raw path input would recursively
     # copy generated deployment environments (currently tens of gigabytes) into
     # the store on every content change.
-    structured-agents = {
-      url = "git+file:///home/andrew/Documents/Projects/structured-agents-v2";
-    };
+    # DISABLED 2026-08-01: input commented out; the server's imports + service
+    # blocks are also disabled. The repo moved to feature branch
+    # project22-llama-cpp-fork-reorg (100+ commits ahead of the last lock);
+    # re-lock deliberately before restoring.
+    # structured-agents = {
+    #   url = "git+file:///home/andrew/Documents/Projects/structured-agents-v2";
+    # };
 
     # Personal SilverBullet server (notes PKM) published over Tailscale Serve at
     # https://server.<tailnet>.ts.net/notes. A self-contained flake exporting one

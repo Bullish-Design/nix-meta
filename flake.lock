@@ -4,22 +4,22 @@
       "inputs": {
         "fenix": "fenix",
         "flake-compat": "flake-compat",
-        "flake-utils": "flake-utils",
+        "flake-parts": "flake-parts",
         "nixpkgs": [
           "nixpkgs"
         ]
       },
       "locked": {
-        "lastModified": 1784748811,
-        "narHash": "sha256-4LOYWHB6h3ThJLEjWIeIL4kNQmj7fC0kk1WJSBGFlAg=",
+        "lastModified": 1785198569,
+        "narHash": "sha256-dPdD9U1CwuGbd1K/ljYwgTlAl9sSzt+dSuxLijLlyBQ=",
         "owner": "atuinsh",
         "repo": "atuin",
-        "rev": "765253b07052ff72481331c00cb6905678fd3d86",
+        "rev": "2aef17ff3637130bb03ab8c1f224abc14f3b2b43",
         "type": "github"
       },
       "original": {
         "owner": "atuinsh",
-        "ref": "v18.18.0-beta.2",
+        "ref": "v18.18.1",
         "repo": "atuin",
         "type": "github"
       }
@@ -31,11 +31,11 @@
         ]
       },
       "locked": {
-        "lastModified": 1785270954,
-        "narHash": "sha256-7wRJfB/9IWb8YvGlnCpu16GhhcJhZVOvcosPT+eWo0U=",
+        "lastModified": 1785543785,
+        "narHash": "sha256-3i4efEbhT6bVM3yz1aTQrYUoA8rqScZGPS2gGElKy+s=",
         "ref": "refs/heads/main",
-        "rev": "fcd096482a99adc5bfe73e2f4dae991a516b00ef",
-        "revCount": 22,
+        "rev": "c42d88bfeaaf51cdd0ecfb3e2442d3a27672076a",
+        "revCount": 25,
         "type": "git",
         "url": "file:///home/andrew/Documents/Projects/atuout"
       },
@@ -87,7 +87,7 @@
     },
     "claude-code": {
       "inputs": {
-        "flake-utils": "flake-utils_2",
+        "flake-utils": "flake-utils",
         "nixpkgs": [
           "nix-terminal",
           "devman",
@@ -111,7 +111,7 @@
     },
     "codex-cli": {
       "inputs": {
-        "flake-utils": "flake-utils_3",
+        "flake-utils": "flake-utils_2",
         "nixpkgs": [
           "nix-terminal",
           "devman",
@@ -155,7 +155,7 @@
         "cachix": "cachix",
         "crate2nix": "crate2nix",
         "flake-compat": "flake-compat_2",
-        "flake-parts": "flake-parts",
+        "flake-parts": "flake-parts_2",
         "ghostty": "ghostty",
         "git-hooks": "git-hooks",
         "nix": "nix",
@@ -215,11 +215,11 @@
         "rust-analyzer-src": "rust-analyzer-src"
       },
       "locked": {
-        "lastModified": 1758609765,
-        "narHash": "sha256-VIYu7R9Yc/CItjmzLSm21Lr9DgpEsKL5H+JUu8KDTn4=",
+        "lastModified": 1780735433,
+        "narHash": "sha256-VU1o4Rjte0jCdV/b+7ng7k1ka42wOvoargx2f1ZB8Ik=",
         "owner": "nix-community",
         "repo": "fenix",
-        "rev": "05545a7f3cd5cd5628b195520758e56e6734b90a",
+        "rev": "6d8f78e4d9aaac5faf2ad6e776462e41f15bdaeb",
         "type": "github"
       },
       "original": {
@@ -231,11 +231,11 @@
     "flake-compat": {
       "flake": false,
       "locked": {
-        "lastModified": 1747046372,
-        "narHash": "sha256-CIVLLkVgvHYbgI2UpXvIIBJ12HWgX+fjA8Xf8PUmqCY=",
+        "lastModified": 1767039857,
+        "narHash": "sha256-vNpUSpF5Nuw8xvDLj2KCwwksIbjua2LZCqhV1LNRDns=",
         "owner": "edolstra",
         "repo": "flake-compat",
-        "rev": "9100a0f413b0c601e0533d1d94ffd501ce2e7885",
+        "rev": "5edf11c44bc78a0d334f6334cdaf7d60d732daab",
         "type": "github"
       },
       "original": {
@@ -277,6 +277,24 @@
       }
     },
     "flake-parts": {
+      "inputs": {
+        "nixpkgs-lib": "nixpkgs-lib"
+      },
+      "locked": {
+        "lastModified": 1778716662,
+        "narHash": "sha256-m1Yf0wZ8j1OHjTc2UwHwyQRSnNeSgLJOd7q5Y45hzi4=",
+        "owner": "hercules-ci",
+        "repo": "flake-parts",
+        "rev": "f7c1a2d347e4c52d5fb8d10cb4d94b5884e546fb",
+        "type": "github"
+      },
+      "original": {
+        "owner": "hercules-ci",
+        "repo": "flake-parts",
+        "type": "github"
+      }
+    },
+    "flake-parts_2": {
       "inputs": {
         "nixpkgs-lib": [
           "nix-terminal",
@@ -320,24 +338,6 @@
     "flake-utils_2": {
       "inputs": {
         "systems": "systems_2"
-      },
-      "locked": {
-        "lastModified": 1731533236,
-        "narHash": "sha256-l0KFg5HjrsfsO/JpG+r7fRrqm12kzFHyUHqHCVpMMbI=",
-        "owner": "numtide",
-        "repo": "flake-utils",
-        "rev": "11707dc2f618dd54ca8739b309ec4fc024de578b",
-        "type": "github"
-      },
-      "original": {
-        "owner": "numtide",
-        "repo": "flake-utils",
-        "type": "github"
-      }
-    },
-    "flake-utils_3": {
-      "inputs": {
-        "systems": "systems_3"
       },
       "locked": {
         "lastModified": 1731533236,
@@ -417,11 +417,11 @@
         ]
       },
       "locked": {
-        "lastModified": 1783525612,
-        "narHash": "sha256-OEFYdbtG6Qy04KGteknnrx15Uo2XXkYVuUvBvFNEn+Q=",
+        "lastModified": 1785531816,
+        "narHash": "sha256-vkMnV0JIyw+g/NmcfoajlGaAO+9a0ezia+FZohQJrik=",
         "ref": "master",
-        "rev": "1aac8895fea6fcabc6a0184c63a80fb2f99fd208",
-        "revCount": 7043,
+        "rev": "bf9ce9fec78f95f374e8dd3b503863a3ec128ebe",
+        "revCount": 7123,
         "type": "git",
         "url": "https://github.com/nix-community/home-manager.git"
       },
@@ -603,11 +603,11 @@
         "paseo": "paseo"
       },
       "locked": {
-        "lastModified": 1784127657,
-        "narHash": "sha256-c9iH50C7MTe/WWF0wjnF4wY9OICGEOSLrUvR/gJ3wTk=",
+        "lastModified": 1785631332,
+        "narHash": "sha256-0seMGbkcZvENeKr6y4/aZR14fYehY3ijcgsCq1Zg4Wo=",
         "ref": "main",
-        "rev": "f416aeccf9807b0e3a954f7d49545906df946a36",
-        "revCount": 10,
+        "rev": "a88920c9891f80459a8082a9aace5f18dd30cc34",
+        "revCount": 13,
         "type": "git",
         "url": "file:///home/andrew/Documents/Projects/nix-paseo"
       },
@@ -647,15 +647,14 @@
         "nixpkgs": [
           "nixpkgs"
         ],
-        "repoman": "repoman",
-        "zelligate": "zelligate"
+        "repoman": "repoman"
       },
       "locked": {
-        "lastModified": 1784000589,
-        "narHash": "sha256-vOc2RAdePNOqv/pzdP/+QfOqstQ6fSzO8perr2G58jk=",
+        "lastModified": 1785632278,
+        "narHash": "sha256-mLLsQmWeQeSfDPBWDj6eaOR0kXCRCqr0Y4WSqHieK8E=",
         "ref": "main",
-        "rev": "46567fe76434ebd0fae91bf084b23cfd24036be2",
-        "revCount": 57,
+        "rev": "b2b25ee151217ad1f7a5b0472a9a4d85c1ced0b6",
+        "revCount": 61,
         "type": "git",
         "url": "https://github.com/Bullish-Design/nix-terminal.git"
       },
@@ -722,11 +721,11 @@
         "nixpkgs": "nixpkgs"
       },
       "locked": {
-        "lastModified": 1783994937,
-        "narHash": "sha256-i+Gcsxm/soexFkfxhcaHj0qIR4g+9HKpEWsnop2E1Rc=",
+        "lastModified": 1784143144,
+        "narHash": "sha256-9jN81uH265+vr0VWRLZXCebKdWZ7hUVsP8u4ela0YgQ=",
         "ref": "main",
-        "rev": "f78256828a42b6c19442760dba34d95861776bdd",
-        "revCount": 15,
+        "rev": "5b13f985d171d4ce8f6c1945184a90fb76e1ed4f",
+        "revCount": 16,
         "type": "git",
         "url": "https://github.com/Bullish-Design/nixos-core.git"
       },
@@ -775,6 +774,21 @@
         "type": "github"
       }
     },
+    "nixpkgs-lib": {
+      "locked": {
+        "lastModified": 1777168982,
+        "narHash": "sha256-GOkGPcboWE9BmGCRMLX3worL4EMnsnG8MyKmXNeYuhQ=",
+        "owner": "nix-community",
+        "repo": "nixpkgs.lib",
+        "rev": "f5901329dade4a6ea039af1433fb087bd9c1fe14",
+        "type": "github"
+      },
+      "original": {
+        "owner": "nix-community",
+        "repo": "nixpkgs.lib",
+        "type": "github"
+      }
+    },
     "nixpkgs-neovim": {
       "locked": {
         "lastModified": 1778869304,
@@ -815,15 +829,16 @@
         ]
       },
       "locked": {
-        "lastModified": 1783808860,
-        "narHash": "sha256-TZFyRMlhfkRQiWJgOFRXmU8emuNUHtJhcznQJLIIUpw=",
+        "lastModified": 1785410560,
+        "narHash": "sha256-3IMEyJS0z83peC1Vzvtj2m+7hm3Uss1qOoE5sMGFITM=",
         "owner": "getpaseo",
         "repo": "paseo",
-        "rev": "92d70666018180e2ba0431ec976b7b3666723a50",
+        "rev": "6fc491e6220fba6543bbbe4bf1b1f58cfe59228b",
         "type": "github"
       },
       "original": {
         "owner": "getpaseo",
+        "ref": "v0.2.5",
         "repo": "paseo",
         "type": "github"
       }
@@ -878,19 +893,17 @@
         "nixpkgs": "nixpkgs_2",
         "pi-nixpkgs": "pi-nixpkgs",
         "shellij": "shellij",
-        "silverbullet-server": "silverbullet-server",
-        "structured-agents": "structured-agents",
-        "zelligate": "zelligate_2"
+        "silverbullet-server": "silverbullet-server"
       }
     },
     "rust-analyzer-src": {
       "flake": false,
       "locked": {
-        "lastModified": 1758556272,
-        "narHash": "sha256-9amq6LAd0CFF3dLrJUItPiG64MQOG4QPrvjbjpa6NFc=",
+        "lastModified": 1780646242,
+        "narHash": "sha256-H8JxLhK8tuSDy1DEYpwK4iExw4jP4/mfH2SR9ZZJpj8=",
         "owner": "rust-lang",
         "repo": "rust-analyzer",
-        "rev": "d05355db16dc526bb16bd84769ea840668d7015e",
+        "rev": "09b33150cb25cd5a42fe3451272f1cce53afa6a0",
         "type": "github"
       },
       "original": {
@@ -933,11 +946,10 @@
         ]
       },
       "locked": {
-        "lastModified": 1784128744,
-        "narHash": "sha256-rEasR+OGP2P3A03iRhCpxVP5YEpIxefOcGzbY7drtac=",
-        "ref": "refs/heads/main",
-        "rev": "53ee5c3d899df3389c6931f90b349fffcba681ae",
-        "revCount": 4,
+        "dirtyRev": "41e28db0398d5e568a81375e20c862fcfd8c2ae7-dirty",
+        "dirtyShortRev": "41e28db-dirty",
+        "lastModified": 1784661266,
+        "narHash": "sha256-2/GGrVUHtqNG8e1F28I85EdMnu48RzYLiC2sFu8/vC0=",
         "type": "git",
         "url": "file:///home/andrew/Documents/Projects/shellij"
       },
@@ -988,21 +1000,6 @@
         "type": "github"
       }
     },
-    "structured-agents": {
-      "locked": {
-        "lastModified": 1784128777,
-        "narHash": "sha256-iMawRy39/WrgzKUG1Gf4o8F+SDmtKrDhYRn56osp8bU=",
-        "ref": "refs/heads/main",
-        "rev": "76fd10abc79ccdb0744269071514f9861cfc273b",
-        "revCount": 22,
-        "type": "git",
-        "url": "file:///home/andrew/Documents/Projects/structured-agents-v2"
-      },
-      "original": {
-        "type": "git",
-        "url": "file:///home/andrew/Documents/Projects/structured-agents-v2"
-      }
-    },
     "systems": {
       "locked": {
         "lastModified": 1681028828,
@@ -1019,21 +1016,6 @@
       }
     },
     "systems_2": {
-      "locked": {
-        "lastModified": 1681028828,
-        "narHash": "sha256-Vy1rq5AaRuLzOxct8nz4T6wlgyUR7zLU309k9mBC768=",
-        "owner": "nix-systems",
-        "repo": "default",
-        "rev": "da67096a3b9bf56a91d16901293e51ba5b49a27e",
-        "type": "github"
-      },
-      "original": {
-        "owner": "nix-systems",
-        "repo": "default",
-        "type": "github"
-      }
-    },
-    "systems_3": {
       "locked": {
         "lastModified": 1681028828,
         "narHash": "sha256-Vy1rq5AaRuLzOxct8nz4T6wlgyUR7zLU309k9mBC768=",
@@ -1070,49 +1052,6 @@
         "owner": "numtide",
         "repo": "treefmt-nix",
         "type": "github"
-      }
-    },
-    "zelligate": {
-      "inputs": {
-        "nixpkgs": [
-          "nix-terminal",
-          "nixpkgs"
-        ]
-      },
-      "locked": {
-        "lastModified": 1783531585,
-        "narHash": "sha256-uD+qUQl8nK8TN9bqQGOWKXnkh0OqhipspyJ+yTPtKu0=",
-        "ref": "main",
-        "rev": "b06aabf71ec242c10f5cbb6e1e924fc6f9b9109b",
-        "revCount": 27,
-        "type": "git",
-        "url": "ssh://git@github.com/Bullish-Design/zelligate.git"
-      },
-      "original": {
-        "ref": "main",
-        "type": "git",
-        "url": "ssh://git@github.com/Bullish-Design/zelligate.git"
-      }
-    },
-    "zelligate_2": {
-      "inputs": {
-        "nixpkgs": [
-          "nixpkgs"
-        ]
-      },
-      "locked": {
-        "lastModified": 1783829588,
-        "narHash": "sha256-ijDuZoWtgn4q2e6Cv/xWU9o0GNs/HNP3SB2smwOb9Qo=",
-        "ref": "main",
-        "rev": "32d0a2cdae509466706e3663dc8d17ada6f088ba",
-        "revCount": 36,
-        "type": "git",
-        "url": "ssh://git@github.com/Bullish-Design/zelligate.git"
-      },
-      "original": {
-        "ref": "main",
-        "type": "git",
-        "url": "ssh://git@github.com/Bullish-Design/zelligate.git"
       }
     }
   },

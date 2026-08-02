@@ -20,8 +20,11 @@ in
     # blocks below.
     # inputs.zelligate.nixosModules.zelligate
     inputs.nix-paseo.nixosModules.paseo
-    inputs.structured-agents.nixosModules.structuredAgentsVllm
-    inputs.structured-agents.nixosModules.structuredAgentsLlamaCpp
+    # DISABLED 2026-08-01: structured-agents input commented out in flake.nix
+    # (repo moved to feature branch project22-llama-cpp-fork-reorg). Uncomment
+    # the input + these imports + the two service blocks below together.
+    # inputs.structured-agents.nixosModules.structuredAgentsVllm
+    # inputs.structured-agents.nixosModules.structuredAgentsLlamaCpp
 
     # fornix sandbox substrate: the btrfs cortex volume fornix snapshots
     # sandboxes on. All wiring lives in the fornix-host module; we only enable.
@@ -112,28 +115,32 @@ in
     #   config.sops.templates."paseo-deepseek.env".path;
   };
 
-  # Private native vLLM endpoint: its process binds only to 127.0.0.1:8000.
-  # Tailscale Serve on HTTPS 443 is configured only after local verification.
-  services.structuredAgentsVllm = {
-    enable = true;
-    repositoryPath = "/home/andrew/Documents/Projects/structured-agents-v2";
-    user = user;
-    group = "users";
-  };
-
-  # Keep the independent llama.cpp API on loopback :8001, but do not publish
-  # its browser UI through Tailscale HTTPS :8443. Paseo owns that public port.
-  services.structuredAgentsLlamaCpp = {
-    enable = true;
-    repositoryPath = "/home/andrew/Documents/Projects/structured-agents-v2";
-    user = user;
-    group = "users";
-    publishViaTailscale = false;
-    # The 1–5 client MTP sweep needs simultaneous decode slots rather than a
-    # single queued slot. The fixed 16k total context gives each of five slots
-    # roughly 3,276 tokens, covering this profile's 1,536-token responses.
-    parallelSlots = 5;
-  };
+  # DISABLED 2026-08-01 with the structured-agents input: native inference
+  # endpoints (vLLM :8000, llama.cpp :8001) are off until the repo's fork reorg
+  # lands and is re-locked. Uncomment alongside the input + imports above.
+  #
+  # # Private native vLLM endpoint: its process binds only to 127.0.0.1:8000.
+  # # Tailscale Serve on HTTPS 443 is configured only after local verification.
+  # services.structuredAgentsVllm = {
+  #   enable = true;
+  #   repositoryPath = "/home/andrew/Documents/Projects/structured-agents-v2";
+  #   user = user;
+  #   group = "users";
+  # };
+  #
+  # # Keep the independent llama.cpp API on loopback :8001, but do not publish
+  # # its browser UI through Tailscale HTTPS :8443. Paseo owns that public port.
+  # services.structuredAgentsLlamaCpp = {
+  #   enable = true;
+  #   repositoryPath = "/home/andrew/Documents/Projects/structured-agents-v2";
+  #   user = user;
+  #   group = "users";
+  #   publishViaTailscale = false;
+  #   # The 1–5 client MTP sweep needs simultaneous decode slots rather than a
+  #   # single queued slot. The fixed 16k total context gives each of five slots
+  #   # roughly 3,276 tokens, covering this profile's 1,536-token responses.
+  #   parallelSlots = 5;
+  # };
 
   # ── Personal SilverBullet notes server ──────────────────────────────────────
   # Runs on loopback :3000, published by Tailscale Serve at
