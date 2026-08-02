@@ -8,6 +8,19 @@ let
   # module) so this profile never hardcodes a user and composes onto whatever
   # host imports it.
   username = config.nixos-core.base.username;
+
+  # With systemd socket activation (HM's atuin module sets systemd_socket = true
+  # on NixOS) the daemon binds the socket *systemd* hands it — `%t/atuin.sock`,
+  # i.e. $XDG_RUNTIME_DIR/atuin.sock — while atuin's own client (pty-proxy) and
+  # atuout read `[daemon].socket_path` from config.toml to reach it. Pin
+  # socket_path to that same runtime path so daemon, pty-proxy and atuout all
+  # agree; pointing it at ~/.local/share breaks history recording (pty-proxy
+  # can't connect) and atuout harvesting with it. NixOS assigns uids at
+  # activation (the `uid` option is null until then), so fall back to the
+  # standard first-user uid 1000.
+  atuinSocketPath =
+    let uid = config.users.users.${username}.uid or null;
+    in "/run/user/${toString (if uid == null then 1000 else uid)}/atuin.sock";
 in
 {
   # nix-terminal is Home-Manager config, so ensure HM is wired. On the server
@@ -116,12 +129,9 @@ in
           (_: { version = "18.18.0-beta.2"; });
 
       # Run the atuin daemon as a systemd user service (HM manages it). atuout
-      # talks to it over the Unix socket below. Pin socket_path so atuin and
-      # atuout agree deterministically (atuout reads it from atuin's config.toml,
-      # falling back to this same default if unset).
+      # talks to it over the Unix socket below (see `atuinSocketPath` above).
       programs.atuin.daemon.enable = true;
-      programs.atuin.settings.daemon.socket_path =
-        "${config.home.homeDirectory}/.local/share/atuin/atuin.sock";
+      programs.atuin.settings.daemon.socket_path = atuinSocketPath;
 
       # pty-proxy init MUST run before atuout's harvest hook. Its emitted code
       # `exec`s the shell into the proxy PTY (setting ATUIN_PTY_PROXY_ACTIVE) and
