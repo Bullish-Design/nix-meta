@@ -10,21 +10,25 @@ in
 {
   imports = [ inputs.home-manager.nixosModules.home-manager ];
 
-  # Agent tooling for working ON the box over SSH: Claude Code, installed
-  # declaratively from nixpkgs (unfree — covered by nixos-core.base.allowUnfree).
-  # This is the host-level CLI; per-repo toolchains still come from each repo's
-  # devenv. Stacked on top of `minimal` like gpu-compute, so it's trivial to
-  # promote into nixos-core.base (fleet-wide) or drop later.
+  # Agent tooling for working ON the box over SSH. This profile is the SOLE
+  # installation point for agent CLIs: Claude Code + Codex (from sadjow's pinned
+  # flakes — the same upstream devman used to bundle; see terminal.nix which
+  # keeps the devman orchestrator but drops the bundled agents) + Pi (pinned via
+  # pi-nixpkgs below). Per-repo toolchains still come from each repo's devenv.
+  # Stacked on top of `minimal` like gpu-compute, so it's trivial to promote
+  # into nixos-core.base (fleet-wide) or drop later.
   environment.systemPackages = with pkgs; [
-    claude-code
+    inputs.claude-code.packages.${system}.default
+    inputs.codex-cli.packages.${system}.default
     # zellij: terminal multiplexer so long agent runs survive an SSH drop
     # (network switch / laptop sleep) — reattach with `zellij attach`. Also the
     # fleet-standard multiplexer, a precursor to the zelligate workspace daemon.
     zellij
   ];
 
-  # The binary lives read-only in the Nix store, so its self-updater can never
-  # succeed — silence it. Updates happen by bumping the nixpkgs input + rebuild.
+  # The binaries live read-only in the Nix store, so their self-updaters can
+  # never succeed — silence them. Updates happen by bumping the pinned inputs
+  # (`nix flake update claude-code codex-cli`) + rebuild.
   environment.variables.DISABLE_AUTOUPDATER = "1";
 
   # Pi is a normal, locally installed CLI that Paseo discovers and launches as

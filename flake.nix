@@ -44,6 +44,20 @@
     #   inputs.nixpkgs.follows = "nixpkgs";
     # };
 
+    # Agent CLIs (Claude Code, Codex) — consumed by profiles/agent.nix, the sole
+    # installation point for agent tooling. sadjow's flakes wrap the upstream npm
+    # packages with pinned Nix builds; pinned at ref=main, resolved to concrete
+    # revs in flake.lock. devman (via nix-terminal) declares the same inputs, so
+    # the lock dedupes both paths onto the same nodes.
+    claude-code = {
+      url = "github:sadjow/claude-code-nix?ref=main";
+      inputs.nixpkgs.follows = "nixpkgs";
+    };
+    codex-cli = {
+      url = "github:sadjow/codex-cli-nix?ref=main";
+      inputs.nixpkgs.follows = "nixpkgs";
+    };
+
     # The interactive terminal environment (zsh/atuin/starship/nvim/tmux) — the
     # rich shell you get over SSH and inside zelligate web terminals. The tower
     # is a host worked IN directly, which is exactly this flake's purpose, so it

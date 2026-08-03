@@ -53,6 +53,17 @@ in
       programs.nix-terminal = {
         enable = true;
 
+        # Agent CLIs are owned by profiles/agent.nix (the sole installation
+        # point for claude-code/codex-cli/pi). Keep the devman workspace
+        # orchestrator (tmuxp + Claude Code + Neovim launcher) — it still finds
+        # `claude` on PATH from agent.nix — but don't bundle duplicate agent
+        # binaries into home.packages.
+        devman = {
+          enable = true;
+          withClaudeCode = false;
+          withCodexCli = false;
+        };
+
         # Git config is intentionally left to your hand-maintained ~/.gitconfig.
         # Flip to true (and let backupFileExtension archive the old file) if you
         # want nix-terminal to own git declaratively instead.
