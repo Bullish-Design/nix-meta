@@ -150,6 +150,7 @@ in
   # dedicated `silverbullet` service user. All defaults target this box, so we
   # only flip enable.
   services.silverbulletServer.enable = true;
+  services.silverbulletServer.indexPage = "Notes";
 
   # ── fornix sandbox substrate ────────────────────────────────────────────────
   # Provision /cortex/fornix as a btrfs loopback owned by andrew and mounted
