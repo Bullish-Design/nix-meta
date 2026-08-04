@@ -159,6 +159,9 @@ in
   # the Go-era service did not: SB_CHROME_PATH is the explicit override the
   # server-runtime-chrome crate checks first (sb_chrome_path → chromium_path →
   # find_chrome), and adding it to the service PATH covers auto-detection.
+  # The runtime also requires a writable HOME: systemd services default to
+  # HOME=/ and chrome's crashpad handler dies with "--database is required"
+  # (RuntimeDirectory gives /run/silverbullet, owned by the service user).
   nixpkgs.overlays = [
     (final: prev: {
       silverbullet = final.callPackage ../pkgs/silverbullet { };
@@ -166,7 +169,11 @@ in
   ];
   systemd.services.silverbullet = {
     path = [ pkgs.chromium ];
-    environment.SB_CHROME_PATH = "${pkgs.chromium}/bin/chromium";
+    environment = {
+      SB_CHROME_PATH = "${pkgs.chromium}/bin/chromium";
+      HOME = "/run/silverbullet";
+    };
+    serviceConfig.RuntimeDirectory = "silverbullet";
   };
 
   # ── fornix sandbox substrate ────────────────────────────────────────────────
