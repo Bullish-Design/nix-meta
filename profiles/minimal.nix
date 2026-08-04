@@ -27,4 +27,8 @@ in
     automatic = true;
     dates = [ "02:00" ];
   };
+
+  # Automounting for removable drives (USB SSDs, etc.) on every machine.
+  # udisks2 is the daemon desktop environments talk to for plug-and-play mounts.
+  services.udisks2.enable = true;
 }
