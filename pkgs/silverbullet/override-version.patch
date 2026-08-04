@@ -1,0 +1,70 @@
+--- a/build/version.ts
++++ b/build/version.ts
+@@ -30,62 +30,13 @@
+  * and forcing a needless Rust rebuild.
+  */
+ export function updateVersionFile(): Promise<void> {
+-  return new Promise<void>((resolve, reject) => {
+-    const gitProcess = spawn("git", ["describe", "--tags", "--long"], {
+-      stdio: ["ignore", "pipe", "pipe"],
+-    });
+-
+-    let stdout = "";
+-
+-    gitProcess.stdout?.on("data", (data) => {
+-      stdout += data.toString();
+-    });
+-
+-    gitProcess.on("close", async (code) => {
+-      let commitVersion = stdout.trim();
+-
+-      if (!commitVersion || code !== 0) {
+-        // Probably no valid .git repo, fallback to GITHUB_SHA env var (used in CI)
+-        commitVersion = `${version}-${process.env.GITHUB_SHA || "unknown"}`;
+-      }
+-
+-      // Keep the existing string when it was minted for this same commit, so
+-      // repeated builds stay byte-identical (see the note above).
+-      if (isForCommit(await readVersionFile(), commitVersion)) {
+-        resolve();
+-        return;
+-      }
+-
+-      // Attach the build date in YYYY-MM-DDTHH-MM-SSZ format to the version.
+-      const publicVersion = `${commitVersion}-${new Date()
+-        .toISOString()
+-        .split(".")[0]
+-        .replaceAll(":", "-")
+-        .concat("Z")}`;
+-
+-      try {
+-        await writeFile(
+-          "./version.json",
+-          `${JSON.stringify({ version: publicVersion })}\n`,
+-          "utf-8",
+-        );
+-        resolve();
+-      } catch (err) {
+-        reject(err);
+-      }
+-    });
+-
+-    gitProcess.on("error", reject);
+-  });
++  return writeFile(
++    "./version.json",
++    `${JSON.stringify({ version: "@version@" })}\n`,
++    "utf-8",
++  );
+ }
+ 
+-/**
+- * Whether an existing version string was minted for `commitVersion`, and can
+- * therefore be reused instead of getting a fresh timestamp.
+- *
+- * The trailing separator is load-bearing: without it a `git describe` of
+- * `2.9.0-7` would claim an existing `2.9.0-70-g…` string as its own.
+- */
+ export function isForCommit(
+   existing: string | undefined,
+   commitVersion: string,
