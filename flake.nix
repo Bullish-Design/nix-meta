@@ -102,6 +102,21 @@
       inputs.nixpkgs.follows = "nixpkgs";
     };
 
+    # pytuin: typed Python SDK + diagnostics for the box's atuin/atuout stack
+    # (`pytuin status` / `pytuin doctor`; KV + recordings library). Local Git
+    # source like atuout. `follows` dedupe nixpkgs and re-use nix-meta's atuout
+    # and home-manager lock nodes, so the pytuin package builds against the SAME
+    # nixpkgs + atuout rev the host already runs — one atuout build, no runtime
+    # drift. Consumed as a package only: terminal.nix (via nix-terminal + atuout)
+    # stays the single owner of programs.atuin/atuout and the zsh init ordering,
+    # and the box hosts no atuin sync server (pytuin-server not used).
+    pytuin = {
+      url = "git+file:///home/andrew/Documents/Projects/pytuin";
+      inputs.nixpkgs.follows = "nixpkgs";
+      inputs.atuout.follows = "atuout";
+      inputs.home-manager.follows = "home-manager";
+    };
+
     # fornix sandbox substrate. Provisions the btrfs cortex volume that fornix
     # forks sandboxes on (loopback image at /cortex/fornix, mounted
     # user_subvol_rm_allowed and owned by andrew). Private GitHub repo, and the

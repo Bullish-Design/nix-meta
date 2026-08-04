@@ -935,6 +935,32 @@
         "type": "github"
       }
     },
+    "pytuin": {
+      "inputs": {
+        "atuout": [
+          "atuout"
+        ],
+        "home-manager": [
+          "home-manager"
+        ],
+        "nixpkgs": [
+          "nixpkgs"
+        ]
+      },
+      "locked": {
+        "lastModified": 1785857438,
+        "narHash": "sha256-LEMP3GLcf9KviazN8XMYyziOUiH/gaqyZpbS117k2b8=",
+        "ref": "refs/heads/main",
+        "rev": "5fc540f38cd8c330385a8cb0935964aef41c9be0",
+        "revCount": 13,
+        "type": "git",
+        "url": "file:///home/andrew/Documents/Projects/pytuin"
+      },
+      "original": {
+        "type": "git",
+        "url": "file:///home/andrew/Documents/Projects/pytuin"
+      }
+    },
     "repoman": {
       "inputs": {
         "nixpkgs": [
@@ -970,6 +996,7 @@
         "nixos-core": "nixos-core",
         "nixpkgs": "nixpkgs_2",
         "pi-nixpkgs": "pi-nixpkgs",
+        "pytuin": "pytuin",
         "silverbullet-server": "silverbullet-server"
       }
     },
@@ -1020,11 +1047,11 @@
         ]
       },
       "locked": {
-        "lastModified": 1785719852,
-        "narHash": "sha256-o9bOW/R7BMc2h7MdQl3eH20/Q+Dwoyr/ImlS4l1wel8=",
+        "lastModified": 1785872224,
+        "narHash": "sha256-Pz/bMYbeYj9UAMJ0nJLtHR8RzPYQMaKUUmgpPjKsh2M=",
         "ref": "main",
-        "rev": "6a839acbc657378ebaf6bcae50ff4fec6b2e8040",
-        "revCount": 7,
+        "rev": "bc9bb4f0145b5fa82a706128b0763be1ae2ada90",
+        "revCount": 8,
         "type": "git",
         "url": "ssh://git@github.com/Bullish-Design/silverbullet-server.git"
       },

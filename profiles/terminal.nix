@@ -50,6 +50,17 @@ in
       # does) wins without a conflicting-definition error.
       home.stateVersion = lib.mkDefault "25.05";
 
+      # pytuin: read-only diagnostics + SDK for the atuin/atuout stack. Package
+      # only — terminal.nix (via nix-terminal + atuout) remains the single owner
+      # of programs.atuin / programs.atuout / zsh init ordering, so
+      # programs.pytuin is deliberately NOT enabled here (the client module would
+      # re-own that stack and duplicate the zsh hooks). `pytuin doctor` checks
+      # the exact silent failures this stack is prone to (capture-incapable
+      # atuin, socket disagreement, missing pty-proxy, empty atuout store).
+      home.packages = [
+        inputs.pytuin.packages.${pkgs.stdenv.hostPlatform.system}.pytuin
+      ];
+
       programs.nix-terminal = {
         enable = true;
 

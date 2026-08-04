@@ -155,26 +155,16 @@ in
   # nixpkgs still packages the Go 2.9.0 line (and its expression cannot build
   # the Rust tree). Override with a source build of the 2.10.0 tag
   # (pkgs/silverbullet — npm client + cargo server, version pinned via a
-  # build/version.ts patch). The Rust runtime API needs headless Chrome, which
-  # the Go-era service did not: SB_CHROME_PATH is the explicit override the
-  # server-runtime-chrome crate checks first (sb_chrome_path → chromium_path →
-  # find_chrome), and adding it to the service PATH covers auto-detection.
-  # The runtime also requires a writable HOME: systemd services default to
-  # HOME=/ and chrome's crashpad handler dies with "--database is required"
-  # (RuntimeDirectory gives /run/silverbullet, owned by the service user).
+  # build/version.ts patch). The Rust runtime API's headless-Chrome needs
+  # (chromium on PATH, SB_CHROME_PATH, writable HOME via RuntimeDirectory,
+  # profile outside the space) are provisioned REQUIRED by the
+  # silverbullet-server module itself — no host-local wiring (see its
+  # runtimeRequired flake check).
   nixpkgs.overlays = [
     (final: prev: {
       silverbullet = final.callPackage ../pkgs/silverbullet { };
     })
   ];
-  systemd.services.silverbullet = {
-    path = [ pkgs.chromium ];
-    environment = {
-      SB_CHROME_PATH = "${pkgs.chromium}/bin/chromium";
-      HOME = "/run/silverbullet";
-    };
-    serviceConfig.RuntimeDirectory = "silverbullet";
-  };
 
   # ── fornix sandbox substrate ────────────────────────────────────────────────
   # Provision /cortex/fornix as a btrfs loopback owned by andrew and mounted
