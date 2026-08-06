@@ -533,26 +533,8 @@
         "type": "github"
       }
     },
-    "knappy": {
-      "flake": false,
-      "locked": {
-        "lastModified": 1785554043,
-        "narHash": "sha256-7YXcOwfFnsGakuwQL8YqDdoHg6NXsvuUos2bQFFbjM4=",
-        "ref": "main",
-        "rev": "7287f480cbe113691f7608cd428dcb50c93c9f90",
-        "revCount": 16,
-        "type": "git",
-        "url": "ssh://git@github.com/Bullish-Design/knappy.git"
-      },
-      "original": {
-        "ref": "main",
-        "type": "git",
-        "url": "ssh://git@github.com/Bullish-Design/knappy.git"
-      }
-    },
     "loci-core": {
       "inputs": {
-        "knappy": "knappy",
         "nixpkgs": [
           "nix-terminal",
           "nix-nvim",
@@ -561,11 +543,11 @@
         ]
       },
       "locked": {
-        "lastModified": 1785806245,
-        "narHash": "sha256-vAnIRzCCgVpA418nbUmhMxPIXgjL0D1/dGe5YtoNCxI=",
+        "lastModified": 1785972225,
+        "narHash": "sha256-EJKJcqUT7FWTMm3/wDIfrpGl3M5uiDF8PbX9V7Cq4BA=",
         "ref": "main",
-        "rev": "d96712646705c5e113537a31d6b078d63285dd83",
-        "revCount": 196,
+        "rev": "4a8d5e2251f5c40081c294730f3222d6cdd57163",
+        "revCount": 257,
         "type": "git",
         "url": "ssh://git@github.com/Bullish-Design/loci-core.git"
       },
@@ -585,16 +567,16 @@
         ]
       },
       "locked": {
-        "lastModified": 1785874821,
-        "narHash": "sha256-JJjWZo7o6tDVrkzWfm2YqD3awhCGJ7kFjkSsOKlQ7gI=",
+        "lastModified": 1785974033,
+        "narHash": "sha256-rkAQIWsW9wBd2++vpz35UsOD0tnDSkV9osSxx4kvEvk=",
         "owner": "Bullish-Design",
         "repo": "loci.nvim",
-        "rev": "18c575a970c002f81a3bf12f273b4140639c762b",
+        "rev": "80ac75a511becbc6427e1e3e14f182bed2b061b0",
         "type": "github"
       },
       "original": {
         "owner": "Bullish-Design",
-        "ref": "v0.1.4",
+        "ref": "v0.2.0",
         "repo": "loci.nvim",
         "type": "github"
       }
@@ -662,11 +644,11 @@
         "nixpkgs-neovim": "nixpkgs-neovim"
       },
       "locked": {
-        "lastModified": 1785874926,
-        "narHash": "sha256-aFwfZCFJqB0/cFPDKcTaorU6KhaOkHsiKQsmyAks8qw=",
+        "lastModified": 1785974106,
+        "narHash": "sha256-OOvj1mrB+XBT9aQTdGpTytu90BuqNeMzyfot64NE+08=",
         "owner": "Bullish-Design",
         "repo": "nix-nvim",
-        "rev": "077a67b60f167b0d0aa698e7a666b23b59582251",
+        "rev": "cf2bd42b5c77a227d8aee9ae611b72c41da5b7f9",
         "type": "github"
       },
       "original": {
@@ -730,11 +712,11 @@
         "repoman": "repoman"
       },
       "locked": {
-        "lastModified": 1785875179,
-        "narHash": "sha256-m9Nk4g0aUAWrzYNhVfc67u8do2MIVQOBqkX0h5TOWps=",
+        "lastModified": 1785974134,
+        "narHash": "sha256-K0l0Jjq6MOkLn8CZQMRJfxwJ9Gz7Xgrer+mJTjTF/8U=",
         "ref": "main",
-        "rev": "2c7ac30303ef333fdcc0b0e06b2ece7c40c9cf9a",
-        "revCount": 64,
+        "rev": "120461851728e63cae24ede6e6b90d5247f8f9b7",
+        "revCount": 65,
         "type": "git",
         "url": "https://github.com/Bullish-Design/nix-terminal.git"
       },
