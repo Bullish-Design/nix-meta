@@ -169,9 +169,19 @@ in
   # atuout recordings: atuout has no server component, and command-output
   # captures stay local to the host that ran the command.
   #
-  # openRegistration is a one-shot bootstrap, not a steady state. Atuin has no
-  # invite system, so to add an account: flip this to true, rebuild, run
-  # `atuin register` on the client, then flip it back to false and rebuild.
+  # ⚠ openRegistration is currently TRUE for the initial bootstrap and must be
+  # turned back off. Atuin has no invite system, so an account can only be
+  # created against a server that accepts registrations. The sequence is:
+  #
+  #   1. (now) openRegistration = true; nixos-rebuild switch
+  #   2. atuin register -u <user> -e <email>   # then `atuin key` — SAVE IT,
+  #                                            # it is the only copy
+  #   3. set openRegistration = false here, autoSync = true in
+  #      profiles/terminal.nix, and rebuild again
+  #
+  # Exposure while open is limited to the tailnet (Serve is tailnet-only and
+  # the port is bound on no interface), but leaving it open lets anything that
+  # reaches the tailnet create accounts. Close it as soon as step 2 is done.
   services.pytuin.server = {
     enable = true;
     # Same 18.18.1 build the clients run (inputs.atuin), not nixpkgs' 18.16.1
@@ -190,7 +200,7 @@ in
         (_: { version = "18.18.0-beta.2"; });
     host = "127.0.0.1"; # Serve proxies to loopback; nothing is bound publicly
     port = 8888;
-    openRegistration = false;
+    openRegistration = true; # ⚠ BOOTSTRAP ONLY — set false after registering
     database.createLocally = true;
     tailscale = {
       serve = true;
@@ -198,6 +208,18 @@ in
       serveHttpsPort = 443;
     };
   };
+
+  # This switch introduces PostgreSQL to the box for the first time (nothing
+  # else here used it), so the first activation initialises a fresh cluster at
+  # /var/lib/postgresql/17.
+  #
+  # Pin the major version explicitly. services.postgresql.package otherwise
+  # derives it from system.stateVersion, which means bumping stateVersion later
+  # would silently select a newer major — and NixOS does not migrate PostgreSQL
+  # data directories, so the service would simply refuse to start against the
+  # v17 cluster. Changing this pin is a deliberate dump/restore, never a
+  # side effect of an unrelated edit.
+  services.postgresql.package = pkgs.postgresql_17;
 
   # nixpkgs still packages the Go 2.9.0 line (and its expression cannot build
   # the Rust tree). Override with a source build of the 2.10.0 tag
