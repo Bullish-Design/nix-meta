@@ -31,6 +31,32 @@ not here.
 6. **Never hand-edit a tool-shipped file as a second copy.** Every file under
    `.agents/skills/` has exactly one owner; see the ownership table below. Edit
    at the source and re-materialize.
+7. **Write in Simplified Technical English.** See the next section.
+
+## Writing style
+
+Everything you write follows **Simplified Technical English
+([ASD-STE100](https://www.asd-ste100.org/)) style** as closely as the context
+allows. This covers docs, skills, code comments, docstrings, commit messages,
+CLI help, error text, and replies to the user.
+
+- **One idea per sentence.** Keep sentences short: 20 words or fewer for
+  descriptive text, 25 for procedures.
+- **One paragraph per topic**, six sentences or fewer.
+- **Use the active voice.** Name the actor: "the parser reads the marker", not
+  "the marker is read".
+- **Use one word for one meaning.** Pick a term and keep it. Never swap in a
+  synonym for variety — a repo's domain terms are fixed vocabulary.
+- **Use the imperative for instructions.** "Run the suite." Not "You should
+  probably run the suite."
+- **Say what to do, not only what not to do.**
+- **Drop filler.** No "simply", "just", "of course", "as you know", "note
+  that", or hedging that adds no information.
+- **Spell out an abbreviation on first use** in each document.
+- **No slang, no idioms, no metaphors** where a plain term works.
+
+Where STE and clarity conflict, choose clarity. Where STE and an established
+domain term conflict, keep the domain term.
 
 ## The agent-files convention
 
