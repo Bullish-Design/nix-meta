@@ -107,9 +107,14 @@
     # source like atuout. `follows` dedupe nixpkgs and re-use nix-meta's atuout
     # and home-manager lock nodes, so the pytuin package builds against the SAME
     # nixpkgs + atuout rev the host already runs — one atuout build, no runtime
-    # drift. Consumed as a package only: terminal.nix (via nix-terminal + atuout)
-    # stays the single owner of programs.atuin/atuout and the zsh init ordering,
-    # and the box hosts no atuin sync server (pytuin-server not used).
+    # drift. Two consumption paths, deliberately separate:
+    #   - package only on the CLIENT side. terminal.nix (via nix-terminal +
+    #     atuout) stays the single owner of programs.atuin/atuout and the zsh
+    #     init ordering, so programs.pytuin (the HM client module) is NOT
+    #     enabled — it would define sync_address twice and conflict.
+    #   - nixosModules.pytuin-server on the SERVER side (machines/server.nix),
+    #     which owns services.atuin + its Tailscale Serve unit. That module
+    #     touches nothing nix-terminal configures.
     pytuin = {
       url = "git+file:///home/andrew/Documents/Projects/pytuin";
       inputs.nixpkgs.follows = "nixpkgs";

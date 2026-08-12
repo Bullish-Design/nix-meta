@@ -132,6 +132,21 @@ in
           enable = true;
           searchMode = "fuzzy";
           style = "auto";
+
+          # Sync against the box's own Atuin server (machines/server.nix:
+          # services.pytuin.server), published by Tailscale Serve. Replaces the
+          # module default of https://api.atuin.sh — no history leaves the
+          # tailnet. Atuin appends its API path to this URL (Url::append_path),
+          # so the /atuin prefix Serve mounts it under is carried through.
+          #
+          # nix-terminal owns programs.atuin on this host, so the address is set
+          # here rather than through programs.pytuin — enabling pytuin's client
+          # module as well would define sync_address twice and conflict.
+          #
+          # autoSync stays off until the account exists: `atuin register` (with
+          # openRegistration temporarily true), then `atuin key` and
+          # `atuin login` on each other host. Flip to true afterwards.
+          syncAddress = "https://server.tail770f47.ts.net/atuin";
           autoSync = false;
         };
       };

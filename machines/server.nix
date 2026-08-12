@@ -34,6 +34,12 @@ in
     # https://server.<tailnet>.ts.net/notes. Defaults target this box (andrew /
     # ~/Notes / :443 /notes); we only enable below.
     inputs.silverbullet-server.nixosModules.default
+
+    # Self-hosted Atuin sync server, published over Tailscale Serve at
+    # https://server.<tailnet>.ts.net/atuin. Shares HTTPS :443 with
+    # SilverBullet — each registers a distinct --set-path route and each
+    # ExecStop removes only its own, so the two never clobber each other.
+    inputs.pytuin.nixosModules.pytuin-server
   ];
 
   # ── Bootloader: systemd-boot on the EFI partition at /boot (UEFI) ───────────
@@ -151,6 +157,47 @@ in
   # only flip enable.
   services.silverbulletServer.enable = true;
   services.silverbulletServer.indexPage = "Notes";
+
+  # ── Self-hosted Atuin sync server ───────────────────────────────────────────
+  # Runs on loopback :8888 (PostgreSQL created locally), published by Tailscale
+  # Serve at https://server.tail770f47.ts.net/atuin. Same perimeter argument as
+  # SilverBullet above: the tailnet ACL is the whole boundary, and the port is
+  # exposed on no interface at all — tailscaled proxies to loopback.
+  #
+  # This is what makes shell history + the Atuin KV store shared across the
+  # tailnet (server, framework, …) instead of per-host. It does NOT centralise
+  # atuout recordings: atuout has no server component, and command-output
+  # captures stay local to the host that ran the command.
+  #
+  # openRegistration is a one-shot bootstrap, not a steady state. Atuin has no
+  # invite system, so to add an account: flip this to true, rebuild, run
+  # `atuin register` on the client, then flip it back to false and rebuild.
+  services.pytuin.server = {
+    enable = true;
+    # Same 18.18.1 build the clients run (inputs.atuin), not nixpkgs' 18.16.1
+    # default — keeping both ends of the sync protocol on one version removes
+    # any record-store skew question. That flake's package ships `atuin-server`
+    # alongside `atuin`.
+    #
+    # The overrideAttrs is byte-identical to profiles/terminal.nix's on purpose:
+    # it makes this the SAME derivation the client already builds, so the
+    # closure carries one atuin, not two. Dropping it would be harmless
+    # semantically (services.atuin only calls `atuin-server` and never reads
+    # `.version`) but would fork the derivation hash and trigger a second full
+    # Rust compile of the same source. Keep the two expressions in sync.
+    package =
+      inputs.atuin.packages.${pkgs.stdenv.hostPlatform.system}.atuin.overrideAttrs
+        (_: { version = "18.18.0-beta.2"; });
+    host = "127.0.0.1"; # Serve proxies to loopback; nothing is bound publicly
+    port = 8888;
+    openRegistration = false;
+    database.createLocally = true;
+    tailscale = {
+      serve = true;
+      servePath = "/atuin";
+      serveHttpsPort = 443;
+    };
+  };
 
   # nixpkgs still packages the Go 2.9.0 line (and its expression cannot build
   # the Rust tree). Override with a source build of the 2.10.0 tag

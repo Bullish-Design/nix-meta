@@ -543,11 +543,11 @@
         ]
       },
       "locked": {
-        "lastModified": 1785972225,
-        "narHash": "sha256-EJKJcqUT7FWTMm3/wDIfrpGl3M5uiDF8PbX9V7Cq4BA=",
+        "lastModified": 1786498621,
+        "narHash": "sha256-xwlTUdSeUGvVV9Wng9sHXnZ6h9niZ/VHZ2t4ITACe10=",
         "ref": "main",
-        "rev": "4a8d5e2251f5c40081c294730f3222d6cdd57163",
-        "revCount": 257,
+        "rev": "81d38baec5d07991e8fa2c5868a43f0435048591",
+        "revCount": 259,
         "type": "git",
         "url": "ssh://git@github.com/Bullish-Design/loci-core.git"
       },
@@ -567,16 +567,16 @@
         ]
       },
       "locked": {
-        "lastModified": 1785974033,
-        "narHash": "sha256-rkAQIWsW9wBd2++vpz35UsOD0tnDSkV9osSxx4kvEvk=",
+        "lastModified": 1786498647,
+        "narHash": "sha256-n0uuQvGUQsNJxyFYRfJYUmUGqiZY/KVdoA20r+ZusgM=",
         "owner": "Bullish-Design",
         "repo": "loci.nvim",
-        "rev": "80ac75a511becbc6427e1e3e14f182bed2b061b0",
+        "rev": "15a1c5b0afa96ae3294bda4986f94064adabba99",
         "type": "github"
       },
       "original": {
         "owner": "Bullish-Design",
-        "ref": "v0.2.0",
+        "ref": "v0.2.1",
         "repo": "loci.nvim",
         "type": "github"
       }
@@ -644,11 +644,11 @@
         "nixpkgs-neovim": "nixpkgs-neovim"
       },
       "locked": {
-        "lastModified": 1786473856,
-        "narHash": "sha256-tdsQtyUUpwtPzXB7r4LaKyepfscUQkx0nHDu5g9CQt4=",
+        "lastModified": 1786498756,
+        "narHash": "sha256-yixfX+cMQM1zN5YSiCArdqhUUU6gQnWzv9tuoP6wFcs=",
         "owner": "Bullish-Design",
         "repo": "nix-nvim",
-        "rev": "4ae2842c35533b3cf705f81c312afe5f938bfa74",
+        "rev": "f9f71cb4808b843f72f298a4c89786d275473f17",
         "type": "github"
       },
       "original": {
@@ -712,11 +712,11 @@
         "repoman": "repoman"
       },
       "locked": {
-        "lastModified": 1786473879,
-        "narHash": "sha256-KoOxn2eLxZzLPGlSpwigW5IJVO4cj3b4Uq/tbzzwtbI=",
+        "lastModified": 1786498777,
+        "narHash": "sha256-sT90WTacu9HFHaMEY8Hy6ogZ0XbMpSKLYYxfMGXISQo=",
         "ref": "main",
-        "rev": "15bbe46323aa7c1d0060d3f62c8b6c8af27488c0",
-        "revCount": 66,
+        "rev": "e60095e23a6c333602574618d6e06a9be6e1dfad",
+        "revCount": 68,
         "type": "git",
         "url": "https://github.com/Bullish-Design/nix-terminal.git"
       },
@@ -934,11 +934,11 @@
         ]
       },
       "locked": {
-        "lastModified": 1785857438,
-        "narHash": "sha256-LEMP3GLcf9KviazN8XMYyziOUiH/gaqyZpbS117k2b8=",
+        "lastModified": 1786498803,
+        "narHash": "sha256-jXKcnyUoGb/Y2gSYeYlcbme0lS7LvhNASQnmXbsgr4M=",
         "ref": "refs/heads/main",
-        "rev": "5fc540f38cd8c330385a8cb0935964aef41c9be0",
-        "revCount": 13,
+        "rev": "947caac5fcc96cc3788de6f3a67c5a57f38df530",
+        "revCount": 15,
         "type": "git",
         "url": "file:///home/andrew/Documents/Projects/pytuin"
       },
