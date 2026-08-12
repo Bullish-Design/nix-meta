@@ -169,19 +169,19 @@ in
   # atuout recordings: atuout has no server component, and command-output
   # captures stay local to the host that ran the command.
   #
-  # ⚠ openRegistration is currently TRUE for the initial bootstrap and must be
-  # turned back off. Atuin has no invite system, so an account can only be
-  # created against a server that accepts registrations. The sequence is:
+  # openRegistration is closed. Atuin has no invite system, so it is the only
+  # registration control — an account can only be created while the server is
+  # accepting them. To add a machine you already have an account for, you do
+  # NOT need this: `atuin login -u <user> -k <key>` works against a closed
+  # server. Only a genuinely NEW account needs a bootstrap window:
   #
-  #   1. (now) openRegistration = true; nixos-rebuild switch
+  #   1. openRegistration = true; nixos-rebuild switch
   #   2. atuin register -u <user> -e <email>   # then `atuin key` — SAVE IT,
   #                                            # it is the only copy
-  #   3. set openRegistration = false here, autoSync = true in
-  #      profiles/terminal.nix, and rebuild again
+  #   3. set it back to false and rebuild
   #
-  # Exposure while open is limited to the tailnet (Serve is tailnet-only and
-  # the port is bound on no interface), but leaving it open lets anything that
-  # reaches the tailnet create accounts. Close it as soon as step 2 is done.
+  # Leave it false in between: while open, anything that reaches the tailnet
+  # can create an account.
   services.pytuin.server = {
     enable = true;
     # Same 18.18.1 build the clients run (inputs.atuin), not nixpkgs' 18.16.1
@@ -200,7 +200,7 @@ in
         (_: { version = "18.18.0-beta.2"; });
     host = "127.0.0.1"; # Serve proxies to loopback; nothing is bound publicly
     port = 8888;
-    openRegistration = true; # ⚠ BOOTSTRAP ONLY — set false after registering
+    openRegistration = false; # see the bootstrap note above before flipping
     database.createLocally = true;
     tailscale = {
       serve = true;

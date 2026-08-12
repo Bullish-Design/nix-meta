@@ -143,11 +143,16 @@ in
           # here rather than through programs.pytuin — enabling pytuin's client
           # module as well would define sync_address twice and conflict.
           #
-          # autoSync stays off until the account exists: `atuin register` (with
-          # openRegistration temporarily true), then `atuin key` and
-          # `atuin login` on each other host. Flip to true afterwards.
+          # autoSync is on: the account exists and this host is logged in.
+          # A new host needs `atuin login -u <user> -k <key>` once (the key
+          # from `atuin key`) — registration does not have to be reopened for
+          # that, only for a genuinely new account.
+          #
+          # sync_frequency is left at atuin's default of 5m; nix-terminal
+          # exposes no option for it, so override programs.atuin.settings
+          # directly if that ever needs changing.
           syncAddress = "https://server.tail770f47.ts.net/atuin";
-          autoSync = false;
+          autoSync = true;
         };
       };
 
