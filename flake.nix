@@ -9,6 +9,18 @@
     # system nixpkgs bumps cannot change the Pi binary unexpectedly.
     pi-nixpkgs.url = "github:NixOS/nixpkgs/567a49d1913ce81ac6e9582e3553dd90a955875f";
 
+    # Keep the developer-environment toolchain independent from the system
+    # package set. This lets us adopt a new devenv release when it needs a newer
+    # nixpkgs, without moving the NixOS configuration at the same time.
+    devenv-nixpkgs.url = "github:NixOS/nixpkgs/nixos-unstable";
+
+    # Pin to a released devenv version. Update this tag and only its two lock
+    # inputs when the developer-environment toolchain should move forward.
+    devenv = {
+      url = "github:cachix/devenv/v2.2";
+      inputs.nixpkgs.follows = "devenv-nixpkgs";
+    };
+
     nixos-core.url = "git+https://github.com/Bullish-Design/nixos-core.git?ref=main";
 
     nix-paseo = {
@@ -66,6 +78,7 @@
     nix-terminal = {
       url = "git+https://github.com/Bullish-Design/nix-terminal.git?ref=main";
       inputs.nixpkgs.follows = "nixpkgs";
+      inputs.devman.inputs.devenv.follows = "devenv";
     };
 
     # Shellij is developed on this server and supplies the Home Manager module
