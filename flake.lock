@@ -1,5 +1,24 @@
 {
   "nodes": {
+    "argentic": {
+      "inputs": {
+        "nixpkgs": [
+          "nixpkgs"
+        ]
+      },
+      "locked": {
+        "lastModified": 1786744328,
+        "narHash": "sha256-YfCAESj5tYTnojKSapx4SYF2I9BrY8SJxSmOHqWLbgM=",
+        "rev": "a423ef47584ba946375af84cb85fb63e4b2ca995",
+        "revCount": 49,
+        "type": "git",
+        "url": "file:///home/andrew/Documents/Projects/argentic"
+      },
+      "original": {
+        "type": "git",
+        "url": "file:///home/andrew/Documents/Projects/argentic"
+      }
+    },
     "atuin": {
       "inputs": {
         "fenix": "fenix",
@@ -970,6 +989,7 @@
     },
     "root": {
       "inputs": {
+        "argentic": "argentic",
         "atuin": "atuin",
         "atuout": "atuout",
         "claude-code": "claude-code",

@@ -165,6 +165,19 @@
       url = "git+ssh://git@github.com/Bullish-Design/silverbullet-server.git?ref=main";
       inputs.nixpkgs.follows = "nixpkgs";
     };
+
+    # The argentic overlay bridge: a pi agent on the SilverBullet notes surface,
+    # reached through SilverBullet's own proxy. Local git source like pytuin —
+    # committed files only, and the revision is recorded in flake.lock.
+    #
+    # A separate service from silverbullet-server on purpose. The bridge runs pi
+    # as the person who owns the notes, because pi reads its credentials from
+    # that account's ~/.pi/agent/auth.json, while SilverBullet runs as its own
+    # service user. One unit could not be both.
+    argentic = {
+      url = "git+file:///home/andrew/Documents/Projects/argentic";
+      inputs.nixpkgs.follows = "nixpkgs";
+    };
   };
 
   outputs = inputs@{ self, nixpkgs, ... }:

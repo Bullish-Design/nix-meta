@@ -35,6 +35,11 @@ in
     # ~/Notes / :443 /notes); we only enable below.
     inputs.silverbullet-server.nixosModules.default
 
+    # The argentic overlay bridge — the pi agent panel inside SilverBullet.
+    # Loopback only; the browser reaches it through SilverBullet's proxy, so
+    # SilverBullet's login is the whole perimeter. Enabled below.
+    inputs.argentic.nixosModules.default
+
     # Self-hosted Atuin sync server, published over Tailscale Serve at
     # https://server.<tailnet>.ts.net/atuin. Shares HTTPS :443 with
     # SilverBullet — each registers a distinct --set-path route and each
@@ -157,6 +162,29 @@ in
   # only flip enable.
   services.silverbulletServer.enable = true;
   services.silverbulletServer.indexPage = "Notes";
+
+  # ── The argentic overlay bridge ─────────────────────────────────────────────
+  # The pi agent panel inside SilverBullet. Binds 127.0.0.1:8790 and is reached
+  # only through SilverBullet's proxy (`/notes/.proxy/127.0.0.1:8790/…`), so it
+  # opens no new perimeter: SilverBullet's own gate is the only one.
+  #
+  # It runs as `andrew`, not as a service user, and that is not laziness — the
+  # bridge spawns pi, and pi reads its credentials from ~/.pi/agent/auth.json.
+  # The same reason keeps it off `silverbullet`'s account.
+  #
+  # Before this unit existed the bridge was started by hand, so every reboot
+  # brought SilverBullet back and left the panel talking to a closed port.
+  services.argenticOverlay = {
+    enable = true;
+    user = user;
+    # The same pi the interactive user runs (profiles/agent.nix), from the same
+    # independently pinned nixpkgs. A service on a different pi than the
+    # terminal is a skew nobody sees until a conversation behaves differently.
+    piPackage =
+      (import inputs.pi-nixpkgs {
+        inherit (pkgs.stdenv.hostPlatform) system;
+      }).pi-coding-agent;
+  };
 
   # ── Self-hosted Atuin sync server ───────────────────────────────────────────
   # Runs on loopback :8888 (PostgreSQL created locally), published by Tailscale
@@ -415,6 +443,90 @@ in
   #   serveMode = "dynamic";
   #   tailscale.enable = false; # base tier already owns services.tailscale
   # };
+
+  # ── Btrfs data protection ───────────────────────────────────────────────────
+  # Periodic checksum verification. Btrfs detects silent corruption only when it
+  # reads a block, so unread data rots undetected without a scheduled scrub.
+  services.btrfs.autoScrub = {
+    enable = true;
+    interval = "monthly";
+    fileSystems = [ "/" ];
+  };
+
+  # Snapshots: DEFERRED 2026-08-14. The @snapshots subvolume stays mounted but
+  # unused, so /home currently has no protection against accidental deletion.
+  #
+  # Blocked on high-churn data inside @home. A snapshot costs only the blocks
+  # that diverge after it is taken, not the size of the data -- so cost tracks
+  # write churn. ~/.cache held 96G of the 244G home directory (uv 38G,
+  # huggingface 32G, structured-agents 11G), all regenerable and all
+  # high-turnover. Snapshotting it would burn the volume's ~117G of headroom on
+  # evicted cache blocks.
+  #
+  # To resume: make ~/.cache its own btrfs subvolume first. Snapshots are not
+  # recursive, so a nested subvolume appears empty inside the snapshot and is
+  # excluded with no snapper filter. Then uncomment both blocks below.
+  #
+  # Note the second block is load-bearing: the NixOS snapper module writes
+  # configs and timers but never creates <subvolume>/.snapshots, and snapper
+  # refuses to run without it. The hardware config already mounts @snapshots at
+  # /.snapshots for the root config, but /home has no equivalent.
+  #
+  # Still open regardless: these are not backups. They live on nvme0n1 beside
+  # the originals and do not survive that disk failing.
+  #
+  # services.snapper.configs = {
+  #   root = {
+  #     SUBVOLUME = "/";
+  #     ALLOW_USERS = [ user ];
+  #     TIMELINE_CREATE = true;
+  #     TIMELINE_CLEANUP = true;
+  #     TIMELINE_LIMIT_HOURLY = 6;
+  #     TIMELINE_LIMIT_DAILY = 7;
+  #     TIMELINE_LIMIT_WEEKLY = 4;
+  #     TIMELINE_LIMIT_MONTHLY = 2;
+  #     TIMELINE_LIMIT_YEARLY = 0;
+  #   };
+  #   home = {
+  #     SUBVOLUME = "/home";
+  #     ALLOW_USERS = [ user ];
+  #     TIMELINE_CREATE = true;
+  #     TIMELINE_CLEANUP = true;
+  #     TIMELINE_LIMIT_HOURLY = 12;
+  #     TIMELINE_LIMIT_DAILY = 14;
+  #     TIMELINE_LIMIT_WEEKLY = 8;
+  #     TIMELINE_LIMIT_MONTHLY = 3;
+  #     TIMELINE_LIMIT_YEARLY = 0;
+  #   };
+  # };
+  #
+  # systemd.services.snapper-home-subvolume = {
+  #   description = "Create /home/.snapshots subvolume for snapper";
+  #   wantedBy = [ "multi-user.target" ];
+  #   before = [ "snapper-timeline.service" "snapper-cleanup.service" ];
+  #   after = [ "local-fs.target" ];
+  #   unitConfig.ConditionPathExists = "!/home/.snapshots";
+  #   serviceConfig = {
+  #     Type = "oneshot";
+  #     RemainAfterExit = true;
+  #     ExecStart = "${pkgs.btrfs-progs}/bin/btrfs subvolume create /home/.snapshots";
+  #   };
+  # };
+
+  # Secondary NTFS data drive. Same contract as /mnt/shared below:
+  # x-systemd.automount defers the mount to first access of the path.
+  fileSystems."/mnt/flex" = {
+    device = "/dev/disk/by-label/FLEX_252";
+    fsType = "ntfs3";
+    options = [
+      "nofail"
+      "x-systemd.automount"
+      "uid=1000"
+      "gid=100"
+      "umask=022"
+      "windows_names"
+    ];
+  };
 
   # Optional shared NTFS data drive. nofail = won't block boot if absent/dirty.
   fileSystems."/mnt/shared" = {
