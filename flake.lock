@@ -7,10 +7,10 @@
         ]
       },
       "locked": {
-        "lastModified": 1786744328,
-        "narHash": "sha256-YfCAESj5tYTnojKSapx4SYF2I9BrY8SJxSmOHqWLbgM=",
-        "rev": "a423ef47584ba946375af84cb85fb63e4b2ca995",
-        "revCount": 49,
+        "lastModified": 1786749696,
+        "narHash": "sha256-ZZZOqpe+fya2DITBdeIykggPaJ9wP9UyR5CofA09rEs=",
+        "rev": "98ab6cdfa0e6fdd5c0d47777a60fd6176b67ff46",
+        "revCount": 50,
         "type": "git",
         "url": "file:///home/andrew/Documents/Projects/argentic"
       },
