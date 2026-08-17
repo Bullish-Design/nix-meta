@@ -541,4 +541,14 @@ in
       "windows_names"
     ];
   };
+
+  # Used WD Re (WD2000FYYZ) drive added to a flexbay, wiped of its prior
+  # linux_raid_member superblock and reformatted ext4. nofail = won't block
+  # boot if the bay is empty; UUID (not /dev/sdX) since bay contents shift
+  # device letters as drives are added/removed.
+  fileSystems."/mnt/wd_re1" = {
+    device = "/dev/disk/by-uuid/2735c646-9ffd-4d29-858c-f6990767b060";
+    fsType = "ext4";
+    options = [ "defaults" "nofail" ];
+  };
 }
