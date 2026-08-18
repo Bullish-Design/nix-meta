@@ -551,4 +551,13 @@ in
     fsType = "ext4";
     options = [ "defaults" "nofail" ];
   };
+
+  # Second used WD Re (WD2000FYYZ) drive, same treatment as wd_re1: wiped
+  # of its prior linux_raid_member superblock (RAID label "topanga:2") and
+  # reformatted ext4.
+  fileSystems."/mnt/wd_re2" = {
+    device = "/dev/disk/by-uuid/221736bc-2a75-4949-823a-364c8c772dad";
+    fsType = "ext4";
+    options = [ "defaults" "nofail" ];
+  };
 }
