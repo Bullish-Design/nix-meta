@@ -4,6 +4,7 @@ inputs:
 let
   system = pkgs.stdenv.hostPlatform.system;
   piPkgs = import inputs.pi-nixpkgs { inherit system; };
+  atuinPackage = inputs.atuin.packages.${system}.atuin;
   username = config.nixos-core.base.username;
 in
 
@@ -35,6 +36,34 @@ in
   # a subprocess. Its package comes from pi-nixpkgs rather than the host's main
   # nixpkgs pin, letting Pi be upgraded and rolled back independently.
   home-manager.users.${username} = {
+    # Codex sends PostToolUse.tool_response as a string, while Atuin 18.18.1
+    # expects an object. Codex sessions launched outside an Atuin-initialized
+    # shell also lack ATUIN_SESSION. Normalize both inputs until the upstream
+    # hook protocols converge.
+    home.file.".local/bin/atuin-codex-hook" = {
+      executable = true;
+      text = ''
+        #!${pkgs.runtimeShell}
+
+        set -euo pipefail
+
+        payload="$(${pkgs.coreutils}/bin/cat)"
+
+        if [[ -z "''${ATUIN_SESSION:-}" ]]; then
+          ATUIN_SESSION="$(${lib.getExe pkgs.jq} -r '.session_id // .turn_id // "codex"' <<<"$payload")"
+          export ATUIN_SESSION
+        fi
+
+        ${lib.getExe pkgs.jq} -c '
+          if (.tool_response | type) == "string" then
+            .tool_response = {}
+          else
+            .
+          end
+        ' <<<"$payload" | ${lib.getExe' atuinPackage "atuin"} hook codex
+      '';
+    };
+
     # Direct SSH shells need the same runtime credential as the Paseo service.
     # The file is created by sops-nix at activation and is never copied to the
     # Nix store or Home Manager's generated configuration.
