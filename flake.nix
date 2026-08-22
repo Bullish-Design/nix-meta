@@ -184,7 +184,7 @@
     # NixOS module takes `pkgs` from this machine and never reads devman's own
     # nixpkgs input, which serves that flake's `packages` and `checks` alone.
     devman = {
-      url = "git+https://github.com/Bullish-Design/devman?ref=main&rev=53ff36b90e4cf8c0069316e412e10af838c78720";
+      url = "git+https://github.com/Bullish-Design/devman?ref=main&rev=b0712286b6b4ce31c33c6a686ecf1b2afa38b12e";
       inputs.nixpkgs.follows = "nixpkgs";
     };
 
