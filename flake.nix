@@ -166,6 +166,28 @@
       inputs.nixpkgs.follows = "nixpkgs";
     };
 
+    # The devman automation plane. One flake exposes both interfaces at one
+    # revision: `nixosModules.default` is this machine's Dagu service (consumed
+    # by profiles/devman.nix), and the SAME rev's `modules/` directory is what
+    # every adopted repository imports from its own devenv.yaml. That is the
+    # whole anti-drift argument — the machine and the repos cannot disagree
+    # about queue names, the registry layout or `DEVMAN_PROJECT_DIR`, because
+    # there is one version of all three.
+    #
+    # `git+https` with an explicit rev, and the form matters. `git+file` records
+    # neither `rev` nor `narHash` and silently follows the branch head, so a
+    # local checkout is never pinned and nothing warns. A `github:` input hits
+    # the GitHub API rate limit on every evaluation. (devman FINDINGS.md B4,
+    # CONCEPT.md §3.2.)
+    #
+    # `follows` here only removes a duplicate nixpkgs node from the lock. The
+    # NixOS module takes `pkgs` from this machine and never reads devman's own
+    # nixpkgs input, which serves that flake's `packages` and `checks` alone.
+    devman = {
+      url = "git+https://github.com/Bullish-Design/devman?ref=main&rev=6bc0bbe1eba299ab53b7420763799fe4130aa732";
+      inputs.nixpkgs.follows = "nixpkgs";
+    };
+
     # The argentic overlay bridge: a pi agent on the SilverBullet notes surface,
     # reached through SilverBullet's own proxy. Local git source like pytuin —
     # committed files only, and the revision is recorded in flake.lock.
@@ -203,7 +225,7 @@
         # profiles.terminal restored: nix-terminal now consumes nix-nvim (the
         # loci-rich config promoted from ~/.dotfiles/nvim) instead of the retired,
         # broken nixvim input.
-        server = mkMachine "server" [ profiles.minimal profiles.terminal profiles.developer profiles.gpu-compute profiles.agent profiles.secrets ];
+        server = mkMachine "server" [ profiles.minimal profiles.terminal profiles.developer profiles.gpu-compute profiles.agent profiles.secrets profiles.devman ];
       };
     };
 }

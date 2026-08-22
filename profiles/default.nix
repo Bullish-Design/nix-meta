@@ -22,4 +22,9 @@ inputs:
 
   # Declarative secrets (sops-nix): the box decrypts with its own SSH host key.
   secrets = import ./secrets.nix inputs;
+
+  # The devman automation plane: one Dagu user service that runs each repo's own
+  # devenv tasks. Stacked on `developer`, which installs the devenv launcher the
+  # plane's workflow steps call.
+  devman = import ./devman.nix inputs;
 }

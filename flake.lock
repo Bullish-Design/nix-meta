@@ -250,6 +250,28 @@
     },
     "devman": {
       "inputs": {
+        "nixpkgs": [
+          "nixpkgs"
+        ]
+      },
+      "locked": {
+        "lastModified": 1787415814,
+        "narHash": "sha256-KxNiM61vXQPCl0nD9tOltkQ5juy0tGbXvHnz0KT00v8=",
+        "ref": "main",
+        "rev": "6bc0bbe1eba299ab53b7420763799fe4130aa732",
+        "revCount": 169,
+        "type": "git",
+        "url": "https://github.com/Bullish-Design/devman"
+      },
+      "original": {
+        "ref": "main",
+        "rev": "6bc0bbe1eba299ab53b7420763799fe4130aa732",
+        "type": "git",
+        "url": "https://github.com/Bullish-Design/devman"
+      }
+    },
+    "devman_2": {
+      "inputs": {
         "claude-code": "claude-code_2",
         "codex-cli": "codex-cli_2",
         "devenv": [
@@ -710,7 +732,7 @@
     },
     "nix-terminal": {
       "inputs": {
-        "devman": "devman",
+        "devman": "devman_2",
         "nix-nvim": "nix-nvim",
         "nixbuild": "nixbuild",
         "nixpkgs": [
@@ -996,6 +1018,7 @@
         "codex-cli": "codex-cli",
         "devenv": "devenv",
         "devenv-nixpkgs": "devenv-nixpkgs",
+        "devman": "devman",
         "fornix-host": "fornix-host",
         "home-manager": "home-manager",
         "nix-paseo": "nix-paseo",
