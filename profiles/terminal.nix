@@ -64,16 +64,26 @@ in
       programs.nix-terminal = {
         enable = true;
 
-        # Agent CLIs are owned by profiles/agent.nix (the sole installation
-        # point for claude-code/codex-cli/pi). Keep the devman workspace
-        # orchestrator (tmuxp + Claude Code + Neovim launcher) — it still finds
-        # `claude` on PATH from agent.nix — but don't bundle duplicate agent
-        # binaries into home.packages.
-        devman = {
-          enable = true;
-          withClaudeCode = false;
-          withCodexCli = false;
-        };
+        # DISABLED 2026-08-22: this installed `devman 0.2.0`, and the devman
+        # repository is now the automation plane described in its own
+        # .scratch/projects/006-automation-plane/CONCEPT.md. Two reasons to drop
+        # the old one, in order:
+        #
+        #   1. It owns the `devman` command. §10's CLI takes the same name, so
+        #      shipping both would make `devman doctor` resolve by profile order
+        #      rather than by intent.
+        #   2. Its `init --force` calls `shutil.rmtree` on a `.devman/` it does
+        #      not recognise. The plane tracks `.devman/workflows/` as canonical
+        #      state (§9.2), so that command deletes work.
+        #
+        # What is lost is one binary. `devman-env` referenced devman 0.2.0 and
+        # nothing else, and its tmuxp workspace launcher could not run anyway:
+        # `tmuxp` is not on this machine's PATH. `nv` comes from nix-nvim and
+        # `claude` from profiles/agent.nix, so neither moves.
+        #
+        # Agent CLIs stay owned by profiles/agent.nix, which was already the
+        # sole installation point for claude-code/codex-cli/pi.
+        devman.enable = false;
 
         # Git config is intentionally left to your hand-maintained ~/.gitconfig.
         # Flip to true (and let backupFileExtension archive the old file) if you
