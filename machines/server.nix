@@ -560,4 +560,14 @@ in
     fsType = "ext4";
     options = [ "defaults" "nofail" ];
   };
+
+  # Used WD Caviar Green (WD20EADS-00R6B0) drive added to a flexbay, blank
+  # when found, partitioned and formatted ext4. IntelliPark idle timer set
+  # to 300s via idle3-tools (pending a power cycle to take effect) to slow
+  # this model's characteristically high Load_Cycle_Count growth.
+  fileSystems."/mnt/wd_green1" = {
+    device = "/dev/disk/by-uuid/21488349-01cb-4efe-9d21-a72f74a908e0";
+    fsType = "ext4";
+    options = [ "defaults" "nofail" ];
+  };
 }
