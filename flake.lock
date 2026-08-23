@@ -255,17 +255,17 @@
         ]
       },
       "locked": {
-        "lastModified": 1787444946,
-        "narHash": "sha256-J7+ZHmDfCnfRN+Sdy+1TLEr0LwizxaNcUAR57o1lmMQ=",
+        "lastModified": 1787455220,
+        "narHash": "sha256-Uuv9A4Oj4g8TH4pLZBd5oRyfF10KSG4OEFHVSiKOXu4=",
         "ref": "main",
-        "rev": "c24425f13e48cf3801e02be5079d14268a25f104",
-        "revCount": 232,
+        "rev": "d9b3269d487845132f8ef71c6e3fa203e7c258ff",
+        "revCount": 239,
         "type": "git",
         "url": "https://github.com/Bullish-Design/devman"
       },
       "original": {
         "ref": "main",
-        "rev": "c24425f13e48cf3801e02be5079d14268a25f104",
+        "rev": "d9b3269d487845132f8ef71c6e3fa203e7c258ff",
         "type": "git",
         "url": "https://github.com/Bullish-Design/devman"
       }
