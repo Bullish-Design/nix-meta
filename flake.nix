@@ -174,11 +174,11 @@
     # about queue names, the registry layout or `DEVMAN_PROJECT_DIR`, because
     # there is one version of all three.
     #
-    # `git+https` with an explicit rev, and the form matters. `git+file` records
-    # neither `rev` nor `narHash` and silently follows the branch head, so a
-    # local checkout is never pinned and nothing warns. A `github:` input hits
-    # the GitHub API rate limit on every evaluation. (devman FINDINGS.md B4,
-    # CONCEPT.md §3.2.)
+    # `git+file:` records `rev` and `narHash` in flake.lock, just as
+    # `git+https:` does, but it sees committed files only. Use `path:` for the
+    # one repository under active edit; every other local consumer is pinned
+    # with `git+file:`. A `github:` input hits the GitHub API rate limit on every
+    # evaluation. (devman FINDINGS.md B4, corrected; CONCEPT.md §3.2.)
     #
     # `follows` here only removes a duplicate nixpkgs node from the lock. The
     # NixOS module takes `pkgs` from this machine and never reads devman's own
