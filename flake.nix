@@ -76,7 +76,7 @@
     # belongs in the server set. Fetched as a git input (public repo, like
     # nixos-core) — NOT the old laptop `path:` that broke the on-box build.
     nix-terminal = {
-      url = "git+https://github.com/Bullish-Design/nix-terminal.git?ref=main";
+      url = "git+file:///home/andrew/Documents/Projects/nix-terminal?ref=main";
       inputs.nixpkgs.follows = "nixpkgs";
       inputs.devman.inputs.devenv.follows = "devenv";
     };

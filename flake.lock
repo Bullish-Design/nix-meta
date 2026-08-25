@@ -741,18 +741,18 @@
         "repoman": "repoman"
       },
       "locked": {
-        "lastModified": 1786656772,
-        "narHash": "sha256-iad8OGoq0IOV3tpJmhYX9TATBHPFbXbZCkIqu7EyqDQ=",
+        "lastModified": 1787680207,
+        "narHash": "sha256-zUQZVaTdi/4lWC7l1cjy5ohs8M1SLTSEp/19Q/eueHY=",
         "ref": "main",
-        "rev": "01b3157c3e904dc96ff2388c8dc6511e9b42307e",
-        "revCount": 72,
+        "rev": "b47170974d1fd0baecebbc92b68d6f8d5368e3c9",
+        "revCount": 73,
         "type": "git",
-        "url": "https://github.com/Bullish-Design/nix-terminal.git"
+        "url": "file:///home/andrew/Documents/Projects/nix-terminal"
       },
       "original": {
         "ref": "main",
         "type": "git",
-        "url": "https://github.com/Bullish-Design/nix-terminal.git"
+        "url": "file:///home/andrew/Documents/Projects/nix-terminal"
       }
     },
     "nixbuild": {
@@ -996,17 +996,18 @@
         ]
       },
       "locked": {
-        "lastModified": 1782862307,
-        "narHash": "sha256-YRvOXyqWr5MiXEmTxDNk7MxaoX9y6MqqT3T+dGU4B4k=",
-        "owner": "Bullish-Design",
-        "repo": "repoman",
-        "rev": "787c7512cdbc01bad12317b84f5d532f316eae11",
-        "type": "github"
+        "lastModified": 1787596043,
+        "narHash": "sha256-R8xOVIVUumiCYNbZrvi5qSNLLlvb5WWfXtQJ+gNZN6Y=",
+        "ref": "main",
+        "rev": "5a8dd670baeace4eda1ec02da0f5e12a9ad2440a",
+        "revCount": 128,
+        "type": "git",
+        "url": "file:///home/andrew/Documents/Projects/repoman"
       },
       "original": {
-        "owner": "Bullish-Design",
-        "repo": "repoman",
-        "type": "github"
+        "ref": "main",
+        "type": "git",
+        "url": "file:///home/andrew/Documents/Projects/repoman"
       }
     },
     "root": {
