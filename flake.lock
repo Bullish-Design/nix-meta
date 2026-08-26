@@ -255,11 +255,11 @@
         ]
       },
       "locked": {
-        "lastModified": 1787676210,
-        "narHash": "sha256-Qbz8rJp/8ZI3MHT73y+WCQNFN7vKg9t/L3qTaXOqyUY=",
+        "lastModified": 1787713788,
+        "narHash": "sha256-g88al74C/cCQjuJLjYaWodVZ5ivTweWACzu4+SanEXM=",
         "ref": "main",
-        "rev": "3fd03366684d52865021c7f13b2ee89b4477bbba",
-        "revCount": 291,
+        "rev": "f4782c88f6c15b1732ddf8a9e82cfae4ed2d7dd0",
+        "revCount": 298,
         "type": "git",
         "url": "file:///home/andrew/Documents/Projects/devman"
       },
