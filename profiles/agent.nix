@@ -81,33 +81,61 @@ in
       # token. Both direct shells and the Paseo systemd service must provide
       # DEEPSEEK_API_KEY at runtime; never put that secret in the Nix store.
       models = {
-        providers.deepseek = {
-          baseUrl = "https://api.deepseek.com";
-          api = "openai-completions";
-          apiKey = "$DEEPSEEK_API_KEY";
-          models = [
+        providers = {
+          deepseek = {
+            baseUrl = "https://api.deepseek.com";
+            api = "openai-completions";
+            apiKey = "$DEEPSEEK_API_KEY";
+            models = [
+              {
+                id = "deepseek-v4-pro";
+                name = "DeepSeek V4 Pro";
+                contextWindow = 1000000;
+                maxTokens = 384000;
+                input = [ "text" ];
+                reasoning = true;
+                compat = {
+                  requiresReasoningContentOnAssistantMessages = true;
+                  thinkingFormat = "deepseek";
+                };
+              }
+              {
+                id = "deepseek-v4-flash";
+                name = "DeepSeek V4 Flash";
+                contextWindow = 1000000;
+                maxTokens = 384000;
+                input = [ "text" ];
+                reasoning = true;
+                compat = {
+                  requiresReasoningContentOnAssistantMessages = true;
+                  thinkingFormat = "deepseek";
+                };
+              }
+            ];
+          };
+
+          openrouter.models = [
             {
-              id = "deepseek-v4-pro";
-              name = "DeepSeek V4 Pro";
-              contextWindow = 1000000;
-              maxTokens = 384000;
-              input = [ "text" ];
+              id = "stealth/ox-alpha";
+              name = "Ox Alpha (free via OpenRouter)";
+              contextWindow = 1048576;
+              maxTokens = 131072;
+              input = [
+                "text"
+                "image"
+              ];
               reasoning = true;
-              compat = {
-                requiresReasoningContentOnAssistantMessages = true;
-                thinkingFormat = "deepseek";
+              thinkingLevelMap = {
+                off = null;
+                minimal = null;
+                medium = null;
+                xhigh = "max";
               };
-            }
-            {
-              id = "deepseek-v4-flash";
-              name = "DeepSeek V4 Flash";
-              contextWindow = 1000000;
-              maxTokens = 384000;
-              input = [ "text" ];
-              reasoning = true;
-              compat = {
-                requiresReasoningContentOnAssistantMessages = true;
-                thinkingFormat = "deepseek";
+              cost = {
+                input = 0;
+                output = 0;
+                cacheRead = 0;
+                cacheWrite = 0;
               };
             }
           ];
@@ -115,9 +143,9 @@ in
       };
 
       settings = {
-        defaultProvider = "deepseek";
-        defaultModel = "deepseek-v4-pro";
-        defaultThinkingLevel = "high";
+        defaultProvider = "openrouter";
+        defaultModel = "stealth/ox-alpha";
+        defaultThinkingLevel = "xhigh";
       };
     };
   };
