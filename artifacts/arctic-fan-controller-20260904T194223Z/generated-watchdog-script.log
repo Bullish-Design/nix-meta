@@ -1,0 +1,104 @@
+#!/nix/store/zh1ijdhb6gng1509b1zrilb6xlzx60j6-bash-5.3p9/bin/bash
+set -u
+
+safe_high() {
+  if ! /nix/store/r6c18r4ldww1vf8pc1gnhmvjh752xr3w-arctic-fans-100/bin/arctic-fans-100; then
+    echo "ARCTIC watchdog could not force safe high" >&2
+    return 1
+  fi
+}
+
+trap 'safe_high || true' EXIT HUP INT TERM
+
+if ! safe_high; then
+  exit 1
+fi
+
+find_arctic_hwmon() {
+  for h in /sys/class/hwmon/hwmon*; do
+    if [ -r "$h/name" ] && [ "$(cat "$h/name")" = arctic_fan ]; then
+      printf '%s\n' "$h"
+      return 0
+    fi
+  done
+  return 1
+}
+
+find_junction_sensor() {
+  pci="$1"
+  for h in "$pci"/hwmon/hwmon*; do
+    [ -d "$h" ] || continue
+    [ -r "$h/name" ] || continue
+    [ "$(cat "$h/name")" = amdgpu ] || continue
+    for label in "$h"/temp*_label; do
+      [ -r "$label" ] || continue
+      [ "$(cat "$label")" = junction ] || continue
+      sensor="${label%_label}_input"
+      [ -r "$sensor" ] || continue
+      printf '%s\n' "$sensor"
+      return 0
+    done
+  done
+  return 1
+}
+
+while :; do
+  if ! /nix/store/rd05syhv5v5999907a2n1r37sgi19vpd-systemd-260.2/bin/systemctl is-active --quiet coolercontrold.service; then
+    echo "CoolerControl is not active; forcing all ARCTIC channels high" >&2
+    exit 1
+  fi
+
+  if ! arctic="$(find_arctic_hwmon)"; then
+    echo "ARCTIC controller hwmon disappeared; forcing safe high" >&2
+    exit 1
+  fi
+
+  pwm_count=0
+  for pwm in "$arctic"/pwm[0-9] "$arctic"/pwm[0-9][0-9]; do
+    [ -r "$pwm" ] || continue
+    if ! value="$(cat "$pwm")"; then
+      echo "failed to read $pwm; forcing safe high" >&2
+      exit 1
+    fi
+    case "$value" in
+      ""|*[!0-9]*)
+        echo "invalid PWM value in $pwm: $value" >&2
+        exit 1
+        ;;
+      0)
+        echo "$pwm is zero; forcing safe high" >&2
+        exit 1
+        ;;
+    esac
+    pwm_count=$((pwm_count + 1))
+  done
+  if [ "$pwm_count" -eq 0 ]; then
+    echo "ARCTIC controller has no readable PWM channels" >&2
+    exit 1
+  fi
+
+  max_junction=""
+  for pci in /sys/bus/pci/devices/0000:19:00.0 /sys/bus/pci/devices/0000:67:00.0; do
+    if ! sensor="$(find_junction_sensor "$pci")"; then
+      echo "GPU junction sensor missing at $pci; forcing safe high" >&2
+      exit 1
+    fi
+    if ! value="$(cat "$sensor")"; then
+      echo "GPU junction read failed at $sensor; forcing safe high" >&2
+      exit 1
+    fi
+    case "$value" in
+      ""|*[!0-9]*)
+        echo "invalid GPU junction value at $sensor: $value" >&2
+        exit 1
+        ;;
+    esac
+    if [ -z "$max_junction" ] || [ "$value" -gt "$max_junction" ]; then
+      max_junction="$value"
+    fi
+  done
+
+  echo "ARCTIC watchdog: max_gpu_junction_mC=$max_junction"
+  /nix/store/sr26flm2nkfa12dkrwj2630kqsfakky4-coreutils-9.11/bin/sleep 2
+done
+

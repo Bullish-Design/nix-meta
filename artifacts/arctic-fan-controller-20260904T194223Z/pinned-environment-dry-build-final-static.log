@@ -1,0 +1,38 @@
+• Validating lock
+✓ Validating lock in 26.1ms
+• Configuring shell
+• Configuring cachix
+✓ Configuring cachix in 3.78ms
+• Evaluating shell
+✓ Evaluating shell in 14.9ms (cached)
+✓ Configuring shell in 23.0ms
+• Loading tasks
+• Evaluating devenv.config.task.config
+✓ Evaluating devenv.config.task.config in 863µs (cached)
+✓ Loading tasks in 2.58ms
+• Running tasks
+• Running devenv:python:uv
+• Running devenv:files:cleanup
+✓ Running devenv:files:cleanup in 20.6ms
+✓ Running devenv:python:uv in 80.2ms
+• Running devenv:enterShell
+✓ Running devenv:enterShell in 19.7ms
+• Running devenv:enterTest
+✓ Running devenv:enterTest in 22.2µs (no command)
+✓ Running tasks in 101ms
+evaluation warning: 'system' has been renamed to/replaced by 'stdenv.hostPlatform.system'
+evaluation warning: nix-paseo: password auth is disabled for network-reachable tailnet access.
+these 6 derivations will be built:
+  /nix/store/7dz96azlh6w9flvgf62nbiglbj465kpm-arctic-fan-watchdog.drv
+  /nix/store/zk8x2h0pl1ivv1b9kls5wps8r01rbql6-unit-arctic-fan-watchdog.service.drv
+  /nix/store/cpy3ls9lpjq9ycvazxz96yhc389qbyv3-system-units.drv
+  /nix/store/g412vbjdfmv1mjw6k6vgqa08qrd7m1dy-etc.drv
+  /nix/store/wz9hxly1d68dgz4zmcyx2a8axrcyqzn4-activate.drv
+  /nix/store/889wzlbyc7wp7gf1rir0prfsl81gabnw-nixos-system-server-26.11.20260705.d407951.drv
+building '/nix/store/7dz96azlh6w9flvgf62nbiglbj465kpm-arctic-fan-watchdog.drv'...
+building '/nix/store/zk8x2h0pl1ivv1b9kls5wps8r01rbql6-unit-arctic-fan-watchdog.service.drv'...
+building '/nix/store/cpy3ls9lpjq9ycvazxz96yhc389qbyv3-system-units.drv'...
+building '/nix/store/g412vbjdfmv1mjw6k6vgqa08qrd7m1dy-etc.drv'...
+building '/nix/store/wz9hxly1d68dgz4zmcyx2a8axrcyqzn4-activate.drv'...
+building '/nix/store/889wzlbyc7wp7gf1rir0prfsl81gabnw-nixos-system-server-26.11.20260705.d407951.drv'...
+nixos-system-server> structuredAttrs is enabled
