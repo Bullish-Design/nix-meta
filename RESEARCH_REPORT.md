@@ -105,6 +105,14 @@ require it, and starts CoolerControl only after the watchdog's initial safe-high
 barrier. This requires a new build and acceptance run before relying on normal
 fan control.
 
+That follow-up rebuild and acceptance run is recorded in
+`artifacts/arctic-fan-controller-test-20260904T213352Z/test.log`. The new
+ordering was active, and stop/ExecStopPost, SIGKILL crash, and PWM response
+tests passed again (`3058 RPM` at `255`, `2411 RPM` at `200`, and `2205 RPM` at
+`180`). The script intentionally restored all channels to `255`; because no
+fan curve or CoolerControl profile has been enabled yet, the final high value
+is expected and does not demonstrate normal dynamic control.
+
 CoolerControl's journal evidence confirms the `arctic_fan` device and all ten
 fan inputs, but its initialization record shows only one AMD GPU location. The
 kernel-level sensors for both GPUs pass; CoolerControl two-GPU visibility still
@@ -140,6 +148,7 @@ and full duct speed before 75--80 C. Keep unused channels at `255`.
 - `RESEARCH_REPORT.md`
 - `artifacts/arctic-fan-controller-20260904T194223Z/*`
 - `artifacts/arctic-fan-controller-test-20260904T211941Z/test.log`
+- `artifacts/arctic-fan-controller-test-20260904T213352Z/test.log`
 
 The earlier lane commit also contains the initial module packaging, server import,
 CoolerControl ordering, and the 20260904T1820Z evidence set.
