@@ -1,0 +1,24 @@
+• Validating lock
+✓ Validating lock in 27.0ms
+• Configuring shell
+• Configuring cachix
+✓ Configuring cachix in 3.06ms
+• Evaluating shell
+✓ Evaluating shell in 11.7ms (cached)
+✓ Configuring shell in 22.0ms
+• Loading tasks
+• Evaluating devenv.config.task.config
+✓ Evaluating devenv.config.task.config in 902µs (cached)
+✓ Loading tasks in 2.53ms
+• Running tasks
+• Running devenv:python:uv
+• Running devenv:files:cleanup
+✓ Running devenv:files:cleanup in 15.5ms
+✓ Running devenv:python:uv in 76.4ms
+• Running devenv:enterShell
+✓ Running devenv:enterShell in 17.7ms
+• Running devenv:enterTest
+✓ Running devenv:enterTest in 4.85µs (no command)
+✓ Running tasks in 94.9ms
+evaluation warning: 'system' has been renamed to/replaced by 'stdenv.hostPlatform.system'
+evaluation warning: nix-paseo: password auth is disabled for network-reachable tailnet access.

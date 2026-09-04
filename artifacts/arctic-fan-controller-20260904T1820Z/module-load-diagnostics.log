@@ -1,0 +1,61 @@
+=== current-system module paths ===
+=== kernel module tree ===
+=== modprobe resolution ===
+modprobe: FATAL: Module arctic_fan_controller not found in directory /run/booted-system/kernel-modules/lib/modules/6.18.38
+=== loaded module lookup ===
+/run/current-system/kernel-modules/lib/modules/6.18.38/modules.dep:7298:updates/arctic_fan_controller.ko: kernel/drivers/hid/usbhid/usbhid.ko.xz kernel/drivers/hid/hid.ko.xz
+/run/current-system/kernel-modules/lib/modules/6.18.38/modules.alias:42035:alias hid:b0003g*v00003904p0000F001 arctic_fan_controller
+=== systemd-modules-load status ===
+● systemd-modules-load.service - Load Kernel Modules
+     Loaded: loaded (/etc/systemd/system/systemd-modules-load.service; enabled; preset: ignored)
+    Drop-In: /nix/store/0y1nk7maa57dvjg6z7bsd7nv23znqn89-system-units/systemd-modules-load.service.d
+             └─overrides.conf
+     Active: active (exited) since Fri 2026-09-04 14:08:19 EDT; 3min 5s ago
+ Invocation: 25a0adce54a74ffe90b885b90bc8aa44
+       Docs: man:systemd-modules-load.service(8)
+             man:modules-load.d(5)
+    Process: 213361 ExecStart=/nix/store/rd05syhv5v5999907a2n1r37sgi19vpd-systemd-260.2/lib/systemd/systemd-modules-load (code=exited, status=0/SUCCESS)
+   Main PID: 213361 (code=exited, status=0/SUCCESS)
+         IP: 0B in, 0B out
+         IO: 0B read, 0B written
+   Mem peak: 42.2M
+        CPU: 462ms
+
+Sep 04 14:08:19 server systemd[1]: Starting Load Kernel Modules...
+Sep 04 14:08:19 server systemd-modules-load[213361]: Using 8 probe threads
+Sep 04 14:08:19 server systemd-modules-load[213361]: Failed to find module 'arctic_fan_controller'
+Sep 04 14:08:19 server systemd-modules-load[213361]: Module 'ctr' is built in
+Sep 04 14:08:19 server systemd-modules-load[213361]: Failed to insert module 'nvidia_uvm': No such device
+Sep 04 14:08:19 server systemd[1]: Finished Load Kernel Modules.
+=== systemd-modules-load journal ===
+Sep 04 13:09:54 server systemd-modules-load[117]: Using 3 probe threads
+Sep 04 13:09:54 server systemd-modules-load[117]: Inserted module 'dm_mod'
+Sep 04 13:09:55 server systemd-modules-load[117]: Inserted module 'vmd'
+Sep 04 13:09:55 server systemd-modules-load[117]: Inserted module 'btrfs'
+Sep 04 13:09:55 server systemd[1]: Finished Load Kernel Modules.
+Sep 04 13:09:56 server systemd[1]: systemd-modules-load.service: Deactivated successfully.
+Sep 04 13:09:56 server systemd[1]: Stopped Load Kernel Modules.
+Sep 04 13:09:59 server systemd-modules-load[400]: Using 8 probe threads
+Sep 04 13:09:59 server systemd-modules-load[400]: Module 'ctr' is built in
+Sep 04 13:09:59 server systemd-modules-load[400]: Inserted module 'veth'
+Sep 04 13:09:59 server systemd-modules-load[400]: Inserted module 'loop'
+Sep 04 13:09:59 server systemd-modules-load[400]: Inserted module 'bridge'
+Sep 04 13:09:59 server systemd-modules-load[400]: Inserted module 'br_netfilter'
+Sep 04 13:09:59 server systemd-modules-load[400]: Inserted module 'xt_nat'
+Sep 04 13:09:59 server systemd-modules-load[400]: Inserted module 'kvm_intel'
+Sep 04 13:10:00 server systemd-modules-load[400]: Failed to insert module 'nvidia_uvm': No such device
+Sep 04 13:10:00 server systemd[1]: Finished Load Kernel Modules.
+Sep 04 14:08:17 server systemd[1]: systemd-modules-load.service: Deactivated successfully.
+Sep 04 14:08:17 server systemd[1]: Stopped Load Kernel Modules.
+Sep 04 14:08:17 server systemd[1]: systemd-modules-load.service: Consumed 765ms CPU time over 58min 17.452s wall clock time, 62M memory peak, 13.1M read from disk.
+Sep 04 14:08:19 server systemd[1]: Starting Load Kernel Modules...
+Sep 04 14:08:19 server systemd-modules-load[213361]: Using 8 probe threads
+Sep 04 14:08:19 server systemd-modules-load[213361]: Failed to find module 'arctic_fan_controller'
+Sep 04 14:08:19 server systemd-modules-load[213361]: Module 'ctr' is built in
+Sep 04 14:08:19 server systemd-modules-load[213361]: Failed to insert module 'nvidia_uvm': No such device
+Sep 04 14:08:19 server systemd[1]: Finished Load Kernel Modules.
+=== kernel command line ===
+initrd=\EFI\nixos\hhq5kp3854i3wj211mhqya4cag62rn6r-initrd-linux-6.18.38-initrd.efi init=/nix/store/pqzwx5q724lcy7j6ikczgy9750vx7hhy-nixos-system-server-26.11.20260705.d407951/init fbcon=nodefer root=fstab loglevel=4 lsm=landlock,yama,bpf vt.default_red=0x1d,0xcc,0x98,0xd7,0x45,0xb1,0x68,0xa8,0x92,0xfb,0xb8,0xfa,0x83,0xd3,0x8e,0xeb vt.default_grn=0x20,0x24,0x97,0x99,0x85,0x62,0x9d,0x99,0x83,0x49,0xbb,0xbd,0xa5,0x86,0xc0,0xdb vt.default_blu=0x21,0x1d,0x1a,0x21,0x88,0x86,0x6a,0x84,0x74,0x34,0x26,0x2f,0x98,0x9b,0x7c,0xb2
+=== active system kernel ===
+/nix/store/gjsk7kyh6ky8yshc4b3xhfzm2icha3c2-linux-6.18.38/bzImage
+/nix/store/kl9h2b8m4fxhjjlsabbkb5a3i36hamq7-linux-6.18.38-modules
