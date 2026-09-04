@@ -2,6 +2,9 @@
 result
 result-*
 
+# Local-only GPU load telemetry; acceptance evidence remains tracked separately.
+/artifacts/arctic-gpu-load-*/
+
 # Ignore automatically generated direnv output
 .direnv
 

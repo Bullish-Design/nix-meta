@@ -123,6 +123,26 @@ USB reconnect, and suspend/resume. Do not enable a fan curve or claim complete
 fail-high protection until those cases and the CoolerControl two-GPU check are
 resolved or explicitly accepted as remaining risks.
 
+## GPU load evidence
+
+The requested dual-GPU load was run on 2026-09-04 with both AMD Vega 10 devices
+at full utilization and the ARCTIC duct fan held at PWM `255`. The monitored
+run is recorded in
+`artifacts/arctic-gpu-load-20260904T221425Z/load.log`, with per-GPU rocBLAS
+output in the adjacent `gpu0-rocblas.log` and `gpu1-rocblas.log` files.
+
+Both tracked `rocblas-bench` processes exited `0`, and the monitor exited `0`.
+GPU0 reached `76 C` junction and GPU1 reached `77 C` junction; neither reached
+the `80 C` abort threshold. Memory temperatures reached approximately `73 C`.
+Both GPUs sustained `99--100%` utilization at roughly `100--113 W`, while
+ARCTIC `pwm1` remained `255` and `fan1` remained approximately `3029--3058
+RPM`. The final readback confirmed all ten ARCTIC channels at `255` and no
+rocBLAS process remained.
+
+An initial wrapper attempt at 18:13 aborted before meaningful work because of
+a monitor predicate typo; both benchmark logs were empty and all channels
+remained at `255`. The corrected run above is the authoritative load result.
+
 ## Fan curve status
 
 No final fan curve is enabled. CoolerControl remains the normal controller, and
