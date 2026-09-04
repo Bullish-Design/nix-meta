@@ -127,6 +127,23 @@ let
       return 1
     }
 
+    # The watchdog is readiness-gated so CoolerControl starts only after this
+    # initial safe-high write has completed. This lets CoolerControl apply its
+    # saved settings after the watchdog's startup barrier. During that brief
+    # ordering window, wait for CoolerControl rather than treating it as a
+    # runtime failure. Once it has been observed active, an inactive daemon is
+    # a failure and the watchdog exits through the safe-high trap.
+    ${pkgs.systemd}/bin/systemd-notify --ready
+    startup_waits=0
+    while ! ${pkgs.systemd}/bin/systemctl is-active --quiet coolercontrold.service; do
+      if [ "$startup_waits" -ge 180 ]; then
+        echo "CoolerControl did not start after watchdog readiness" >&2
+        exit 1
+      fi
+      startup_waits=$((startup_waits + 1))
+      ${pkgs.coreutils}/bin/sleep 0.5
+    done
+
     while :; do
       if ! ${pkgs.systemd}/bin/systemctl is-active --quiet coolercontrold.service; then
         echo "CoolerControl is not active; forcing all ARCTIC channels high" >&2
@@ -254,8 +271,8 @@ in
   # If CoolerControl stops or crashes, restore all channels to 100%. This is
   # independent of CoolerControl's saved profiles and control loop.
   systemd.services.coolercontrold = {
-    requires = [ "arctic-fan-safe-high.service" ];
-    after = [ "arctic-fan-safe-high.service" ];
+    requires = [ "arctic-fan-safe-high.service" "arctic-fan-watchdog.service" ];
+    after = [ "arctic-fan-safe-high.service" "arctic-fan-watchdog.service" ];
     serviceConfig.ExecStopPost = "${allFansHigh}/bin/arctic-fans-100";
   };
 
@@ -263,11 +280,12 @@ in
     description = "Independent fail-high watchdog for ARCTIC GPU duct cooling";
     wantedBy = [ "multi-user.target" ];
     requires = [ "arctic-fan-safe-high.service" ];
-    after = [ "arctic-fan-safe-high.service" "coolercontrold.service" ];
-    before = [ "shutdown.target" ];
+    after = [ "arctic-fan-safe-high.service" ];
+    before = [ "coolercontrold.service" "shutdown.target" ];
 
     serviceConfig = {
-      Type = "simple";
+      Type = "notify";
+      NotifyAccess = "main";
       ExecStart = fanWatchdog;
       ExecStopPost = "${allFansHigh}/bin/arctic-fans-100";
       Restart = "on-failure";

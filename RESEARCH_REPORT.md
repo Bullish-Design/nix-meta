@@ -79,16 +79,41 @@ Prior live evidence recorded all ten ARCTIC PWM channels at `255`, `fan1` at
 `3058 RPM`, and the other nine tach channels at zero. The saved controlled fan
 test recorded `3029 RPM` at PWM `255` and `2352 RPM` at PWM `200`.
 
-The fresh read-only live snapshot found `pwm1=150` and `pwm2` through `pwm10`
-at `255`. CoolerControl is active and listens only on `127.0.0.1` and `::1` on
-ports `11987` and `11988`. This is a safety failure for the requested sequence.
-The session cannot authenticate `sudo`, so it cannot safely restore all channels
-to `255` or run the required service-stop and PWM-response tests. No GPU load,
-reboot, controller disconnect, module unload, or fan-curve activation occurred.
+The root-authorized acceptance run is recorded in
+`artifacts/arctic-fan-controller-test-20260904T211941Z/test.log`. It confirmed
+kernel `6.18.38`, USB `3904:f001`, the bound native module, dynamic hwmon name
+`arctic_fan`, ten PWM channels, ten tach channels, both stable PCI GPU sensor
+paths, and localhost-only CoolerControl listeners. The exact module file was
+found below the current-system symlink and reported native name
+`arctic_fan_controller` with vermagic `6.18.38 SMP preempt mod_unload`.
 
-Do not claim complete fail-high protection until the root-authorized test sequence
-demonstrates daemon stop, daemon crash, sensor loss, controller reconnect, and
-suspend/resume behavior.
+The stop/ExecStopPost test passed, the SIGKILL crash test passed, and the
+controlled response test passed without touching unused channels:
+
+```text
+pwm1/fan1: GPU duct fan
+255 -> 3029 RPM
+200 -> 2441 RPM
+180 -> 2205 RPM
+```
+
+The run also found a lifecycle defect: the watchdog was started after
+CoolerControl and its startup safe-high write overrode CoolerControl's saved
+fan setting, leaving the controller at PWM 255 after restoration. The current
+working tree changes the watchdog to systemd `Type=notify`, makes CoolerControl
+require it, and starts CoolerControl only after the watchdog's initial safe-high
+barrier. This requires a new build and acceptance run before relying on normal
+fan control.
+
+CoolerControl's journal evidence confirms the `arctic_fan` device and all ten
+fan inputs, but its initialization record shows only one AMD GPU location. The
+kernel-level sensors for both GPUs pass; CoolerControl two-GPU visibility still
+requires authenticated API/UI verification.
+
+Not yet demonstrated: GPU load, reboot persistence, synthetic sensor removal,
+USB reconnect, and suspend/resume. Do not enable a fan curve or claim complete
+fail-high protection until those cases and the CoolerControl two-GPU check are
+resolved or explicitly accepted as remaining risks.
 
 ## Fan curve status
 
@@ -113,6 +138,7 @@ and full duct speed before 75--80 C. Keep unused channels at `255`.
 - `machines/hardware/arctic-fan-controller.nix`
 - `RESEARCH_REPORT.md`
 - `artifacts/arctic-fan-controller-20260904T194223Z/*`
+- `artifacts/arctic-fan-controller-test-20260904T211941Z/test.log`
 
 The earlier lane commit also contains the initial module packaging, server import,
 CoolerControl ordering, and the 20260904T1820Z evidence set.

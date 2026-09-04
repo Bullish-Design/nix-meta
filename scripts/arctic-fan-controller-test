@@ -347,6 +347,8 @@ check_service_ordering() {
   echo "coolercontrold.After=$after"
   printf '%s\n' "$requires" | grep -q 'arctic-fan-safe-high.service' \
     || fail "CoolerControl does not require arctic-fan-safe-high.service"
+  printf '%s\n' "$requires" | grep -q 'arctic-fan-watchdog.service' \
+    || fail "CoolerControl does not require arctic-fan-watchdog.service"
   printf '%s\n' "$after" | grep -q 'arctic-fan-safe-high.service' \
     || fail "CoolerControl does not start after arctic-fan-safe-high.service"
   if [ "$watchdog_exists" -ne 1 ]; then
