@@ -3,6 +3,27 @@
 let
   # The account that owns ~/Documents/Projects on the box.
   user = "andrew";
+
+  # This workstation is headless. Permit both Vega 10 GPUs to runtime-suspend
+  # when no compute or display client holds a reference to them. The service
+  # uses stable PCI paths and does not depend on card or hwmon numbering.
+  enableAmdgpuRuntimePm = pkgs.writeShellScript "enable-amdgpu-runtime-pm" ''
+    set -eu
+
+    for pci in /sys/bus/pci/devices/0000:19:00.0 /sys/bus/pci/devices/0000:67:00.0; do
+      control="$pci/power/control"
+      if [ ! -w "$control" ]; then
+        echo "AMDGPU runtime-PM control is unavailable: $control" >&2
+        exit 1
+      fi
+
+      printf '%s\n' auto > "$control"
+      if [ "$(cat "$control")" != auto ]; then
+        echo "AMDGPU runtime-PM control did not accept auto: $control" >&2
+        exit 1
+      fi
+    done
+  '';
 in
 {
   imports = [
@@ -59,8 +80,22 @@ in
   # Dell/Intel platform exposes the NVMe root via Intel VMD (BIOS "RAID On" mode
   # for Windows compat) — keep vmd in the initrd so root is visible at boot.
   boot.initrd.kernelModules = [ "vmd" ];
+  # Explicitly enable AMDGPU dGPU runtime power management. The selected
+  # kernel remains the existing 6.18.38 kernel; this is only a driver parameter.
+  boot.kernelParams = [ "amdgpu.runpm=1" ];
   boot.supportedFilesystems = [ "btrfs" "ntfs" "vfat" ];
   hardware.enableRedistributableFirmware = true;
+
+  systemd.services.amdgpu-headless-runtime-pm = {
+    description = "Allow headless AMD GPUs to runtime-suspend when idle";
+    wantedBy = [ "multi-user.target" ];
+    after = [ "systemd-modules-load.service" ];
+    serviceConfig = {
+      Type = "oneshot";
+      RemainAfterExit = true;
+      ExecStart = enableAmdgpuRuntimePm;
+    };
+  };
 
   # CoolerControl provides the local web UI and daemon. Its fan profiles will
   # be configured only after the controller channels are physically mapped.

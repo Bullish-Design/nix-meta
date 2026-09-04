@@ -175,10 +175,9 @@ ramp-down. It verifies every `pwm1` write. It rejects zero, invalid values, and
 any unused channel below `255`. Every read, write, sensor, controller, or exit
 failure forces all channels to `255`.
 
-The generated configuration passed `nix flake check`; the current server dry
-build is being rerun after adding the persistent AMD/ROCm evaluation tools.
-Live activation remains an operator action via the privileged
-`nixos-rebuild switch` command.
+The generated configuration passed `nix flake check`; the exact server dry
+build passed with kernel `6.18.38`. Live activation remains an operator action
+via the privileged `nixos-rebuild switch` command.
 
 ## Post-load GPU idle power investigation
 
@@ -201,10 +200,20 @@ references and DPM residency. Do not force a GPU power state during fan testing.
 `machines/server.nix` now installs the AMDGPU/ROCm tools used for evaluation in
 the declarative system package set: `amdgpu_top`, `clinfo`, `amd-smi`,
 `rocm-smi`, `rocminfo`, `rocm-bandwidth-test`, `rocblas-bench`, `rocgdb`, and
-`rocprofiler`. This removes the need for an ad hoc `nix shell` after the next
-activation. The existing `profiles/gpu-compute.nix` NVIDIA compute layer and
-its CDI generator are unchanged; the `Driver Not Loaded` warning is a separate
-stale NVIDIA configuration issue.
+`rocprofiler`. This removes the need for an ad hoc `nix shell` after activation.
+
+The server now sets `amdgpu.runpm=1` and provides
+`amdgpu-headless-runtime-pm.service`. The service writes `auto` to
+`power/control` for the two stable AMD PCI paths, so idle cards can enter
+runtime suspend. The exact server build passed and evaluated the service and
+kernel parameter. Activation was not completed in this run because sudo
+required the operator password.
+
+The NVIDIA compute profile is now explicitly opt-in through
+`nix-meta.gpu-compute.enable`, defaulting to `false`. The AMD-only server keeps
+the profile in its composition but does not enable the NVIDIA driver,
+container toolkit, persistence service, or CDI generator. A host with NVIDIA
+hardware can set the option to `true`.
 
 ### DPM explanation
 
@@ -248,6 +257,7 @@ because forcing them could affect display stability and ROCm behavior.
 
 - `machines/hardware/arctic-fan-controller.nix`
 - `machines/server.nix`
+- `profiles/gpu-compute.nix`
 - `scripts/arctic-fan-controller-test`
 - `scripts/arctic-gpu-load-test`
 - `.gitignore`
