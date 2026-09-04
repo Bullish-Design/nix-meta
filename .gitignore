@@ -7,6 +7,10 @@ result-*
 
 # Local-only GPU load telemetry; acceptance evidence remains tracked separately.
 
+# devenv generates this per-machine; it is never reproducible from the flake.
+.devenv/
+.devenv.flake.nix
+
 # Ignore automatically generated direnv output
 .direnv
 

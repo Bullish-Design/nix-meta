@@ -94,6 +94,17 @@ in
     repoDir = "/home/andrew/Documents/Projects/inferference";
   };
 
+  # The launcher uses /usr/bin/env bash. User units do not inherit the
+  # interactive shell PATH, so include Bash in the deployed unit explicitly.
+  systemd.user.services.inferference-router.environment.PATH = pkgs.lib.mkForce (pkgs.lib.makeBinPath [
+    pkgs.bash
+    pkgs.coreutils
+    pkgs.findutils
+    pkgs.gnugrep
+    pkgs.gnused
+    pkgs.systemd
+  ]);
+
   # CoolerControl provides the local web UI and daemon. Its fan profiles will
   # be configured only after the controller channels are physically mapped.
   programs.coolercontrol.enable = true;
@@ -120,27 +131,15 @@ in
   networking.firewall.interfaces.tailscale0.allowedTCPPorts = [ 22 8077 ];
 
   # Developer workflow policy is host-owned: the shared profile provides the
-  # tools and user-relative defaults, while this box chooses its organization
-  # checkout set. The root matches paseo/zelligate's opt-in workspace scan.
+  # tools and user-relative defaults, while this box sets its own log root.
+  #
+  # The repoman baseDir/accounts checkout set that used to live here is gone.
+  # It only ever fed nix-terminal's repoman module, which profiles/developer.nix
+  # now disables so the shared toolchain venv is the single owner of the
+  # `repoman` name. repoman 0.7.1 reads no config file, so that generated
+  # config was already unread.
   nix-meta.developer = {
     nixbuild.outputDir = "/home/${user}/.nixbuild-logs";
-    repoman = {
-      baseDir = "/home/${user}/Documents/Projects";
-      accounts = [
-        {
-          name = "Bullish-Design";
-          repos = [
-            "nix-meta"
-            "nixos-core"
-            "nix-terminal"
-            "nixvim"
-            "terminal-state"
-            "devman"
-            "gitman"
-          ];
-        }
-      ];
-    };
   };
 
   nix-paseo.paseo = {

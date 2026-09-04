@@ -121,6 +121,15 @@ in
             # not a bare `nvim`), so point the muscle-memory aliases at it.
             vim = "nv";
             vi = "nv";
+
+            # These come from nix-terminal's repoman module, which gates them
+            # behind its own `enable`. profiles/developer.nix turns that module
+            # off so the shared toolchain venv is the single owner of the
+            # `repoman` name, so re-declare the aliases here. They now run the
+            # venv's 0.7.1 rather than the module's 0.7.0.
+            rsync = "repoman sync";
+            rlist = "repoman list";
+            rstatus = "repoman status";
           };
 
           # yazi's cd-on-quit wrapper: `y` opens the file manager and, on exit,
