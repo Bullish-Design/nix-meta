@@ -71,10 +71,10 @@ let
     echo "ARCTIC Fan Controller: verified $count PWM channel(s) at 100%"
   '';
 
-  # This watchdog is independent of CoolerControl's control loop. It starts
-  # high, checks both stable GPU PCI paths, and returns high on every error.
-  # It does not implement a fan curve. CoolerControl remains the only normal
-  # controller until the physical mapping and acceptance tests are complete.
+  # This watchdog is the normal controller for the mapped GPU duct fan. It
+  # starts high, uses both stable GPU PCI paths, and returns high on every
+  # error. CoolerControl leaves the ARCTIC fan unmanaged; it remains the
+  # localhost UI and hardware monitor.
   fanWatchdog = pkgs.writeShellScript "arctic-fan-watchdog" ''
     set -u
 
@@ -127,6 +127,25 @@ let
       return 1
     }
 
+    curve_pwm() {
+      junction="$1"
+      # The measured minimum reliable value is 180. Use full speed before
+      # 70 C, with a conservative margin below the requested 75--80 C limit.
+      if [ "$junction" -ge 65000 ]; then
+        printf '%s\n' 255
+      elif [ "$junction" -ge 60000 ]; then
+        printf '%s\n' 245
+      elif [ "$junction" -ge 55000 ]; then
+        printf '%s\n' 230
+      elif [ "$junction" -ge 50000 ]; then
+        printf '%s\n' 215
+      elif [ "$junction" -ge 45000 ]; then
+        printf '%s\n' 200
+      else
+        printf '%s\n' 180
+      fi
+    }
+
     # The watchdog is readiness-gated so CoolerControl starts only after this
     # initial safe-high write has completed. This lets CoolerControl apply its
     # saved settings after the watchdog's startup barrier. During that brief
@@ -144,6 +163,7 @@ let
       ${pkgs.coreutils}/bin/sleep 0.5
     done
 
+    cooldown_samples=0
     while :; do
       if ! ${pkgs.systemd}/bin/systemctl is-active --quiet coolercontrold.service; then
         echo "CoolerControl is not active; forcing all ARCTIC channels high" >&2
@@ -156,6 +176,7 @@ let
       fi
 
       pwm_count=0
+      pwm1_value=""
       for pwm in "$arctic"/pwm[0-9] "$arctic"/pwm[0-9][0-9]; do
         [ -r "$pwm" ] || continue
         if ! value="$(cat "$pwm")"; then
@@ -172,10 +193,29 @@ let
             exit 1
             ;;
         esac
+        if [ "$value" -gt 255 ]; then
+          echo "invalid PWM value in $pwm: $value" >&2
+          exit 1
+        fi
+        case "$pwm" in
+          "$arctic"/pwm1)
+            pwm1_value="$value"
+            ;;
+          *)
+            if [ "$value" -ne 255 ]; then
+              echo "unused ARCTIC channel is not high: $pwm=$value" >&2
+              exit 1
+            fi
+            ;;
+        esac
         pwm_count=$((pwm_count + 1))
       done
       if [ "$pwm_count" -eq 0 ]; then
         echo "ARCTIC controller has no readable PWM channels" >&2
+        exit 1
+      fi
+      if [ -z "$pwm1_value" ]; then
+        echo "mapped GPU duct channel pwm1 is missing; forcing safe high" >&2
         exit 1
       fi
 
@@ -200,7 +240,39 @@ let
         fi
       done
 
-      echo "ARCTIC watchdog: max_gpu_junction_mC=$max_junction"
+      target_pwm="$(curve_pwm "$max_junction")"
+      if [ "$target_pwm" -gt "$pwm1_value" ]; then
+        # Ramp up without delay when the maximum junction temperature rises.
+        cooldown_samples=0
+        if ! printf '%s\n' "$target_pwm" > "$arctic/pwm1"; then
+          echo "failed to increase GPU duct PWM to $target_pwm; forcing safe high" >&2
+          exit 1
+        fi
+        if ! readback="$(cat "$arctic/pwm1")" || [ "$readback" != "$target_pwm" ]; then
+          echo "GPU duct PWM ramp-up readback failed: expected $target_pwm, got $readback" >&2
+          exit 1
+        fi
+        pwm1_value="$readback"
+      elif [ "$target_pwm" -lt "$pwm1_value" ]; then
+        # Require five consecutive cool samples before ramping down.
+        cooldown_samples=$((cooldown_samples + 1))
+        if [ "$cooldown_samples" -ge 5 ]; then
+          if ! printf '%s\n' "$target_pwm" > "$arctic/pwm1"; then
+            echo "failed to decrease GPU duct PWM to $target_pwm; forcing safe high" >&2
+            exit 1
+          fi
+          if ! readback="$(cat "$arctic/pwm1")" || [ "$readback" != "$target_pwm" ]; then
+            echo "GPU duct PWM ramp-down readback failed: expected $target_pwm, got $readback" >&2
+            exit 1
+          fi
+          pwm1_value="$readback"
+          cooldown_samples=0
+        fi
+      else
+        cooldown_samples=0
+      fi
+
+      echo "ARCTIC watchdog: max_gpu_junction_mC=$max_junction target_pwm1=$target_pwm actual_pwm1=$pwm1_value cooldown_samples=$cooldown_samples"
       ${pkgs.coreutils}/bin/sleep 2
     done
   '';

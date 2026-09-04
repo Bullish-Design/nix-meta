@@ -376,10 +376,11 @@ record_initial_state() {
 test_coolercontrol_stop() {
   local since
   echo "=== CoolerControl stop / ExecStopPost test ==="
-  require_all_high || return 1
+  # The normal curve may be below 255 at low temperature. Start this test
+  # from a known high state, then exercise the service stop path.
+  force_all_high || return 1
   systemctl start coolercontrold.service || return 1
   wait_for_active coolercontrold.service || return 1
-  require_all_high || return 1
   since="$(date --iso-8601=seconds)"
   systemctl stop coolercontrold.service || return 1
   sleep 2
@@ -397,10 +398,9 @@ test_coolercontrol_stop() {
 test_coolercontrol_crash() {
   local pid since
   echo "=== CoolerControl SIGKILL crash test ==="
-  require_all_high || return 1
+  force_all_high || return 1
   systemctl start coolercontrold.service || return 1
   wait_for_active coolercontrold.service || return 1
-  require_all_high || return 1
   pid="$(systemctl show -p MainPID --value coolercontrold.service)"
   case "$pid" in
     ""|*[!0-9]*|0|1) fail "invalid CoolerControl MainPID: $pid"; return 1 ;;
@@ -418,13 +418,9 @@ test_coolercontrol_crash() {
 test_pwm_response() {
   local h pwm fan rpm255 rpm200 rpm180 value index
   echo "=== GPU duct fan PWM response test ==="
-  require_all_high || return 1
   systemctl stop coolercontrold.service || true
+  systemctl stop arctic-fan-watchdog.service 2>/dev/null || true
   require_all_high || return 1
-  if [ "$watchdog_was_active" -eq 1 ]; then
-    systemctl stop arctic-fan-watchdog.service || return 1
-    require_all_high || return 1
-  fi
 
   h="$(find_arctic_hwmon)" || return 1
   pwm="$h/pwm1"
@@ -476,6 +472,49 @@ test_pwm_response() {
   echo "response_summary=rpm255=$rpm255 rpm200=$rpm200 rpm180=$rpm180"
   echo "minimum_reliable_pwm=180 (observed tach response; confirm acoustics and stall margin manually)"
   require_all_high
+}
+
+test_low_temperature_curve() {
+  local h sensor value max_junction pwm i
+  echo "=== low-temperature curve test ==="
+  force_all_high || return 1
+  if ! systemctl is-active --quiet arctic-fan-watchdog.service; then
+    echo "LOW-TEMP CURVE NOT TESTED: watchdog is not active"
+    required_unverified=1
+    return 0
+  fi
+
+  h="$(find_arctic_hwmon)" || return 1
+  max_junction=0
+  for pci in /sys/bus/pci/devices/0000:19:00.0 /sys/bus/pci/devices/0000:67:00.0; do
+    sensor="$(find_gpu_sensor "$pci" junction)" || return 1
+    value="$(cat "$sensor")" || return 1
+    case "$value" in
+      ""|*[!0-9]*) fail "low-temperature junction value is invalid: $sensor=$value"; return 1 ;;
+    esac
+    [ "$value" -gt "$max_junction" ] && max_junction="$value"
+  done
+
+  echo "low_temp_max_gpu_junction_mC=$max_junction"
+  if [ "$max_junction" -ge 45000 ]; then
+    echo "LOW-TEMP CURVE NOT TESTED: maximum junction is not below 45 C"
+    required_unverified=1
+    return 0
+  fi
+
+  for i in $(seq 1 10); do
+    pwm="$(cat "$h/pwm1")" || return 1
+    echo "low_temp_curve_sample=$i pwm1=$pwm"
+    if [ "$pwm" = 180 ]; then
+      echo "Low-temperature curve result: PASS; pwm1 reached 180"
+      require_all_high || return 1
+      return 0
+    fi
+    sleep 2
+  done
+  fail "low-temperature curve did not reach PWM 180"
+  force_all_high || true
+  return 1
 }
 
 restore_service_state() {
@@ -574,6 +613,11 @@ if [ "$failure" -eq 0 ] && ! test_coolercontrol_crash; then failure=1; fi
 echo "=== measured response tests ==="
 if [ "$failure" -eq 0 ] && ! test_pwm_response; then failure=1; fi
 
+if [ "$failure" -eq 0 ]; then
+  restore_service_state
+  test_low_temperature_curve || failure=1
+fi
+
 echo "=== intentionally untested cases ==="
 echo "NOT TESTED: GPU load; run only after this report passes review."
 echo "NOT TESTED: reboot persistence; ask for reboot approval first."
@@ -582,7 +626,13 @@ echo "NOT TESTED: USB disconnect/reconnect; the controller stayed connected."
 echo "NOT TESTED: suspend/resume; the workstation was not suspended."
 required_unverified=1
 
-restore_service_state
+if [ "$failure" -eq 0 ]; then
+  systemctl is-active --quiet coolercontrold.service || failure=1
+  systemctl is-active --quiet arctic-fan-watchdog.service || failure=1
+else
+  systemctl stop coolercontrold.service arctic-fan-watchdog.service 2>/dev/null || true
+  force_all_high || true
+fi
 snapshot_controller || failure=1
 snapshot_gpu
 echo "=== final sensors ==="

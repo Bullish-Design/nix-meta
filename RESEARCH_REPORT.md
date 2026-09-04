@@ -143,13 +143,48 @@ An initial wrapper attempt at 18:13 aborted before meaningful work because of
 a monitor predicate typo; both benchmark logs were empty and all channels
 remained at `255`. The corrected run above is the authoritative load result.
 
-## Fan curve status
+## Fan curve implementation
 
-No final fan curve is enabled. CoolerControl remains the normal controller, and
-the watchdog provides fail-high supervision. After the live acceptance sequence
-passes, tune only `pwm1` from the maximum of the two GPU junction temperatures.
-Use the measured PWM/RPM response, hysteresis, delayed ramp-down, fast ramp-up,
-and full duct speed before 75--80 C. Keep unused channels at `255`.
+The watchdog now controls only the confirmed GPU duct channel `pwm1`. CoolerControl
+leaves the ARCTIC device unmanaged and provides the local monitoring UI. The
+watchdog computes the maximum junction temperature from both stable PCI paths.
+
+The first conservative curve is:
+
+```text
+maximum junction < 45 C: 180
+45--49 C:                 200
+50--54 C:                 215
+55--59 C:                 230
+60--64 C:                 245
+65 C and above:          255
+```
+
+PWM 180 is the lowest tested value with a positive tach response. The watchdog
+ramp-up is immediate. It requires five consecutive cool samples before a
+ramp-down. It verifies every `pwm1` write. It rejects zero, invalid values, and
+any unused channel below `255`. Every read, write, sensor, controller, or exit
+failure forces all channels to `255`.
+
+The generated configuration passed `nix flake check` and the exact server dry
+build. Live activation still requires the operator to run the privileged
+`nixos-rebuild switch` command.
+
+## Post-load GPU idle power investigation
+
+After the successful dual-GPU load, a read-only eight-sample idle poll found no
+rocBLAS process and reported `gpu_busy_percent=0` on both GPUs. Power remained
+approximately `17--20 W` per GPU. Both devices reported `power/control=on`,
+runtime usage `2`, and `power_dpm_force_performance_level=auto`. GPU0 retained a
+500 MHz memory state, and both GPUs retained elevated shader-clock states.
+
+The observed state explains the higher post-load power, but it does not yet
+prove which client holds the devices active. No DPM or runtime-power sysfs value
+was changed. A `rocm-smi` monitor process existed during an earlier inspection
+and was gone by the later poll. CoolerControl, display ownership, and runtime
+power references remain candidates for follow-up. The safe next step is to
+repeat the read-only poll with monitoring clients closed, then compare runtime
+references and DPM residency. Do not force a GPU power state during fan testing.
 
 ## Primary references
 
