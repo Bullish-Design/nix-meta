@@ -56,6 +56,11 @@ controller, or exit errors. Systemd supplies `ExecStopPost`, `Restart=on-failure
 
 ## Verification
 
+The repeatable test harness is [scripts/arctic-fan-controller-test](scripts/arctic-fan-controller-test).
+Run it from the repository with `sudo ./scripts/arctic-fan-controller-test`.
+It writes a UTC artifact directory, stops on safety failures, and leaves the
+controller high with CoolerControl stopped on the failure path.
+
 Static verification passed:
 
 - Nix parser check.
