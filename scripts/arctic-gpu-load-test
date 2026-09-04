@@ -15,6 +15,13 @@ exec > >(tee -a "$log_file") 2>&1
 
 bench="$(command -v rocblas-bench || true)"
 if [ -z "$bench" ]; then
+  for candidate in /nix/store/*-rocblas-*/bin/rocblas-bench; do
+    [ -x "$candidate" ] || continue
+    bench="$candidate"
+    break
+  done
+fi
+if [ -z "$bench" ]; then
   echo "FAIL: rocblas-bench is not installed or not in PATH" >&2
   exit 2
 fi
