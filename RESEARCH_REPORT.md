@@ -109,19 +109,19 @@ That follow-up rebuild and acceptance run is recorded in
 `artifacts/arctic-fan-controller-test-20260904T213352Z/test.log`. The new
 ordering was active, and stop/ExecStopPost, SIGKILL crash, and PWM response
 tests passed again (`3058 RPM` at `255`, `2411 RPM` at `200`, and `2205 RPM` at
-`180`). The script intentionally restored all channels to `255`; because no
-fan curve or CoolerControl profile has been enabled yet, the final high value
-is expected and does not demonstrate normal dynamic control.
+`180`). The script intentionally restored all channels to `255`; the watchdog
+then resumed its normal conservative control.
 
 CoolerControl's journal evidence confirms the `arctic_fan` device and all ten
 fan inputs, but its initialization record shows only one AMD GPU location. The
 kernel-level sensors for both GPUs pass; CoolerControl two-GPU visibility still
 requires authenticated API/UI verification.
 
-Not yet demonstrated: GPU load, reboot persistence, synthetic sensor removal,
-USB reconnect, and suspend/resume. Do not enable a fan curve or claim complete
-fail-high protection until those cases and the CoolerControl two-GPU check are
-resolved or explicitly accepted as remaining risks.
+Not yet demonstrated: reboot persistence, synthetic sensor removal, USB
+reconnect, and suspend/resume. CoolerControl's two-GPU visibility still needs
+authenticated API/UI verification. These remain explicit risks; the tested
+fail-high cases do not establish protection for every possible hardware or
+power-management fault.
 
 ## GPU load evidence
 
@@ -142,6 +142,15 @@ rocBLAS process remained.
 An initial wrapper attempt at 18:13 aborted before meaningful work because of
 a monitor predicate typo; both benchmark logs were empty and all channels
 remained at `255`. The corrected run above is the authoritative load result.
+
+A later run using the live dynamic curve is recorded in
+`artifacts/arctic-gpu-load-20260904T230333Z/load.log`. Both GPUs reached
+`99--100%` utilization and the watchdog ramped the duct fan from `245` to
+`255` as junction temperature rose. GPU0 reached exactly `80 C` at
+`19:05:23`; the guard immediately terminated both tracked rocBLAS processes,
+verified all ten ARCTIC channels at `255`, and exited `RESULT=FAIL`. This is a
+deliberate safety cutoff, not a completed throughput result, and no benchmark
+performance number should be inferred from it.
 
 ## Fan curve implementation
 
@@ -166,8 +175,9 @@ ramp-down. It verifies every `pwm1` write. It rejects zero, invalid values, and
 any unused channel below `255`. Every read, write, sensor, controller, or exit
 failure forces all channels to `255`.
 
-The generated configuration passed `nix flake check` and the exact server dry
-build. Live activation still requires the operator to run the privileged
+The generated configuration passed `nix flake check`; the current server dry
+build is being rerun after adding the persistent AMD/ROCm evaluation tools.
+Live activation remains an operator action via the privileged
 `nixos-rebuild switch` command.
 
 ## Post-load GPU idle power investigation
@@ -186,6 +196,44 @@ power references remain candidates for follow-up. The safe next step is to
 repeat the read-only poll with monitoring clients closed, then compare runtime
 references and DPM residency. Do not force a GPU power state during fan testing.
 
+## Persistent AMD/ROCm tools
+
+`machines/server.nix` now installs the AMDGPU/ROCm tools used for evaluation in
+the declarative system package set: `amdgpu_top`, `clinfo`, `amd-smi`,
+`rocm-smi`, `rocminfo`, `rocm-bandwidth-test`, `rocblas-bench`, `rocgdb`, and
+`rocprofiler`. This removes the need for an ad hoc `nix shell` after the next
+activation. The existing `profiles/gpu-compute.nix` NVIDIA compute layer and
+its CDI generator are unchanged; the `Driver Not Loaded` warning is a separate
+stale NVIDIA configuration issue.
+
+### DPM explanation
+
+AMDGPU DPM means Dynamic Power Management. PowerPlay exposes several selectable
+clock states for each domain, principally shader/engine clock (`SCLK`) and
+memory clock (`MCLK`). In `auto`, the driver and the GPU's System Management
+Unit choose among those states according to workload, display/memory timing,
+thermal limits, and power policy. The `*` in `pp_dpm_sclk` or `pp_dpm_mclk`
+marks the state currently selected. The kernel documents `auto` as the mode
+that dynamically selects the optimal profile; `low` and `high` force the
+lowest/highest power states.
+
+The idle observation was therefore more precise than “the GPU is busy”: both
+GPUs reported instantaneous engine utilization `0`, but the device remained
+runtime-active, `power/control=on`, `power_dpm_force_performance_level=auto`,
+and retained elevated clock residency. A zero utilization sample means no
+engine work at that instant; it does not guarantee that every clock domain has
+entered its deepest idle state or that the device has runtime-suspended.
+
+The preceding load run also caused a real state transition: both GPUs moved
+between their Vega 10 DPM SCLK/MCLK levels while loaded, and the post-load
+power stayed around `17--20 W` rather than the earlier `5--6 W`. Current
+evidence does not identify a persistent userspace holder: no `/dev/dri` or
+`/dev/kfd` holder was found in the later idle scan. CoolerControl's hwmon reads
+are a candidate to rule out, but they are not proof of ownership. Display
+requirements, runtime-PM references, and the driver's post-compute residency
+decay remain the likely classes of cause. We have not changed DPM sysfs values
+because forcing them could affect display stability and ROCm behavior.
+
 ## Primary references
 
 - [Linux hwmon sysfs interface](https://docs.kernel.org/hwmon/sysfs-interface.html)
@@ -199,7 +247,10 @@ references and DPM residency. Do not force a GPU power state during fan testing.
 ## Changed files
 
 - `machines/hardware/arctic-fan-controller.nix`
+- `machines/server.nix`
 - `scripts/arctic-fan-controller-test`
+- `scripts/arctic-gpu-load-test`
+- `.gitignore`
 - `RESEARCH_REPORT.md`
 - `artifacts/arctic-fan-controller-20260904T194223Z/*`
 - `artifacts/arctic-fan-controller-test-20260904T211941Z/test.log`

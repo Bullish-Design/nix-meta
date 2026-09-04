@@ -70,6 +70,17 @@ in
     lm_sensors
     pciutils
     usbutils
+    # AMDGPU and ROCm diagnostics and evaluation tools. Keep these in the
+    # system closure so GPU checks do not require an ad hoc nix shell.
+    amdgpu_top
+    clinfo
+    rocmPackages.amdsmi
+    rocmPackages.rocm-smi
+    rocmPackages.rocminfo
+    rocmPackages.rocm-bandwidth-test
+    rocmPackages.rocblas.benchmark
+    rocmPackages.rocgdb
+    rocmPackages.rocprofiler
   ];
 
   # ── Host identity ───────────────────────────────────────────────────────────
