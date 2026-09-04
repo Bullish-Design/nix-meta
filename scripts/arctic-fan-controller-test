@@ -287,7 +287,7 @@ check_localhost_listeners() {
   local bad
   echo "=== CoolerControl listeners ==="
   ss -ltn | grep -E ':11987|:11988' || true
-  bad="$(ss -H -ltn | awk '$4 ~ /:11987$|:11988$/ && $4 !~ /^127\\.0\\.0\\.1:/ && $4 !~ /^\\[::1\\]:/ {print}')"
+  bad="$(ss -H -ltn | awk '$4 ~ /:11987$|:11988$/ && $4 !~ /^127[.]0[.]0[.]1:/ && $4 !~ /^[[]::1[]]:/ {print}')"
   if [ -n "$bad" ]; then
     fail "CoolerControl has a non-local listener: $bad"
   else
@@ -315,7 +315,7 @@ check_module_metadata() {
   kernel="$(uname -r)"
   echo "=== exact ARCTIC module metadata ==="
   modinfo arctic_fan_controller || true
-  module_path="$(find \
+  module_path="$(find -L \
     "/run/current-system/kernel-modules/lib/modules/$kernel" \
     -type f -name arctic_fan_controller.ko -print -quit 2>/dev/null || true)"
   if [ -z "$module_path" ]; then
