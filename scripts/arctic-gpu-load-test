@@ -49,19 +49,23 @@ controller_pwm_files() {
   done
 }
 
-find_junction() {
-  local pci="$1" h label
+find_sensor() {
+  local pci="$1" wanted="$2" h label
   for h in "$pci"/hwmon/hwmon*; do
     [ -d "$h" ] || continue
     [ "$(cat "$h/name" 2>/dev/null || true)" = amdgpu ] || continue
     for label in "$h"/temp*_label; do
       [ -r "$label" ] || continue
-      [ "$(cat "$label")" = junction ] || continue
+      [ "$(cat "$label")" = "$wanted" ] || continue
       label="${label%_label}_input"
       [ -r "$label" ] && printf '%s\n' "$label" && return 0
     done
   done
   return 1
+}
+
+find_junction() {
+  find_sensor "$1" junction
 }
 
 force_all_high() {
@@ -115,8 +119,12 @@ force_all_high || exit 1
 
 j0="$(find_junction "$gpu0")" || { echo "FAIL: GPU0 junction sensor missing"; exit 1; }
 j1="$(find_junction "$gpu1")" || { echo "FAIL: GPU1 junction sensor missing"; exit 1; }
+m0="$(find_sensor "$gpu0" mem)" || { echo "FAIL: GPU0 memory sensor missing"; exit 1; }
+m1="$(find_sensor "$gpu1" mem)" || { echo "FAIL: GPU1 memory sensor missing"; exit 1; }
 echo "gpu0_junction=$j0"
 echo "gpu1_junction=$j1"
+echo "gpu0_memory=$m0"
+echo "gpu1_memory=$m1"
 
 HIP_VISIBLE_DEVICES=0 "$bench" -f gemm -r f16_r -m 4096 -n 4096 -k 4096 -i 9000 > "$artifact_dir/gpu0-rocblas.log" 2>&1 &
 pids+=("$!")
@@ -135,18 +143,43 @@ while :; do
   h="$(find_arctic_hwmon)" || { echo "FAIL: ARCTIC controller disappeared"; failure=1; break; }
   j0_value="$(cat "$j0" 2>/dev/null || true)"
   j1_value="$(cat "$j1" 2>/dev/null || true)"
-  case "$j0_value:$j1_value" in
-    *[!0-9:]*|:*) echo "FAIL: GPU junction read failed"; failure=1; break ;;
-  esac
+  m0_value="$(cat "$m0" 2>/dev/null || true)"
+  m1_value="$(cat "$m1" 2>/dev/null || true)"
+  h0="${j0%/temp*_input}"
+  h1="${j1%/temp*_input}"
+  p0="$(cat "$h0/power1_input" 2>/dev/null || true)"
+  p1="$(cat "$h1/power1_input" 2>/dev/null || true)"
+  u0="$(cat "$gpu0/gpu_busy_percent" 2>/dev/null || true)"
+  u1="$(cat "$gpu1/gpu_busy_percent" 2>/dev/null || true)"
+  s0="$(grep '\*' "$gpu0/pp_dpm_sclk" 2>/dev/null | tr '\n' ';' || true)"
+  s1="$(grep '\*' "$gpu1/pp_dpm_sclk" 2>/dev/null | tr '\n' ';' || true)"
+  c0="$(grep '\*' "$gpu0/pp_dpm_mclk" 2>/dev/null | tr '\n' ';' || true)"
+  c1="$(grep '\*' "$gpu1/pp_dpm_mclk" 2>/dev/null | tr '\n' ';' || true)"
+  invalid=0
+  for value in "$j0_value" "$j1_value" "$m0_value" "$m1_value" "$p0" "$p1" "$u0" "$u1"; do
+    case "$value" in
+      ""|*[!0-9]*) invalid=1 ;;
+    esac
+  done
+  if [ "$invalid" -ne 0 ]; then
+    echo "FAIL: GPU sensor or utilization read failed"
+    failure=1
+    break
+  fi
   max="$j0_value"
   [ "$j1_value" -gt "$max" ] && max="$j1_value"
   pwm1="$(cat "$h/pwm1" 2>/dev/null || true)"
   fan1="$(cat "$h/fan1_input" 2>/dev/null || true)"
-  echo "$(date -Is) gpu0_junction=$j0_value gpu1_junction=$j1_value max_junction=$max pwm1=$pwm1 fan1_rpm=$fan1"
+  echo "$(date -Is) gpu0_junction=$j0_value gpu0_mem=$m0_value gpu0_power=$p0 gpu0_busy=$u0 gpu0_sclk=[$s0] gpu0_mclk=[$c0] gpu1_junction=$j1_value gpu1_mem=$m1_value gpu1_power=$p1 gpu1_busy=$u1 gpu1_sclk=[$s1] gpu1_mclk=[$c1] max_junction=$max pwm1=$pwm1 fan1_rpm=$fan1"
   case "$pwm1:$fan1" in
     *[!0-9:]*|:*) echo "FAIL: fan control read failed"; failure=1; break ;;
   esac
   [ "$pwm1" -ge 180 ] && [ "$pwm1" -le 255 ] || { echo "FAIL: pwm1 outside safe curve range: $pwm1"; failure=1; break; }
+  for unused in 2 3 4 5 6 7 8 9 10; do
+    unused_value="$(cat "$h/pwm${unused}" 2>/dev/null || true)"
+    [ "$unused_value" = 255 ] || { echo "FAIL: unused pwm${unused} is not 255: $unused_value"; failure=1; break 2; }
+  done
+  [ "$fan1" -gt 0 ] || { echo "FAIL: mapped duct fan tach is zero"; failure=1; break; }
   [ "$max" -lt 80000 ] || { echo "FAIL: GPU junction reached 80 C"; failure=1; break; }
   sleep 2
 done
