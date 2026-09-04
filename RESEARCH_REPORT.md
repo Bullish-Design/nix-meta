@@ -136,6 +136,7 @@ and full duct speed before 75--80 C. Keep unused channels at `255`.
 ## Changed files
 
 - `machines/hardware/arctic-fan-controller.nix`
+- `scripts/arctic-fan-controller-test`
 - `RESEARCH_REPORT.md`
 - `artifacts/arctic-fan-controller-20260904T194223Z/*`
 - `artifacts/arctic-fan-controller-test-20260904T211941Z/test.log`
