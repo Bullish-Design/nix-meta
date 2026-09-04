@@ -265,7 +265,7 @@ check_physical_mapping() {
   tach="$h/fan1_input"
   if ! value="$(cat "$tach" 2>/dev/null)"; then
     fail "fan1 tachometer cannot be read"
-  elif [ "$value" -le 0 ] 2>/dev/null; then
+  elif ! [[ "$value" =~ ^[0-9]+$ ]] || [ "$value" -le 0 ]; then
     fail "fan1 has no tach response at PWM 255"
   else
     echo "mapping evidence: fan1 reports $value RPM at PWM 255"
@@ -273,8 +273,9 @@ check_physical_mapping() {
   for index in 2 3 4 5 6 7 8 9 10; do
     tach="$h/fan${index}_input"
     [ -f "$tach" ] || { fail "expected tach attribute is missing: $tach"; continue; }
-    value="$(cat "$tach")"
-    if [ "$value" != 0 ]; then
+    if ! value="$(cat "$tach")"; then
+      fail "unused tachometer cannot be read: $tach"
+    elif ! [[ "$value" =~ ^[0-9]+$ ]] || [ "$value" != 0 ]; then
       fail "unused-channel mapping is not confirmed: $tach=$value RPM"
     else
       echo "mapping evidence: $tach=0 RPM; treated as unused, not failed"
@@ -291,6 +292,70 @@ check_localhost_listeners() {
     fail "CoolerControl has a non-local listener: $bad"
   else
     echo "CoolerControl listener PASS: no non-local 11987/11988 listener found"
+  fi
+}
+
+check_nix_configuration() {
+  local repo_dir kernel_patches packages
+  repo_dir="$(cd "$(dirname "$0")/.." && pwd)"
+  echo "=== evaluated Nix configuration ==="
+  kernel_patches="$(nix eval --json "path:$repo_dir#nixosConfigurations.server.config.boot.kernelPatches")" \
+    || { fail "Nix evaluation of boot.kernelPatches failed"; return; }
+  packages="$(nix eval --json "path:$repo_dir#nixosConfigurations.server.config.boot.extraModulePackages")" \
+    || { fail "Nix evaluation of extraModulePackages failed"; return; }
+  echo "boot.kernelPatches=$kernel_patches"
+  echo "boot.extraModulePackages=$packages"
+  [ "$kernel_patches" = '[]' ] || fail "boot.kernelPatches is not []"
+  printf '%s\n' "$packages" | grep -q 'arctic-fan-controller' \
+    || fail "external ARCTIC package is missing from extraModulePackages"
+}
+
+check_module_metadata() {
+  local kernel module_path metadata
+  kernel="$(uname -r)"
+  echo "=== exact ARCTIC module metadata ==="
+  modinfo arctic_fan_controller || true
+  module_path="$(find \
+    "/run/current-system/kernel-modules/lib/modules/$kernel" \
+    -type f -name arctic_fan_controller.ko -print -quit 2>/dev/null || true)"
+  if [ -z "$module_path" ]; then
+    fail "exact ARCTIC module file was not found below the current kernel module tree"
+    return
+  fi
+  echo "module_path=$module_path"
+  metadata="$(modinfo "$module_path")" || {
+    fail "modinfo failed for $module_path"
+    return
+  }
+  printf '%s\n' "$metadata"
+  printf '%s\n' "$metadata" | grep -q '^name:[[:space:]]*arctic_fan_controller$' \
+    || fail "module native name is not arctic_fan_controller"
+  printf '%s\n' "$metadata" | grep -q "^vermagic:[[:space:]]*$kernel " \
+    || fail "module vermagic does not match $kernel"
+}
+
+check_service_ordering() {
+  local requires after
+  echo "=== service ordering ==="
+  systemctl is-active --quiet arctic-fan-module-load.service \
+    || fail "arctic-fan-module-load.service is not active"
+  systemctl is-active --quiet arctic-fan-safe-high.service \
+    || fail "arctic-fan-safe-high.service is not active"
+  requires="$(systemctl show -p Requires --value coolercontrold.service 2>/dev/null || true)"
+  after="$(systemctl show -p After --value coolercontrold.service 2>/dev/null || true)"
+  echo "coolercontrold.Requires=$requires"
+  echo "coolercontrold.After=$after"
+  printf '%s\n' "$requires" | grep -q 'arctic-fan-safe-high.service' \
+    || fail "CoolerControl does not require arctic-fan-safe-high.service"
+  printf '%s\n' "$after" | grep -q 'arctic-fan-safe-high.service' \
+    || fail "CoolerControl does not start after arctic-fan-safe-high.service"
+  if [ "$watchdog_exists" -ne 1 ]; then
+    fail "arctic-fan-watchdog.service is not installed"
+  elif [ "$watchdog_was_active" -ne 1 ]; then
+    fail "arctic-fan-watchdog.service is not active"
+  else
+    systemctl show -p Requires -p After -p ExecStopPost -p Restart \
+      arctic-fan-watchdog.service
   fi
 }
 
@@ -485,17 +550,20 @@ check_gpu_sensors
 check_physical_mapping
 check_localhost_listeners
 
-if [ "$failure" -ne 0 ]; then
-  echo "Initial acceptance checks failed; no destructive or response test will run."
-  exit 1
-fi
-
 echo "=== kernel and module acceptance ==="
 if [ "$(uname -r)" != "6.18.38" ]; then fail "running kernel is not exactly 6.18.38"; fi
 if ! grep -q '^arctic_fan_controller ' /proc/modules; then fail "arctic_fan_controller is not loaded"; fi
 hwmontest="$(find_arctic_hwmon 2>/dev/null || true)"
 if [ -z "$hwmontest" ]; then fail "arctic_fan hwmon is not bound"; fi
 if [ -n "$hwmontest" ] && [ "$(cat "$hwmontest/name")" != "arctic_fan" ]; then fail "unexpected ARCTIC hwmon name"; fi
+check_nix_configuration
+check_module_metadata
+check_service_ordering
+
+if [ "$failure" -ne 0 ]; then
+  echo "Initial acceptance checks failed; no destructive or response test will run."
+  exit 1
+fi
 
 echo "=== required fail-high tests ==="
 if ! test_coolercontrol_stop; then failure=1; fi
