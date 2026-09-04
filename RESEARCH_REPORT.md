@@ -197,21 +197,21 @@ references and DPM residency. Do not force a GPU power state during fan testing.
 
 ## Persistent AMD/ROCm tools
 
-`machines/server.nix` now installs the AMDGPU/ROCm tools used for evaluation in
-the declarative system package set: `amdgpu_top`, `clinfo`, `amd-smi`,
+`profiles/gpu-compute.nix` now owns the optional AMDGPU/ROCm tools used for
+evaluation: `amdgpu_top`, `clinfo`, `amd-smi`,
 `rocm-smi`, `rocminfo`, `rocm-bandwidth-test`, `rocblas-bench`, `rocgdb`, and
 `rocprofiler`. This removes the need for an ad hoc `nix shell` after activation.
 
-The server now sets `amdgpu.runpm=1` and provides
-`amdgpu-headless-runtime-pm.service`. The service writes `auto` to
+The server enables the profile's AMD flag. That flag sets `amdgpu.runpm=1` and
+provides `amdgpu-headless-runtime-pm.service`. The service writes `auto` to
 `power/control` for the two stable AMD PCI paths, so idle cards can enter
 runtime suspend. The exact server build passed and evaluated the service and
 kernel parameter. Activation was not completed in this run because sudo
 required the operator password.
 
-The NVIDIA compute profile is now explicitly opt-in through
-`nix-meta.gpu-compute.enable`, defaulting to `false`. The AMD-only server keeps
-the profile in its composition but does not enable the NVIDIA driver,
+The GPU compute profile now has independent `amd.enable` and `nvidia.enable`
+flags. Both default to `false`. The AMD-only server enables only the AMD flag
+and does not enable the NVIDIA driver,
 container toolkit, persistence service, or CDI generator. A host with NVIDIA
 hardware can set the option to `true`.
 
