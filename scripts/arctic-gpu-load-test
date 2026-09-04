@@ -1,0 +1,151 @@
+#!/usr/bin/env bash
+
+set -u
+set -o pipefail
+
+if [ "${EUID:-$(id -u)}" -ne 0 ]; then
+  echo "FAIL: run this script as root: sudo $0" >&2
+  exit 2
+fi
+
+artifact_dir="artifacts/arctic-gpu-load-$(date -u +%Y%m%dT%H%M%SZ)"
+mkdir -p "$artifact_dir" || exit 2
+log_file="$artifact_dir/load.log"
+exec > >(tee -a "$log_file") 2>&1
+
+bench="$(command -v rocblas-bench || true)"
+if [ -z "$bench" ]; then
+  echo "FAIL: rocblas-bench is not installed or not in PATH" >&2
+  exit 2
+fi
+
+gpu0=/sys/bus/pci/devices/0000:19:00.0
+gpu1=/sys/bus/pci/devices/0000:67:00.0
+pids=()
+failure=0
+
+find_arctic_hwmon() {
+  local h
+  for h in /sys/class/hwmon/hwmon*; do
+    [ -r "$h/name" ] || continue
+    [ "$(cat "$h/name")" = arctic_fan ] || continue
+    printf '%s\n' "$h"
+    return 0
+  done
+  return 1
+}
+
+controller_pwm_files() {
+  local h="$1" pwm
+  for pwm in "$h"/pwm[0-9] "$h"/pwm[0-9][0-9]; do
+    [ -f "$pwm" ] && printf '%s\n' "$pwm"
+  done
+}
+
+find_junction() {
+  local pci="$1" h label
+  for h in "$pci"/hwmon/hwmon*; do
+    [ -d "$h" ] || continue
+    [ "$(cat "$h/name" 2>/dev/null || true)" = amdgpu ] || continue
+    for label in "$h"/temp*_label; do
+      [ -r "$label" ] || continue
+      [ "$(cat "$label")" = junction ] || continue
+      label="${label%_label}_input"
+      [ -r "$label" ] && printf '%s\n' "$label" && return 0
+    done
+  done
+  return 1
+}
+
+force_all_high() {
+  local h pwm value count=0 failed=0
+  h="$(find_arctic_hwmon)" || { echo "SAFE-HIGH FAIL: controller missing" >&2; return 1; }
+  while IFS= read -r pwm; do
+    count=$((count + 1))
+    printf '%s\n' 255 > "$pwm" || failed=1
+  done < <(controller_pwm_files "$h")
+  [ "$count" -gt 0 ] || failed=1
+  while IFS= read -r pwm; do
+    value="$(cat "$pwm" 2>/dev/null || true)"
+    [ "$value" = 255 ] || failed=1
+  done < <(controller_pwm_files "$h")
+  [ "$failed" -eq 0 ] || { echo "SAFE-HIGH FAIL" >&2; return 1; }
+  echo "SAFE-HIGH PASS: verified $count PWM channel(s) at 255"
+}
+
+cleanup() {
+  local status=$? pid
+  trap - EXIT INT TERM
+  for pid in "${pids[@]}"; do
+    kill -TERM "$pid" 2>/dev/null || true
+  done
+  for pid in "${pids[@]}"; do
+    wait "$pid" 2>/dev/null || true
+  done
+  if ! force_all_high; then
+    failure=1
+  fi
+  echo "ended=$(date -Is)"
+  if [ "$status" -ne 0 ] || [ "$failure" -ne 0 ]; then
+    echo "RESULT=FAIL"
+    exit 1
+  fi
+  echo "RESULT=PASS"
+}
+trap cleanup EXIT INT TERM
+
+echo "=== guarded dual-GPU rocBLAS load ==="
+echo "started=$(date -Is)"
+echo "artifact_dir=$artifact_dir"
+echo "kernel=$(uname -r)"
+echo "bench=$bench"
+[ "$(uname -r)" = 6.18.38 ] || { echo "FAIL: kernel is not 6.18.38"; exit 1; }
+pgrep -x rocblas-bench >/dev/null 2>&1 && { echo "FAIL: rocblas-bench is already running"; exit 1; }
+
+h="$(find_arctic_hwmon)" || { echo "FAIL: arctic_fan hwmon is missing"; exit 1; }
+echo "arctic_hwmon=$h"
+force_all_high || exit 1
+
+j0="$(find_junction "$gpu0")" || { echo "FAIL: GPU0 junction sensor missing"; exit 1; }
+j1="$(find_junction "$gpu1")" || { echo "FAIL: GPU1 junction sensor missing"; exit 1; }
+echo "gpu0_junction=$j0"
+echo "gpu1_junction=$j1"
+
+HIP_VISIBLE_DEVICES=0 "$bench" -f gemm -r f16_r -m 4096 -n 4096 -k 4096 -i 9000 > "$artifact_dir/gpu0-rocblas.log" 2>&1 &
+pids+=("$!")
+HIP_VISIBLE_DEVICES=1 "$bench" -f gemm -r f16_r -m 4096 -n 4096 -k 4096 -i 9000 > "$artifact_dir/gpu1-rocblas.log" 2>&1 &
+pids+=("$!")
+echo "gpu0_pid=${pids[0]}"
+echo "gpu1_pid=${pids[1]}"
+
+while :; do
+  alive=0
+  for pid in "${pids[@]}"; do
+    kill -0 "$pid" 2>/dev/null && alive=1
+  done
+  [ "$alive" -eq 1 ] || break
+
+  h="$(find_arctic_hwmon)" || { echo "FAIL: ARCTIC controller disappeared"; failure=1; break; }
+  j0_value="$(cat "$j0" 2>/dev/null || true)"
+  j1_value="$(cat "$j1" 2>/dev/null || true)"
+  case "$j0_value:$j1_value" in
+    *[!0-9:]*|:*) echo "FAIL: GPU junction read failed"; failure=1; break ;;
+  esac
+  max="$j0_value"
+  [ "$j1_value" -gt "$max" ] && max="$j1_value"
+  pwm1="$(cat "$h/pwm1" 2>/dev/null || true)"
+  fan1="$(cat "$h/fan1_input" 2>/dev/null || true)"
+  echo "$(date -Is) gpu0_junction=$j0_value gpu1_junction=$j1_value max_junction=$max pwm1=$pwm1 fan1_rpm=$fan1"
+  case "$pwm1:$fan1" in
+    *[!0-9:]*|:*) echo "FAIL: fan control read failed"; failure=1; break ;;
+  esac
+  [ "$pwm1" -ge 180 ] && [ "$pwm1" -le 255 ] || { echo "FAIL: pwm1 outside safe curve range: $pwm1"; failure=1; break; }
+  [ "$max" -lt 80000 ] || { echo "FAIL: GPU junction reached 80 C"; failure=1; break; }
+  sleep 2
+done
+
+for pid in "${pids[@]}"; do
+  wait "$pid" || failure=1
+done
+[ "$failure" -eq 0 ] || exit 1
+echo "Both rocblas-bench processes exited successfully"
