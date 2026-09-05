@@ -37,6 +37,11 @@ in
     (lib.mkIf cfg.amd.enable {
       boot.kernelParams = [ "amdgpu.runpm=1" ];
 
+      # RADV Vulkan ICD for the AMD compute backend. The nvidia-compute module
+      # supplied this before the backends became independent flags. The AMD
+      # path must request it directly, or /run/opengl-driver does not exist.
+      hardware.graphics.enable = true;
+
       environment.systemPackages = with pkgs; [
         amdgpu_top
         clinfo
