@@ -1,0 +1,65 @@
+• Validating lock
+✓ Validating lock in 30.4ms
+• Configuring shell
+• Configuring cachix
+✓ Configuring cachix in 4.79ms
+• Evaluating shell
+✓ Evaluating shell in 8.92ms (cached)
+✓ Configuring shell in 16.9ms
+• Loading tasks
+• Evaluating devenv.config.task.config
+✓ Evaluating devenv.config.task.config in 554µs (cached)
+✓ Loading tasks in 2.00ms
+• Running tasks
+• Running devenv:python:uv
+• Running devenv:files:cleanup
+✓ Running devenv:files:cleanup in 16.3ms
+✓ Running devenv:python:uv in 68.0ms
+• Running devenv:enterShell
+✓ Running devenv:enterShell in 16.4ms
+• Running devenv:enterTest
+✓ Running devenv:enterTest in 15.7µs (no command)
+✓ Running tasks in 85.1ms
+evaluation warning: 'system' has been renamed to/replaced by 'stdenv.hostPlatform.system'
+evaluation warning: nix-paseo: password auth is disabled for network-reachable tailnet access.
+these 17 derivations will be built:
+  /nix/store/3igd19w11i7mmd704rf74r6jvrldf2dm-arctic-fans-100.drv
+  /nix/store/50rqyxbmjvrkwwh1vsz7c531zmlkaxq0-unit-arctic-fan-safe-high.service.drv
+  /nix/store/5xakihddbg8iczclzz8153xk499b24yi-system-path.drv
+  /nix/store/lfa93z8qlj24djkqhp9rz9hdqclir7nw-dbus-1.drv
+  /nix/store/rzdnkn63lp5nksqv0v9fz7ccdn90r01a-X-Restart-Triggers-dbus-broker.drv
+  /nix/store/jqf6ym2vpmla33621f2i1nksgf1r1wap-unit-dbus-broker.service.drv
+  /nix/store/93m677z5w7hfi3qnd2p2y9bpyxj8h9zq-user-units.drv
+  /nix/store/xm912akf4csinzh0yrz4namgw2xzjvl7-X-Restart-Triggers-polkit.drv
+  /nix/store/a3fky1xqgylhx73fhpg24ipwn80r657j-unit-polkit.service.drv
+  /nix/store/nkp43dk09nchqr56qfm0889hz7kg2ryf-unit-dbus-broker.service.drv
+  /nix/store/np82svpn0h5mqmj3dr09mg7s6igs9x4i-unit-coolercontrold.service.drv
+  /nix/store/xzy0yghx07qbygfldi8ycc5kf83ryyac-arctic-fan-watchdog.drv
+  /nix/store/x9qpphw4r4ayrmxrm7k9cviiqrbsj339-unit-arctic-fan-watchdog.service.drv
+  /nix/store/x296l8li1k94yffabrk2ccharnib79nh-system-units.drv
+  /nix/store/fj6kxn6zr761y342vnf2brgqa0pq229z-etc.drv
+  /nix/store/dwnkc1lybl86cckx910fl1dz250xflf4-activate.drv
+  /nix/store/zhj8bmb9ksyy04xfj4kv80zncw5qwhfb-nixos-system-server-26.11.20260705.d407951.drv
+building '/nix/store/3igd19w11i7mmd704rf74r6jvrldf2dm-arctic-fans-100.drv'...
+building '/nix/store/xzy0yghx07qbygfldi8ycc5kf83ryyac-arctic-fan-watchdog.drv'...
+building '/nix/store/5xakihddbg8iczclzz8153xk499b24yi-system-path.drv'...
+building '/nix/store/50rqyxbmjvrkwwh1vsz7c531zmlkaxq0-unit-arctic-fan-safe-high.service.drv'...
+building '/nix/store/np82svpn0h5mqmj3dr09mg7s6igs9x4i-unit-coolercontrold.service.drv'...
+system-path> structuredAttrs is enabled
+building '/nix/store/x9qpphw4r4ayrmxrm7k9cviiqrbsj339-unit-arctic-fan-watchdog.service.drv'...
+system-path> pkgs.buildEnv warning: colliding subpath (ignored): `/nix/store/rfcgkh3s0h0chnm1shhvnbx60lp11cja-rxvt-unicode-unwrapped-9.31-terminfo/share/terminfo/r/rxvt-unicode' and `/nix/store/33d36ypawhjckvdyc62xa551d5mbzndv-rxvt-unicode-unwrapped-9.31-terminfo/share/terminfo/r/rxvt-unicode'
+system-path> pkgs.buildEnv warning: colliding subpath (ignored): `/nix/store/rfcgkh3s0h0chnm1shhvnbx60lp11cja-rxvt-unicode-unwrapped-9.31-terminfo/share/terminfo/r/rxvt-unicode-256color' and `/nix/store/33d36ypawhjckvdyc62xa551d5mbzndv-rxvt-unicode-unwrapped-9.31-terminfo/share/terminfo/r/rxvt-unicode-256color'
+system-path> created 9632 symlinks in user environment
+system-path> install-info: warning: no info dir entry in `/nix/store/qn2jl629z3rlil7h3r7n9cc00ycb7q6b-system-path/share/info/notes.info'
+building '/nix/store/xm912akf4csinzh0yrz4namgw2xzjvl7-X-Restart-Triggers-polkit.drv'...
+building '/nix/store/lfa93z8qlj24djkqhp9rz9hdqclir7nw-dbus-1.drv'...
+building '/nix/store/a3fky1xqgylhx73fhpg24ipwn80r657j-unit-polkit.service.drv'...
+building '/nix/store/rzdnkn63lp5nksqv0v9fz7ccdn90r01a-X-Restart-Triggers-dbus-broker.drv'...
+building '/nix/store/jqf6ym2vpmla33621f2i1nksgf1r1wap-unit-dbus-broker.service.drv'...
+building '/nix/store/nkp43dk09nchqr56qfm0889hz7kg2ryf-unit-dbus-broker.service.drv'...
+building '/nix/store/93m677z5w7hfi3qnd2p2y9bpyxj8h9zq-user-units.drv'...
+building '/nix/store/x296l8li1k94yffabrk2ccharnib79nh-system-units.drv'...
+building '/nix/store/fj6kxn6zr761y342vnf2brgqa0pq229z-etc.drv'...
+building '/nix/store/dwnkc1lybl86cckx910fl1dz250xflf4-activate.drv'...
+building '/nix/store/zhj8bmb9ksyy04xfj4kv80zncw5qwhfb-nixos-system-server-26.11.20260705.d407951.drv'...
+nixos-system-server> structuredAttrs is enabled

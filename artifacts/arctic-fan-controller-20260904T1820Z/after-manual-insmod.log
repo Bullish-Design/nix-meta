@@ -1,0 +1,36 @@
+=== module after manual insmod ===
+6.18.38
+arctic_fan_controller    16384  0
+amdgpu              16023552  1
+dell_smm_hwmon         28672  0
+modinfo: ERROR: Module arctic_fan_controller not found.
+=== USB ===
+Bus 001 Device 006: ID 3904:f001 ARCTIC (HK) ARCTIC Fan Controller
+=== hwmon names ===
+/sys/class/hwmon/hwmon0: nvme
+/sys/class/hwmon/hwmon1: nvme
+/sys/class/hwmon/hwmon2: coretemp
+/sys/class/hwmon/hwmon3: dell_smm
+/sys/class/hwmon/hwmon4: amdgpu
+/sys/class/hwmon/hwmon5: amdgpu
+/sys/class/hwmon/hwmon6: arctic_fan
+=== kernel messages ===
+sudo: a password is required
+=== safety status ===
+× arctic-fan-safe-high.service - Set all ARCTIC Fan Controller channels to safe high
+     Loaded: loaded (/etc/systemd/system/arctic-fan-safe-high.service; enabled; preset: ignored)
+     Active: failed (Result: exit-code) since Fri 2026-09-04 14:09:22 EDT; 4min 43s ago
+ Invocation: 0aad008404104c3d991c92857f8e5ff7
+    Process: 213460 ExecStart=/nix/store/7cm24ayy1zaw66mhz66cay6rk84289w6-arctic-fans-100/bin/arctic-fans-100 (code=exited, status=1/FAILURE)
+   Main PID: 213460 (code=exited, status=1/FAILURE)
+         IP: 0B in, 0B out
+         IO: 0B read, 0B written
+   Mem peak: 3.2M
+        CPU: 3.182s
+
+Sep 04 14:08:19 server systemd[1]: Starting Set all ARCTIC Fan Controller channels to safe high...
+Sep 04 14:09:22 server arctic-fans-100[213460]: ARCTIC Fan Controller hwmon device did not appear
+Sep 04 14:09:22 server systemd[1]: arctic-fan-safe-high.service: Main process exited, code=exited, status=1/FAILURE
+Sep 04 14:09:22 server systemd[1]: arctic-fan-safe-high.service: Failed with result 'exit-code'.
+Sep 04 14:09:22 server systemd[1]: Failed to start Set all ARCTIC Fan Controller channels to safe high.
+Sep 04 14:09:22 server systemd[1]: arctic-fan-safe-high.service: Consumed 3.182s CPU time over 1min 3.160s wall clock time, 3.2M memory peak.

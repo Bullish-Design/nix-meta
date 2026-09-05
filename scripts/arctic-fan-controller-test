@@ -1,0 +1,644 @@
+#!/usr/bin/env bash
+
+set -u
+set -o pipefail
+
+usage() {
+  cat <<'EOF'
+Usage: sudo ./scripts/arctic-fan-controller-test [--artifact-dir DIR]
+
+Runs the safe ARCTIC controller acceptance tests and writes a complete log.
+The script never writes PWM 0. It does not reboot, run GPU load, unload a
+module, disconnect USB, remove sensors, or suspend the machine.
+EOF
+}
+
+artifact_dir=""
+while [ "$#" -gt 0 ]; do
+  case "$1" in
+    --artifact-dir)
+      [ "$#" -ge 2 ] || { usage >&2; exit 3; }
+      artifact_dir="$2"
+      shift 2
+      ;;
+    --help|-h)
+      usage
+      exit 0
+      ;;
+    *)
+      usage >&2
+      exit 3
+      ;;
+  esac
+done
+
+if [ -z "$artifact_dir" ]; then
+  artifact_dir="artifacts/arctic-fan-controller-test-$(date -u +%Y%m%dT%H%M%SZ)"
+fi
+mkdir -p "$artifact_dir" || exit 2
+log_file="$artifact_dir/test.log"
+exec > >(tee -a "$log_file") 2>&1
+
+echo "=== ARCTIC Fan Controller acceptance test ==="
+echo "started=$(date -Is)"
+echo "artifact_dir=$artifact_dir"
+echo "command=$0 $*"
+
+if [ "${EUID:-$(id -u)}" -ne 0 ]; then
+  echo "FAIL: run this script as root, for example: sudo $0" >&2
+  exit 2
+fi
+
+required_commands=(
+  awk cat date find grep journalctl kill ls lsmod modinfo readlink
+  nix pgrep sensors seq sleep ss stat systemctl uname
+)
+for command in "${required_commands[@]}"; do
+  if ! command -v "$command" >/dev/null 2>&1; then
+    echo "FAIL: required command is missing: $command" >&2
+    exit 2
+  fi
+done
+
+failure=0
+required_unverified=0
+coolercontrol_was_active=0
+watchdog_was_active=0
+watchdog_exists=0
+
+fail() {
+  echo "FAIL: $*" >&2
+  failure=1
+}
+
+find_arctic_hwmon() {
+  local h
+  for h in /sys/class/hwmon/hwmon*; do
+    [ -r "$h/name" ] || continue
+    [ "$(cat "$h/name")" = "arctic_fan" ] || continue
+    printf '%s\n' "$h"
+    return 0
+  done
+  return 1
+}
+
+find_gpu_sensor() {
+  local pci="$1" wanted="$2" h label sensor
+  for h in "$pci"/hwmon/hwmon*; do
+    [ -d "$h" ] || continue
+    [ -r "$h/name" ] || continue
+    [ "$(cat "$h/name")" = "amdgpu" ] || continue
+    for label in "$h"/temp*_label; do
+      [ -r "$label" ] || continue
+      [ "$(cat "$label")" = "$wanted" ] || continue
+      sensor="${label%_label}_input"
+      [ -r "$sensor" ] || continue
+      printf '%s\n' "$sensor"
+      return 0
+    done
+  done
+  return 1
+}
+
+controller_pwm_files() {
+  local h="$1" pwm
+  for pwm in "$h"/pwm[0-9] "$h"/pwm[0-9][0-9]; do
+    [ -f "$pwm" ] || continue
+    printf '%s\n' "$pwm"
+  done
+}
+
+controller_tach_files() {
+  local h="$1" tach
+  for tach in "$h"/fan[0-9]_input "$h"/fan[0-9][0-9]_input; do
+    [ -f "$tach" ] || continue
+    printf '%s\n' "$tach"
+  done
+}
+
+force_all_high() {
+  local h pwm value count=0 write_failed=0 read_failed=0
+  if ! h="$(find_arctic_hwmon)"; then
+    echo "SAFE-HIGH FAIL: arctic_fan hwmon is missing" >&2
+    return 1
+  fi
+
+  while IFS= read -r pwm; do
+    count=$((count + 1))
+    if ! printf '%s\n' 255 > "$pwm"; then
+      echo "SAFE-HIGH FAIL: write failed: $pwm" >&2
+      write_failed=1
+    fi
+  done < <(controller_pwm_files "$h")
+
+  if [ "$count" -eq 0 ]; then
+    echo "SAFE-HIGH FAIL: no PWM channels were exposed" >&2
+    return 1
+  fi
+
+  while IFS= read -r pwm; do
+    if ! value="$(cat "$pwm")"; then
+      echo "SAFE-HIGH FAIL: readback failed: $pwm" >&2
+      read_failed=1
+    elif [ "$value" != 255 ]; then
+      echo "SAFE-HIGH FAIL: $pwm reads $value, expected 255" >&2
+      read_failed=1
+    fi
+  done < <(controller_pwm_files "$h")
+
+  if [ "$write_failed" -ne 0 ] || [ "$read_failed" -ne 0 ]; then
+    return 1
+  fi
+  echo "SAFE-HIGH PASS: verified $count PWM channel(s) at 255"
+  return 0
+}
+
+verify_all_high() {
+  local h pwm value count=0 bad=0
+  if ! h="$(find_arctic_hwmon)"; then
+    echo "HIGH CHECK FAIL: arctic_fan hwmon is missing" >&2
+    return 1
+  fi
+  while IFS= read -r pwm; do
+    count=$((count + 1))
+    if ! value="$(cat "$pwm")"; then
+      echo "HIGH CHECK FAIL: read failed: $pwm" >&2
+      bad=1
+    elif [ "$value" != 255 ]; then
+      echo "HIGH CHECK FAIL: $pwm reads $value" >&2
+      bad=1
+    fi
+  done < <(controller_pwm_files "$h")
+  [ "$count" -gt 0 ] || bad=1
+  [ "$bad" -eq 0 ]
+}
+
+require_all_high() {
+  if ! verify_all_high; then
+    echo "Safety barrier failed. Attempting one safe-high recovery." >&2
+    force_all_high || true
+    return 1
+  fi
+  echo "SAFETY BARRIER PASS: all exposed PWM channels read 255"
+  return 0
+}
+
+wait_for_active() {
+  local service="$1" i
+  for i in $(seq 1 20); do
+    systemctl is-active --quiet "$service" && return 0
+    sleep 0.5
+  done
+  return 1
+}
+
+snapshot_controller() {
+  local h f
+  echo "=== dynamic ARCTIC controller snapshot ==="
+  if ! h="$(find_arctic_hwmon)"; then
+    echo "hwmon=NOT_FOUND"
+    return 1
+  fi
+  echo "hwmon=$h"
+  echo "name=$(cat "$h/name")"
+  echo "device=$(readlink -f "$h/device")"
+  echo "device_link=$(readlink "$h/device")"
+  echo "--- attributes ---"
+  for f in "$h"/*; do
+    [ -e "$f" ] || continue
+    stat -c '%A %U:%G %n' "$f"
+  done | sort
+  echo "--- PWM values ---"
+  while IFS= read -r f; do
+    printf '%s=%s\n' "$f" "$(cat "$f")"
+  done < <(controller_pwm_files "$h")
+  echo "--- tach values ---"
+  while IFS= read -r f; do
+    printf '%s=%s\n' "$f" "$(cat "$f")"
+  done < <(controller_tach_files "$h")
+}
+
+snapshot_gpu() {
+  local pci h f
+  echo "=== stable PCI GPU snapshot ==="
+  for pci in /sys/bus/pci/devices/0000:19:00.0 /sys/bus/pci/devices/0000:67:00.0; do
+    echo "PCI=$pci"
+    echo "driver=$(readlink -f "$pci/driver" 2>/dev/null || echo NOT_FOUND)"
+    for h in "$pci"/hwmon/hwmon*; do
+      [ -d "$h" ] || continue
+      echo "hwmon=$h name=$(cat "$h/name" 2>/dev/null || echo READ_FAILED)"
+      for f in "$h"/temp*_label "$h"/temp*_input "$h"/power*_input "$h"/freq*_input "$h"/utilization*; do
+        [ -f "$f" ] || continue
+        printf '%s=%s\n' "$f" "$(cat "$f" 2>/dev/null || echo READ_FAILED)"
+      done
+    done
+  done
+}
+
+check_gpu_sensors() {
+  local pci sensor value
+  for pci in /sys/bus/pci/devices/0000:19:00.0 /sys/bus/pci/devices/0000:67:00.0; do
+    if [ "$(readlink -f "$pci/driver" 2>/dev/null)" != "/sys/bus/pci/drivers/amdgpu" ]; then
+      fail "GPU driver is not amdgpu at $pci"
+      continue
+    fi
+    for sensor_name in junction mem; do
+      if ! sensor="$(find_gpu_sensor "$pci" "$sensor_name")"; then
+        fail "GPU $sensor_name sensor is missing at $pci"
+        continue
+      fi
+      if ! value="$(cat "$sensor")"; then
+        fail "GPU $sensor_name sensor cannot be read at $sensor"
+      else
+        case "$value" in
+          ""|*[!0-9]*) fail "GPU $sensor_name sensor is not numeric: $sensor=$value" ;;
+          *) echo "GPU sensor PASS: $sensor=$value mC" ;;
+        esac
+      fi
+    done
+  done
+}
+
+check_physical_mapping() {
+  local h tach value
+  h="$(find_arctic_hwmon)" || { fail "cannot inspect physical fan mapping"; return; }
+  tach="$h/fan1_input"
+  if ! value="$(cat "$tach" 2>/dev/null)"; then
+    fail "fan1 tachometer cannot be read"
+  elif ! [[ "$value" =~ ^[0-9]+$ ]] || [ "$value" -le 0 ]; then
+    fail "fan1 has no tach response at PWM 255"
+  else
+    echo "mapping evidence: fan1 reports $value RPM at PWM 255"
+  fi
+  for index in 2 3 4 5 6 7 8 9 10; do
+    tach="$h/fan${index}_input"
+    [ -f "$tach" ] || { fail "expected tach attribute is missing: $tach"; continue; }
+    if ! value="$(cat "$tach")"; then
+      fail "unused tachometer cannot be read: $tach"
+    elif ! [[ "$value" =~ ^[0-9]+$ ]] || [ "$value" != 0 ]; then
+      fail "unused-channel mapping is not confirmed: $tach=$value RPM"
+    else
+      echo "mapping evidence: $tach=0 RPM; treated as unused, not failed"
+    fi
+  done
+}
+
+check_localhost_listeners() {
+  local bad
+  echo "=== CoolerControl listeners ==="
+  ss -ltn | grep -E ':11987|:11988' || true
+  bad="$(ss -H -ltn | awk '$4 ~ /:11987$|:11988$/ && $4 !~ /^127[.]0[.]0[.]1:/ && $4 !~ /^[[]::1[]]:/ {print}')"
+  if [ -n "$bad" ]; then
+    fail "CoolerControl has a non-local listener: $bad"
+  else
+    echo "CoolerControl listener PASS: no non-local 11987/11988 listener found"
+  fi
+}
+
+check_nix_configuration() {
+  local repo_dir kernel_patches packages
+  repo_dir="$(cd "$(dirname "$0")/.." && pwd)"
+  echo "=== evaluated Nix configuration ==="
+  kernel_patches="$(nix eval --json "path:$repo_dir#nixosConfigurations.server.config.boot.kernelPatches")" \
+    || { fail "Nix evaluation of boot.kernelPatches failed"; return; }
+  packages="$(nix eval --json "path:$repo_dir#nixosConfigurations.server.config.boot.extraModulePackages")" \
+    || { fail "Nix evaluation of extraModulePackages failed"; return; }
+  echo "boot.kernelPatches=$kernel_patches"
+  echo "boot.extraModulePackages=$packages"
+  [ "$kernel_patches" = '[]' ] || fail "boot.kernelPatches is not []"
+  printf '%s\n' "$packages" | grep -q 'arctic-fan-controller' \
+    || fail "external ARCTIC package is missing from extraModulePackages"
+}
+
+check_module_metadata() {
+  local kernel module_path metadata
+  kernel="$(uname -r)"
+  echo "=== exact ARCTIC module metadata ==="
+  modinfo arctic_fan_controller || true
+  module_path="$(find -L \
+    "/run/current-system/kernel-modules/lib/modules/$kernel" \
+    -type f -name arctic_fan_controller.ko -print -quit 2>/dev/null || true)"
+  if [ -z "$module_path" ]; then
+    fail "exact ARCTIC module file was not found below the current kernel module tree"
+    return
+  fi
+  echo "module_path=$module_path"
+  metadata="$(modinfo "$module_path")" || {
+    fail "modinfo failed for $module_path"
+    return
+  }
+  printf '%s\n' "$metadata"
+  printf '%s\n' "$metadata" | grep -q '^name:[[:space:]]*arctic_fan_controller$' \
+    || fail "module native name is not arctic_fan_controller"
+  printf '%s\n' "$metadata" | grep -q "^vermagic:[[:space:]]*$kernel " \
+    || fail "module vermagic does not match $kernel"
+}
+
+check_service_ordering() {
+  local requires after
+  echo "=== service ordering ==="
+  systemctl is-active --quiet arctic-fan-module-load.service \
+    || fail "arctic-fan-module-load.service is not active"
+  systemctl is-active --quiet arctic-fan-safe-high.service \
+    || fail "arctic-fan-safe-high.service is not active"
+  requires="$(systemctl show -p Requires --value coolercontrold.service 2>/dev/null || true)"
+  after="$(systemctl show -p After --value coolercontrold.service 2>/dev/null || true)"
+  echo "coolercontrold.Requires=$requires"
+  echo "coolercontrold.After=$after"
+  printf '%s\n' "$requires" | grep -q 'arctic-fan-safe-high.service' \
+    || fail "CoolerControl does not require arctic-fan-safe-high.service"
+  printf '%s\n' "$requires" | grep -q 'arctic-fan-watchdog.service' \
+    || fail "CoolerControl does not require arctic-fan-watchdog.service"
+  printf '%s\n' "$after" | grep -q 'arctic-fan-safe-high.service' \
+    || fail "CoolerControl does not start after arctic-fan-safe-high.service"
+  if [ "$watchdog_exists" -ne 1 ]; then
+    fail "arctic-fan-watchdog.service is not installed"
+  elif [ "$watchdog_was_active" -ne 1 ]; then
+    fail "arctic-fan-watchdog.service is not active"
+  else
+    systemctl show -p Requires -p After -p ExecStopPost -p Restart \
+      arctic-fan-watchdog.service
+  fi
+}
+
+record_initial_state() {
+  coolercontrol_was_active=0
+  watchdog_was_active=0
+  systemctl is-active --quiet coolercontrold.service && coolercontrol_was_active=1
+  if systemctl cat arctic-fan-watchdog.service >/dev/null 2>&1; then
+    watchdog_exists=1
+    systemctl is-active --quiet arctic-fan-watchdog.service && watchdog_was_active=1
+  fi
+  echo "initial coolercontrold active=$coolercontrol_was_active"
+  echo "initial arctic-fan-watchdog exists=$watchdog_exists active=$watchdog_was_active"
+}
+
+test_coolercontrol_stop() {
+  local since
+  echo "=== CoolerControl stop / ExecStopPost test ==="
+  # The normal curve may be below 255 at low temperature. Start this test
+  # from a known high state, then exercise the service stop path.
+  force_all_high || return 1
+  systemctl start coolercontrold.service || return 1
+  wait_for_active coolercontrold.service || return 1
+  since="$(date --iso-8601=seconds)"
+  systemctl stop coolercontrold.service || return 1
+  sleep 2
+  require_all_high || return 1
+  echo "CoolerControl stop high result: PASS"
+  journalctl -u coolercontrold.service --since "$since" --no-pager || true
+  if ! journalctl -u coolercontrold.service --since "$since" --no-pager | grep -q 'verified .* PWM channel'; then
+    fail "CoolerControl ExecStopPost success was not visible in the journal"
+    return 1
+  fi
+  echo "CoolerControl ExecStopPost journal evidence: PASS"
+  return 0
+}
+
+test_coolercontrol_crash() {
+  local pid since
+  echo "=== CoolerControl SIGKILL crash test ==="
+  force_all_high || return 1
+  systemctl start coolercontrold.service || return 1
+  wait_for_active coolercontrold.service || return 1
+  pid="$(systemctl show -p MainPID --value coolercontrold.service)"
+  case "$pid" in
+    ""|*[!0-9]*|0|1) fail "invalid CoolerControl MainPID: $pid"; return 1 ;;
+  esac
+  since="$(date --iso-8601=seconds)"
+  echo "terminating CoolerControl PID $pid with SIGKILL"
+  kill -KILL "$pid" || return 1
+  sleep 2
+  require_all_high || return 1
+  echo "CoolerControl crash high result: PASS"
+  journalctl -u coolercontrold.service --since "$since" --no-pager || true
+  return 0
+}
+
+test_pwm_response() {
+  local h pwm fan rpm255 rpm200 rpm180 value index
+  echo "=== GPU duct fan PWM response test ==="
+  systemctl stop coolercontrold.service || true
+  systemctl stop arctic-fan-watchdog.service 2>/dev/null || true
+  require_all_high || return 1
+
+  h="$(find_arctic_hwmon)" || return 1
+  pwm="$h/pwm1"
+  fan="$h/fan1_input"
+  [ -f "$pwm" ] || { fail "known mapped channel is missing: $pwm"; return 1; }
+  [ -f "$fan" ] || { fail "known mapped tach is missing: $fan"; return 1; }
+  rpm255="$(cat "$fan")"
+  echo "physical_fan=GPU duct fan"
+  echo "channel=pwm1/fan1"
+  echo "rpm_at_255=$rpm255"
+  if [ "$rpm255" -le 0 ] 2>/dev/null; then
+    fail "fan1 stopped at PWM 255"
+    force_all_high || true
+    return 1
+  fi
+
+  for value in 200 180; do
+    require_all_high || return 1
+    echo "writing pwm1=$value; no other channel will be written"
+    if ! printf '%s\n' "$value" > "$pwm"; then
+      fail "PWM write failed at pwm1=$value"
+      force_all_high || true
+      return 1
+    fi
+    sleep 5
+    rpm="$(cat "$fan")"
+    echo "pwm1=$value rpm=$rpm"
+    if [ "$rpm" -le 0 ] 2>/dev/null; then
+      fail "fan1 stopped or tach became invalid at pwm1=$value"
+      force_all_high || true
+      return 1
+    fi
+    for index in 2 3 4 5 6 7 8 9 10; do
+      if ! value_unused="$(cat "$h/fan${index}_input")" || [ "$value_unused" != 0 ]; then
+        fail "unused tach channel changed during pwm1 response test: fan${index}_input=$value_unused"
+        force_all_high || true
+        return 1
+      fi
+      if ! value_unused="$(cat "$h/pwm${index}")" || [ "$value_unused" != 255 ]; then
+        fail "unused PWM channel changed during pwm1 response test: pwm${index}=$value_unused"
+        force_all_high || true
+        return 1
+      fi
+    done
+    force_all_high || return 1
+  done
+  rpm200="$(grep '^pwm1=200 rpm=' "$log_file" | tail -1 | awk -F= '{print $3}')"
+  rpm180="$(grep '^pwm1=180 rpm=' "$log_file" | tail -1 | awk -F= '{print $3}')"
+  echo "response_summary=rpm255=$rpm255 rpm200=$rpm200 rpm180=$rpm180"
+  echo "minimum_reliable_pwm=180 (observed tach response; confirm acoustics and stall margin manually)"
+  require_all_high
+}
+
+test_low_temperature_curve() {
+  local h sensor value max_junction pwm i
+  echo "=== low-temperature curve test ==="
+  force_all_high || return 1
+  if ! systemctl is-active --quiet arctic-fan-watchdog.service; then
+    echo "LOW-TEMP CURVE NOT TESTED: watchdog is not active"
+    required_unverified=1
+    return 0
+  fi
+
+  h="$(find_arctic_hwmon)" || return 1
+  max_junction=0
+  for pci in /sys/bus/pci/devices/0000:19:00.0 /sys/bus/pci/devices/0000:67:00.0; do
+    sensor="$(find_gpu_sensor "$pci" junction)" || return 1
+    value="$(cat "$sensor")" || return 1
+    case "$value" in
+      ""|*[!0-9]*) fail "low-temperature junction value is invalid: $sensor=$value"; return 1 ;;
+    esac
+    [ "$value" -gt "$max_junction" ] && max_junction="$value"
+  done
+
+  echo "low_temp_max_gpu_junction_mC=$max_junction"
+  if [ "$max_junction" -ge 45000 ]; then
+    echo "LOW-TEMP CURVE NOT TESTED: maximum junction is not below 45 C"
+    required_unverified=1
+    return 0
+  fi
+
+  for i in $(seq 1 10); do
+    pwm="$(cat "$h/pwm1")" || return 1
+    echo "low_temp_curve_sample=$i pwm1=$pwm"
+    if [ "$pwm" = 180 ]; then
+      echo "Low-temperature curve result: PASS; pwm1 reached 180"
+      require_all_high || return 1
+      return 0
+    fi
+    sleep 2
+  done
+  fail "low-temperature curve did not reach PWM 180"
+  force_all_high || true
+  return 1
+}
+
+restore_service_state() {
+  local restore_failure=0
+  echo "=== restoring service state ==="
+  force_all_high || restore_failure=1
+  if [ "$failure" -eq 0 ]; then
+    if [ "$coolercontrol_was_active" -eq 1 ]; then
+      systemctl start coolercontrold.service || restore_failure=1
+      wait_for_active coolercontrold.service || restore_failure=1
+    fi
+    if [ "$watchdog_was_active" -eq 1 ]; then
+      require_all_high || restore_failure=1
+      systemctl start arctic-fan-watchdog.service || restore_failure=1
+      wait_for_active arctic-fan-watchdog.service || restore_failure=1
+    fi
+  else
+    echo "Failure path: leaving CoolerControl and watchdog stopped with all channels high."
+    systemctl stop coolercontrold.service arctic-fan-watchdog.service 2>/dev/null || true
+    force_all_high || restore_failure=1
+  fi
+  [ "$restore_failure" -eq 0 ] || failure=1
+}
+
+cleanup() {
+  local status=$?
+  trap - EXIT HUP INT TERM
+  if [ "$status" -ne 0 ] || [ "$failure" -ne 0 ]; then
+    failure=1
+    systemctl stop coolercontrold.service arctic-fan-watchdog.service 2>/dev/null || true
+    force_all_high || true
+  fi
+  echo "ended=$(date -Is)"
+  if [ "$failure" -ne 0 ]; then
+    echo "RESULT=FAIL; all channels were forced high where the controller was available"
+    exit 1
+  fi
+  if [ "$required_unverified" -ne 0 ]; then
+    echo "RESULT=INCOMPLETE; automated safe tests passed but required cases remain untested"
+    exit 2
+  fi
+  echo "RESULT=PASS"
+  exit 0
+}
+trap cleanup EXIT HUP INT TERM
+
+echo "=== versions and initial state ==="
+date -Is
+uname -a
+uname -r
+lsusb
+lsusb -d 3904:f001
+lsmod | grep -E 'arctic|dell_smm|amdgpu' || true
+modinfo arctic_fan_controller || true
+systemctl status --no-pager arctic-fan-module-load.service arctic-fan-safe-high.service coolercontrold.service || true
+systemctl cat arctic-fan-safe-high.service || true
+systemctl cat coolercontrold.service || true
+systemctl cat arctic-fan-watchdog.service || true
+dmesg | grep -i -E 'arctic|hid|hwmon' || true
+sensors || true
+record_initial_state
+
+if pgrep -x rocblas-bench >/dev/null 2>&1; then
+  echo "FAIL: rocblas-bench is already running; refusing to test fan control"
+  failure=1
+  exit 1
+fi
+
+echo "=== initial safety barrier ==="
+force_all_high || { failure=1; exit 1; }
+snapshot_controller || { failure=1; exit 1; }
+snapshot_gpu
+check_gpu_sensors
+check_physical_mapping
+check_localhost_listeners
+
+echo "=== kernel and module acceptance ==="
+if [ "$(uname -r)" != "6.18.38" ]; then fail "running kernel is not exactly 6.18.38"; fi
+if ! grep -q '^arctic_fan_controller ' /proc/modules; then fail "arctic_fan_controller is not loaded"; fi
+hwmontest="$(find_arctic_hwmon 2>/dev/null || true)"
+if [ -z "$hwmontest" ]; then fail "arctic_fan hwmon is not bound"; fi
+if [ -n "$hwmontest" ] && [ "$(cat "$hwmontest/name")" != "arctic_fan" ]; then fail "unexpected ARCTIC hwmon name"; fi
+check_nix_configuration
+check_module_metadata
+check_service_ordering
+
+if [ "$failure" -ne 0 ]; then
+  echo "Initial acceptance checks failed; no destructive or response test will run."
+  exit 1
+fi
+
+echo "=== required fail-high tests ==="
+if ! test_coolercontrol_stop; then failure=1; fi
+if [ "$failure" -eq 0 ] && ! test_coolercontrol_crash; then failure=1; fi
+
+echo "=== measured response tests ==="
+if [ "$failure" -eq 0 ] && ! test_pwm_response; then failure=1; fi
+
+if [ "$failure" -eq 0 ]; then
+  restore_service_state
+  test_low_temperature_curve || failure=1
+fi
+
+echo "=== intentionally untested cases ==="
+echo "NOT TESTED: GPU load; run only after this report passes review."
+echo "NOT TESTED: reboot persistence; ask for reboot approval first."
+echo "NOT TESTED: synthetic GPU sensor removal; no sensor was removed."
+echo "NOT TESTED: USB disconnect/reconnect; the controller stayed connected."
+echo "NOT TESTED: suspend/resume; the workstation was not suspended."
+required_unverified=1
+
+if [ "$failure" -eq 0 ]; then
+  systemctl is-active --quiet coolercontrold.service || failure=1
+  systemctl is-active --quiet arctic-fan-watchdog.service || failure=1
+else
+  systemctl stop coolercontrold.service arctic-fan-watchdog.service 2>/dev/null || true
+  force_all_high || true
+fi
+snapshot_controller || failure=1
+snapshot_gpu
+echo "=== final sensors ==="
+sensors || true
+
+if [ "$failure" -ne 0 ]; then
+  exit 1
+fi
+exit 0

@@ -1,0 +1,26 @@
+=== uname -r ===
+6.18.38
+=== lsusb ===
+zsh:6: command not found: lsusb
+=== lsusb -d 3904:f001 ===
+zsh:8: command not found: lsusb
+=== lsmod arctic|dell_smm|amdgpu ===
+amdgpu              16023552  1
+amdxcp                 12288  1 amdgpu
+drm_panel_backlight_quirks    12288  1 amdgpu
+gpu_sched              69632  1 amdgpu
+dell_smm_hwmon         28672  0
+drm_buddy              32768  1 amdgpu
+drm_exec               16384  1 amdgpu
+drm_suballoc_helper    16384  1 amdgpu
+drm_ttm_helper         20480  1 amdgpu
+ttm                   126976  2 amdgpu,drm_ttm_helper
+drm_display_helper    319488  1 amdgpu
+cec                    81920  2 drm_display_helper,amdgpu
+i2c_algo_bit           24576  1 amdgpu
+video                  81920  2 dell_wmi,amdgpu
+crc16                  12288  2 amdgpu,ext4
+wmi                    36864  7 video,intel_wmi_thunderbolt,dell_wmi,wmi_bmof,dell_smm_hwmon,dell_smbios,dell_wmi_descriptor
+=== sensors ===
+zsh:12: command not found: sensors
+=== hwmon names ===

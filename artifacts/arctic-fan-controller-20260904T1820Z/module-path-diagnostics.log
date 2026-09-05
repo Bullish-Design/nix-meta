@@ -1,0 +1,23 @@
+=== current module file ===
+-r-xr-xr-x 1 root root 543232 Dec 31  1969 /run/current-system/kernel-modules/lib/modules/6.18.38/updates/arctic_fan_controller.ko
+  File: /run/current-system/kernel-modules/lib/modules/6.18.38/updates/arctic_fan_controller.ko
+  Size: 543232    	Blocks: 1064       IO Block: 4096   regular file
+Device: 0,35	Inode: 2564835002  Links: 1
+Access: (0555/-r-xr-xr-x)  Uid: (    0/    root)   Gid: (    0/    root)
+Access: 2026-09-04 13:53:04.052880516 -0400
+Modify: 1969-12-31 19:00:01.000000000 -0500
+Change: 2026-09-04 13:53:04.050880492 -0400
+ Birth: 2026-09-04 13:53:04.039880355 -0400
+=== current vs booted module file ===
+ls: cannot access '/run/booted-system/kernel-modules/lib/modules/6.18.38/updates/arctic_fan_controller.ko': No such file or directory
+=== module directory listings ===
+lrwxrwxrwx 1 root root 115 Dec 31  1969 /run/current-system/kernel-modules/lib/modules/6.18.38/updates -> /nix/store/fj7nfvcvh3mpf427prv3h3y3db6rz9ml-arctic-fan-controller-6.18.38-kernel-module/lib/modules/6.18.38/updates
+=== current module metadata ===
+modinfo: ERROR: Module /run/current-system/kernel-modules not found.
+modinfo: ERROR: Module arctic_fan_controller not found.
+=== booted/current symlinks ===
+/nix/store/pqzwx5q724lcy7j6ikczgy9750vx7hhy-nixos-system-server-26.11.20260705.d407951
+/nix/store/jjbhs64dmfvsarhh10x50d2wwp8fi7rg-nixos-system-server-26.11.20260705.d407951
+=== sudo cache ===
+sudo: a password is required
+sudo_n_status=1

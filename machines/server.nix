@@ -7,6 +7,7 @@ in
 {
   imports = [
     ./hardware/server.nix
+    ./hardware/arctic-fan-controller.nix
 
     # Phase C — the zelligate workspace daemon. Both modules are authored in the
     # zelligate repo (all config lives there); the server only imports + enables.
@@ -60,6 +61,23 @@ in
   boot.initrd.kernelModules = [ "vmd" ];
   boot.supportedFilesystems = [ "btrfs" "ntfs" "vfat" ];
   hardware.enableRedistributableFirmware = true;
+
+  # This headless workstation has AMD GPUs. NVIDIA remains available through
+  # the same profile, but both backends are explicit independent feature flags.
+  nix-meta.gpu-compute = {
+    amd.enable = true;
+    nvidia.enable = false;
+  };
+
+  # CoolerControl provides the local web UI and daemon. Its fan profiles will
+  # be configured only after the controller channels are physically mapped.
+  programs.coolercontrol.enable = true;
+
+  environment.systemPackages = with pkgs; [
+    lm_sensors
+    pciutils
+    usbutils
+  ];
 
   # ── Host identity ───────────────────────────────────────────────────────────
   # base tier (profiles.minimal) owns nix flakes, the user account, zsh,
