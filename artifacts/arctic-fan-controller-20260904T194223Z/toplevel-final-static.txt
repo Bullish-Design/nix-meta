@@ -1,1 +1,0 @@
-/nix/store/82rmwva0pkcjamlpr9amrx4s42i42im3-nixos-system-server-26.11.20260705.d407951

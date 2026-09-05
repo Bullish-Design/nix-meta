@@ -1,9 +1,0 @@
-filename:       /nix/store/fj7nfvcvh3mpf427prv3h3y3db6rz9ml-arctic-fan-controller-6.18.38-kernel-module/lib/modules/6.18.38/updates/arctic_fan_controller.ko
-license:        GPL
-description:    HID hwmon driver for ARCTIC Fan Controller
-author:         Aureo Serrano de Souza <aureo.serrano@arctic.de>
-alias:          hid:b0003g*v00003904p0000F001
-depends:        hid,usbhid
-name:           arctic_fan_controller
-retpoline:      Y
-vermagic:       6.18.38 SMP preempt mod_unload 
