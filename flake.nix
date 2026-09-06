@@ -200,6 +200,13 @@
       url = "git+file:///home/andrew/Documents/Projects/argentic";
       inputs.nixpkgs.follows = "nixpkgs";
     };
+
+    # Native inference service module. The repository is not a flake, so keep
+    # it as a source input and import its NixOS module through `inputs`.
+    inferference = {
+      url = "git+ssh://git@github.com/Bullish-Design/inferference.git?ref=fix/restore-mi25-power-table";
+      flake = false;
+    };
   };
 
   outputs = inputs@{ self, nixpkgs, ... }:
@@ -218,7 +225,7 @@
       };
     in
     {
-      nixosConfigurations = {
+    nixosConfigurations = {
         # Minimal headless server (Dell Precision 5820). The wsl/desktop skeleton
         # hosts were retired for this bring-up; grow the fleet back out from the
         # box via `nixos-rebuild switch --flake .#server`.

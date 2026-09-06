@@ -555,6 +555,23 @@
         "type": "github"
       }
     },
+    "inferference": {
+      "flake": false,
+      "locked": {
+        "lastModified": 1788737098,
+        "narHash": "sha256-lLSuSTj3dXoRz3GngMu5NGsIy0LLsVW6Zp7j98UualE=",
+        "ref": "fix/restore-mi25-power-table",
+        "rev": "926a45ae5134c8963179104ad8534c8f72ccf323",
+        "revCount": 104,
+        "type": "git",
+        "url": "ssh://git@github.com/Bullish-Design/inferference.git"
+      },
+      "original": {
+        "ref": "fix/restore-mi25-power-table",
+        "type": "git",
+        "url": "ssh://git@github.com/Bullish-Design/inferference.git"
+      }
+    },
     "loci-core": {
       "inputs": {
         "nixpkgs": [
@@ -1003,6 +1020,7 @@
         "devman": "devman",
         "fornix-host": "fornix-host",
         "home-manager": "home-manager",
+        "inferference": "inferference",
         "nix-paseo": "nix-paseo",
         "nix-secrets": "nix-secrets",
         "nix-terminal": "nix-terminal",

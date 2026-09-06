@@ -15,7 +15,7 @@ in
     # block below. The module holds no model path, port, or device placement;
     # those all live in ~/.config/inferference/{placement.yaml,models/*.yaml}
     # on the box, read by the unit at start.
-    /home/andrew/Documents/Projects/inferference/nix/nixos-module.nix
+    (inputs.inferference + "/nix/nixos-module.nix")
 
     # Phase C — the zelligate workspace daemon. Both modules are authored in the
     # zelligate repo (all config lives there); the server only imports + enables.
