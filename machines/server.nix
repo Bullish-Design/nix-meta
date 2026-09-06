@@ -9,6 +9,14 @@ in
     ./hardware/server.nix
     ./hardware/arctic-fan-controller.nix
 
+    # THIS LIBRARY OWNS ALL LLM SERVING (inferference AGENTS.md, owner decision
+    # 2026-09-04): every model this box serves is a child of the ONE llama.cpp
+    # router this module starts — never a per-model server process. Config
+    # block below. The module holds no model path, port, or device placement;
+    # those all live in ~/.config/inferference/{placement.yaml,models/*.yaml}
+    # on the box, read by the unit at start.
+    /home/andrew/Documents/Projects/inferference/nix/nixos-module.nix
+
     # Phase C — the zelligate workspace daemon. Both modules are authored in the
     # zelligate repo (all config lives there); the server only imports + enables.
     inputs.home-manager.nixosModules.home-manager
@@ -67,6 +75,23 @@ in
   nix-meta.gpu-compute = {
     amd.enable = true;
     nvidia.enable = false;
+  };
+
+  # ── inferference: the llama.cpp router ──────────────────────────────────────
+  # ONE router, total — not one per model, not one per card. Which models are
+  # resident, and which Vulkan device(s) they land on, is a
+  # ~/.config/inferference/{placement.yaml,models/*.yaml} decision on the box,
+  # never a Nix option: changing the resident set is an edit plus
+  # `inferference-reconcile.py apply`, never a rebuild.
+  #
+  # DEPLOYED on this box as of 2026-09-06: placement.yaml + models/*.yaml
+  # under ~/.config/inferference declare the resident set. The default endpoint
+  # is Gemma on Vulkan0; the second resident endpoint is the routed model on
+  # Vulkan1. The unit remains fail-closed if those host-local files disappear.
+  services.inferference-router = {
+    enable = true;
+    user = user;
+    repoDir = "/home/andrew/Documents/Projects/inferference";
   };
 
   # CoolerControl provides the local web UI and daemon. Its fan profiles will
