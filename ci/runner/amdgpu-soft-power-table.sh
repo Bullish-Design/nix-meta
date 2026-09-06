@@ -48,11 +48,13 @@ check_id device 0x6860
 check_id subsystem_vendor 0x1002
 check_id subsystem_device 0x0c35
 
-table_sha="$(sha256sum "$TABLE" | awk '{print $1}')"
+table_sha="$(sha256sum "$TABLE")"
+table_sha="${table_sha%% *}"
 [[ "$table_sha" == "$EXPECTED_TARGET_SHA" ]] || {
   echo "!! refusing: target table hash $table_sha is not the reviewed 150 W table" >&2; exit 1;
 }
-current_sha="$(sha256sum "$PP" | awk '{print $1}')"
+current_sha="$(sha256sum "$PP")"
+current_sha="${current_sha%% *}"
 if [[ "$current_sha" == "$EXPECTED_TARGET_SHA" ]]; then
   echo "OK: $BDF already has the reviewed 150 W table"; exit 0
 fi
@@ -62,7 +64,8 @@ fi
 echo "Applying reviewed soft PowerPlay table to $BDF"
 cat "$TABLE" > "$PP"
 sleep 3
-after_sha="$(sha256sum "$PP" | awk '{print $1}')"
+after_sha="$(sha256sum "$PP")"
+after_sha="${after_sha%% *}"
 [[ "$after_sha" == "$EXPECTED_TARGET_SHA" ]] || {
   echo "!! refusing: readback hash $after_sha does not match target" >&2; exit 1;
 }
