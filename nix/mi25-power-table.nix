@@ -3,7 +3,7 @@
 
 let
   cfg = config.services.inferference-mi25-power-table;
-  applier = "${cfg.repoDir}/ci/runner/amdgpu-soft-power-table.sh";
+  applier = ../ci/runner/amdgpu-soft-power-table.sh;
   serviceFor = card:
     let
       serviceName = lib.replaceStrings [ ":" "." ] [ "-" "-" ] card.bdf;
@@ -29,12 +29,6 @@ in
 {
   options.services.inferference-mi25-power-table = {
     enable = lib.mkEnableOption "the reviewed 150 W MI25 soft PowerPlay table";
-
-    repoDir = lib.mkOption {
-      type = lib.types.path;
-      default = /home/andrew/Documents/Projects/inferference;
-      description = "Inferference checkout containing the table applier.";
-    };
 
     cards = lib.mkOption {
       type = lib.types.listOf (lib.types.submodule ({ ... }: {
