@@ -35,7 +35,29 @@ in
 
   config = lib.mkMerge [
     (lib.mkIf cfg.amd.enable {
-      boot.kernelParams = [ "amdgpu.runpm=1" ];
+      # ppfeaturemask: unmask OverDrive (bit 0x00004000, PP_OVERDRIVE_MASK).
+      #
+      # Without it amdgpu never creates pp_od_clk_voltage and pins
+      # power1_cap_max to power1_cap_default, so the MI25s' 110 W cap cannot be
+      # raised at all — measured 0xfff7bfff against the amdgpu default of
+      # 0xfff7ffff. The 110 W is the flashed firmware's default, not a PSU,
+      # riser or slot-power limit, so the ceiling is a tuning question.
+      #
+      # Expect a MODEST return. Inferference project 011 swept the cap downward
+      # and measured the efficiency curve flattening to 0.065 tok/s per watt at
+      # the top of the range, so ~150 W extrapolates to roughly +16% decode, not
+      # the 2x an earlier report implied. It is still the largest lever left:
+      # every governor knob tested came in at +-4% synthetic and -13% on real
+      # serving traffic.
+      #
+      # It may also do nothing. Unmasking tells the driver to OFFER headroom;
+      # how much is bounded by the flashed power table. After a reboot, check:
+      #   cat /sys/module/amdgpu/parameters/ppfeaturemask      # expect 0xffffffff
+      #   ls  /sys/class/drm/card0/device/pp_od_clk_voltage    # expect it to exist
+      #   cat /sys/class/drm/card0/device/hwmon/hwmon*/power1_cap_max
+      # If power1_cap_max is still 110 W, the driver is willing and the firmware
+      # is not. Reverting is removing this one string and rebuilding.
+      boot.kernelParams = [ "amdgpu.runpm=1" "amdgpu.ppfeaturemask=0xffffffff" ];
 
       # RADV Vulkan ICD for the AMD compute backend. The nvidia-compute module
       # supplied this before the backends became independent flags. The AMD
