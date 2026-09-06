@@ -26,6 +26,7 @@ in
 {
   imports = [
     nixos-core.nixosModules.nvidia-compute
+    ../nix/mi25-power-table.nix
   ];
 
   options.nix-meta.gpu-compute = {
@@ -58,6 +59,12 @@ in
       # If power1_cap_max is still 110 W, the driver is willing and the firmware
       # is not. Reverting is removing this one string and rebuilding.
       boot.kernelParams = [ "amdgpu.runpm=1" "amdgpu.ppfeaturemask=0xffffffff" ];
+
+      # Apply the reviewed 150 W soft PowerPlay table at boot. The imported
+      # module checks each card's PCI identity, amdgpu binding, and exact
+      # firmware-derived baseline hash before changing anything. Its defaults
+      # cover both MI25s and can be overridden per BDF when needed.
+      services.inferference-mi25-power-table.enable = true;
 
       # RADV Vulkan ICD for the AMD compute backend. The nvidia-compute module
       # supplied this before the backends became independent flags. The AMD
