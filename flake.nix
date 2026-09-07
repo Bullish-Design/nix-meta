@@ -27,6 +27,20 @@
 
     nixos-core.url = "git+https://github.com/Bullish-Design/nixos-core.git?ref=main";
 
+    # The shared RepoMan command closure (vendomat Face D). profiles/developer.nix puts
+    # its bin on the login shell's PATH, replacing the mutable venv at
+    # ~/.local/share/repoman/venv that `repoman-sync --machine` used to build.
+    #
+    # Pinned to a published tag, like every other first-party input here: this lock
+    # decides the toolchain revision, so a floating ref would make "which repoman is on
+    # my PATH" unanswerable.
+    # NO `inputs.nixpkgs.follows`. Vendomat pins the same nixpkgs the devenv stack uses,
+    # and that pin is what makes the closure shared: a devenv consumer and this login
+    # shell must resolve the SAME store paths for the same commands. Making vendomat
+    # follow the system nixpkgs forks the closure in two — same source, same version,
+    # different build — which is the duplication this whole design removes.
+    vendomat.url = "git+https://github.com/Bullish-Design/vendomat?ref=refs/tags/v0.3.5";
+
     nix-paseo = {
       url = "git+file:///home/andrew/Documents/Projects/nix-paseo?ref=main";
       inputs.nixpkgs.follows = "nixpkgs";

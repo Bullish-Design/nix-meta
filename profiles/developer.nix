@@ -9,6 +9,12 @@ let
   # ignored while pkgs.devenv supplied the binary (023-toolchain P4).
   pinnedDevenv = inputs.devenv.packages.${pkgs.stdenv.hostPlatform.system}.default;
 
+  # The shared RepoMan command closure: repoman, copyroom, gitman and docman, built
+  # once as Nix Python applications and content-addressed. One immutable derivation per
+  # source revision, so every shell that names this input resolves the same store paths.
+  repomanToolchain =
+    inputs.vendomat.packages.${pkgs.stdenv.hostPlatform.system}.repoman-toolchain-core;
+
   cfg = config.nix-meta.developer;
   username = config.nixos-core.base.username;
   homeDir = "/home/${username}";
@@ -131,16 +137,22 @@ in
           # which cannot load on 3.12.
           #
           # The RepoMan shared toolchain's console scripts, for interactive use.
-          # It is the same venv repoman/modules/devenv.nix already prepends
-          # inside a devenv; this adds no second copy of anything.
           #
-          # This must come LAST on PATH, so it can never shadow a Nix-managed
-          # binary. `home.sessionPath` PREPENDS, and the venv's bin/ holds
-          # python, python3 and python3.13 — using it would shadow pkgs.python3
-          # in every login shell. `home.sessionVariablesExtra` is emitted after
-          # the PATH export in hm-session-vars.sh, so it appends correctly.
+          # This USED to point at ~/.local/share/repoman/venv/bin: one mutable
+          # virtualenv, installed from four live working trees by `repoman-sync
+          # --machine`, with no rollback. It is now a Nix closure — immutable,
+          # content-addressed, pinned by this flake's lock, and rolled back by
+          # `nixos-rebuild --rollback` like everything else.
+          #
+          # Still LAST on PATH, and `home.sessionVariablesExtra` (not
+          # `home.sessionPath`) because that is emitted after the PATH export in
+          # hm-session-vars.sh and therefore appends. The original reason was that
+          # the venv's bin/ held python, python3 and python3.13 and would shadow
+          # pkgs.python3 in every login shell. The closure holds only the four
+          # manager commands, so that specific hazard is gone — but the profile's
+          # rule stands: developer tooling never shadows a Nix-managed binary.
           home.sessionVariablesExtra = ''
-            export PATH="$PATH''${PATH:+:}${homeDir}/.local/share/repoman/venv/bin"
+            export PATH="$PATH''${PATH:+:}${repomanToolchain}/bin"
           '';
 
           # DISABLED 2026-08-01 with the shellij input (see flake.nix note).

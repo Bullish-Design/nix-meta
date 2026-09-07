@@ -1,0 +1,203 @@
+#!/usr/bin/env bash
+#
+# Live acceptance test for the shared RepoMan command closure on THIS machine.
+#
+# profiles/developer.nix puts the closure's bin on the login shell's PATH, replacing
+# the mutable virtualenv that ~/.local/share/repoman/venv used to be. This script
+# checks the claim end to end, against the real evaluated configuration and the real
+# file a login shell sources — not against the source text that produced them.
+#
+# It is read-only: it evaluates, builds and runs commands. It changes nothing, needs
+# no sudo, and does not require the configuration to have been switched to yet.
+#
+# Usage: ./scripts/repoman-toolchain-test [--flake .#server]
+# Exit:  0 all checks passed · 1 a check failed · 2 could not run the checks
+
+set -u
+set -o pipefail
+
+flake_attr="${1:-.#server}"
+[ "$flake_attr" = "--flake" ] && { flake_attr="${2:-.#server}"; }
+host="${flake_attr#*#}"
+
+repo_root="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
+cd "$repo_root" || exit 2
+
+pass=0
+fail=0
+
+ok()   { printf '  \033[32mok\033[0m   %s\n' "$1"; pass=$((pass + 1)); }
+bad()  { printf '  \033[31mFAIL\033[0m %s\n' "$1"; fail=$((fail + 1)); }
+info() { printf '       %s\n' "$1"; }
+
+cfg="nixosConfigurations.${host}.config.home-manager.users"
+
+echo "Shared RepoMan toolchain — live test on $(hostname), config ${flake_attr}"
+echo
+
+# ---------------------------------------------------------------- 1. the configuration
+username="$(nix eval --raw ".#nixosConfigurations.${host}.config.nixos-core.base.username" 2>/dev/null)"
+if [ -z "$username" ]; then
+  echo "cannot read the configured username from ${flake_attr}" >&2
+  exit 2
+fi
+info "user: $username"
+
+session_vars_extra="$(nix eval --raw ".#${cfg}.${username}.home.sessionVariablesExtra" 2>/dev/null)"
+if [ -z "$session_vars_extra" ]; then
+  echo "cannot evaluate home.sessionVariablesExtra" >&2
+  exit 2
+fi
+
+case "$session_vars_extra" in
+  *".local/share/repoman/venv"*)
+    bad "the login shell still points at the mutable venv (~/.local/share/repoman/venv)" ;;
+  *"/nix/store/"*"repoman-toolchain-"*)
+    ok "the login shell points at a store closure, not the venv" ;;
+  *)
+    bad "the login shell PATH line names neither the venv nor a toolchain closure"
+    info "$session_vars_extra" ;;
+esac
+
+# The closure the configuration will install.
+configured="$(printf '%s' "$session_vars_extra" | grep -o '/nix/store/[a-z0-9]*-repoman-toolchain-[a-z0-9-]*' | head -1)"
+if [ -z "$configured" ]; then
+  # A real regression, not an inability to run: exit 1, so a caller can tell a failed
+  # check from a broken harness. Everything below needs this path, so stop here.
+  echo
+  printf 'FAILED — %d of %d checks (no toolchain closure is configured)\n' "$fail" "$((pass + fail))"
+  exit 1
+fi
+info "closure: $configured"
+
+# ------------------------------------------------- 2. one build, shared by every consumer
+# The acceptance criterion: a devenv consumer and this login shell must resolve the SAME
+# store path. They only do so while vendomat keeps its own nixpkgs — an
+# `inputs.nixpkgs.follows` here would fork the closure in two, same source and version
+# but a different build, which is the duplication this design exists to remove.
+# Resolve vendomat exactly as this flake's lock pins it, then ask THAT flake what it
+# builds. `nix eval .#inputs...` is not addressable, so read the lock.
+vendomat_ref="$(python3 - <<'PY' 2>/dev/null
+import json
+
+with open("flake.lock") as fh:
+    lock = json.load(fh)
+node = lock["nodes"].get("vendomat", {}).get("locked", {})
+url, rev = node.get("url"), node.get("rev")
+print(f"git+{url}?rev={rev}" if url and rev else "")
+PY
+)"
+if [ -z "$vendomat_ref" ]; then
+  bad "flake.lock has no locked vendomat input to compare against"
+  direct=""
+else
+  direct="$(nix eval --raw "${vendomat_ref}#repoman-toolchain-core" 2>/dev/null || true)"
+fi
+if [ -z "$direct" ]; then
+  bad "could not evaluate vendomat's own closure — the shared-build claim is unverified"
+elif [ "$direct" = "$configured" ]; then
+  ok "vendomat's own flake resolves to the same store path (one build, shared)"
+else
+  bad "the closure is forked: this host builds a different one than vendomat does"
+  info "host:     $configured"
+  info "vendomat: $direct"
+fi
+
+# ------------------------------------------------------ 3. the file a login shell sources
+# Build the generation and read the very file that gets sourced, rather than trusting
+# that the evaluated option reaches it intact.
+system_path="$(nix build --no-link --print-out-paths \
+  ".#nixosConfigurations.${host}.config.system.build.toplevel" 2>/dev/null | tail -1)"
+if [ -z "$system_path" ]; then
+  echo "could not build the system closure" >&2
+  exit 2
+fi
+
+session_file="$(nix path-info -r "$system_path" 2>/dev/null \
+  | grep -- '-hm-session-vars.sh$' | head -1)/etc/profile.d/hm-session-vars.sh"
+if [ ! -r "$session_file" ]; then
+  bad "no hm-session-vars.sh in the built generation"
+else
+  ok "found the session file a login shell sources"
+  info "$session_file"
+fi
+
+# --------------------------------------------------------------- 4. live, in a clean shell
+# env -i: nothing inherited. This is what a fresh login gets, not what THIS shell has.
+if [ -r "$session_file" ]; then
+  probe="$(env -i HOME="$HOME" PATH=/run/current-system/sw/bin bash -c "
+    . '$session_file'
+    case \"\$PATH\" in *.local/share/repoman/venv*) echo 'VENV=yes';; *) echo 'VENV=no';; esac
+    for c in repoman copyroom gitman docman; do
+      echo \"WHICH_\$c=\$(command -v \$c 2>/dev/null || echo missing)\"
+    done
+    echo \"REPOMAN_VERSION=\$(repoman --version 2>/dev/null || echo missing)\"
+    echo \"GITMAN_VERSION=\$(gitman --version 2>/dev/null || echo missing)\"
+  " 2>/dev/null)"
+
+  case "$probe" in
+    *"VENV=no"*) ok "the retired venv is absent from a clean login PATH" ;;
+    *)           bad "the retired venv is still on a clean login PATH" ;;
+  esac
+
+  for command in repoman copyroom gitman docman; do
+    resolved="$(printf '%s\n' "$probe" | sed -n "s/^WHICH_${command}=//p")"
+    case "$resolved" in
+      "$configured"/bin/"$command") ok "$command resolves into the configured closure" ;;
+      missing|"")                   bad "$command is not on the login PATH at all" ;;
+      *)                            bad "$command resolves to $resolved, outside the closure" ;;
+    esac
+  done
+
+  # Resolving is not running. A package that evaluates and links but cannot import its
+  # own dependencies would pass every check above.
+  version="$(printf '%s\n' "$probe" | sed -n 's/^REPOMAN_VERSION=//p')"
+  case "$version" in
+    "repoman "*) ok "repoman runs: $version" ;;
+    *)           bad "repoman did not run (got: ${version:-nothing})" ;;
+  esac
+  # gitman imports pyjutsu, the native extension. If the vended wheel were wrong, this
+  # is where it would surface, and nowhere earlier.
+  version="$(printf '%s\n' "$probe" | sed -n 's/^GITMAN_VERSION=//p')"
+  case "$version" in
+    "gitman "*) ok "gitman runs, so its native pyjutsu import works: $version" ;;
+    *)          bad "gitman did not run (got: ${version:-nothing})" ;;
+  esac
+fi
+
+# ------------------------------------------------------- 5. provenance, and no shadowing
+manifest="$configured/share/vendomat/toolchain.json"
+if [ -r "$manifest" ]; then
+  ok "the closure carries a provenance manifest"
+  reported="$("$configured/bin/repoman" --version 2>/dev/null | awk '{print $2}')"
+  claimed="$(python3 -c "import json,sys;print(json.load(open('$manifest'))['tools']['repoman']['version'])" 2>/dev/null)"
+  if [ -n "$claimed" ] && [ "$reported" = "$claimed" ]; then
+    ok "repoman --version agrees with the manifest ($claimed)"
+  else
+    bad "repoman reports '${reported:-nothing}' but the manifest says '${claimed:-nothing}'"
+  fi
+else
+  bad "no provenance manifest at $manifest"
+fi
+
+# The closure is APPENDED to PATH, which is safe only while it holds no name that a
+# Nix-managed binary also holds. It shipped four manager commands; a python here would
+# shadow pkgs.python3 in every login shell, which is why the venv had to be last.
+extra="$(python3 -c "
+import os
+allowed = {'repoman', 'copyroom', 'gitman', 'docman'}
+found = {p for p in os.listdir('$configured/bin') if not p.startswith('.')}
+print(' '.join(sorted(found - allowed)))" 2>/dev/null)"
+if [ -z "$extra" ]; then
+  ok "the closure holds only the four manager commands"
+else
+  bad "the closure holds unexpected commands that could shadow system binaries: $extra"
+fi
+
+echo
+if [ "$fail" -eq 0 ]; then
+  printf 'PASSED — %d checks\n' "$pass"
+  exit 0
+fi
+printf 'FAILED — %d of %d checks\n' "$fail" "$((pass + fail))"
+exit 1
