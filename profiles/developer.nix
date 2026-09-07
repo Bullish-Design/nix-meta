@@ -4,6 +4,11 @@ inputs:
 let
   inherit (inputs) home-manager nix-terminal;
 
+  # The devenv the flake PINS, not the one the system nixpkgs happens to carry.
+  # These are different versions, and before this the pin was declared and
+  # ignored while pkgs.devenv supplied the binary (023-toolchain P4).
+  pinnedDevenv = inputs.devenv.packages.${pkgs.stdenv.hostPlatform.system}.default;
+
   cfg = config.nix-meta.developer;
   username = config.nixos-core.base.username;
   homeDir = "/home/${username}";
@@ -22,9 +27,11 @@ in
         python3
         # Ad-hoc `uv run --with ...` without entering a devenv.
         uv
+      ] ++ [
         # Gitman owns its Python/pyjutsu runtime through its own pinned devenv;
-        # keep the launcher available from every developer profile.
-        devenv
+        # keep the launcher available from every developer profile. This is
+        # inputs.devenv, the flake's pin — NOT pkgs.devenv.
+        pinnedDevenv
       ];
       description = "Developer tools installed for the configured base user, including Gitman's devenv launcher.";
     };

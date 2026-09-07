@@ -16,8 +16,12 @@
 
     # Pin to a released devenv version. Update this tag and only its two lock
     # inputs when the developer-environment toolchain should move forward.
+    #
+    # This pin is what profiles/developer.nix installs. It used to be declared
+    # here and ignored, while `pkgs.devenv` from the system nixpkgs supplied the
+    # actual binary — three declarations for one name (023-toolchain P4).
     devenv = {
-      url = "github:cachix/devenv/v2.2";
+      url = "github:cachix/devenv/v2.2.2";
       inputs.nixpkgs.follows = "devenv-nixpkgs";
     };
 
