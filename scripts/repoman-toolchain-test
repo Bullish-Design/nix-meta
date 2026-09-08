@@ -128,7 +128,7 @@ if [ -r "$session_file" ]; then
   probe="$(env -i HOME="$HOME" PATH=/run/current-system/sw/bin bash -c "
     . '$session_file'
     case \"\$PATH\" in *.local/share/repoman/venv*) echo 'VENV=yes';; *) echo 'VENV=no';; esac
-    for c in repoman copyroom gitman docman; do
+    for c in repoman copyroom gitman docman templateer; do
       echo \"WHICH_\$c=\$(command -v \$c 2>/dev/null || echo missing)\"
     done
     echo \"REPOMAN_VERSION=\$(repoman --version 2>/dev/null || echo missing)\"
@@ -140,7 +140,7 @@ if [ -r "$session_file" ]; then
     *)           bad "the retired venv is still on a clean login PATH" ;;
   esac
 
-  for command in repoman copyroom gitman docman; do
+  for command in repoman copyroom gitman docman templateer; do
     resolved="$(printf '%s\n' "$probe" | sed -n "s/^WHICH_${command}=//p")"
     case "$resolved" in
       "$configured"/bin/"$command") ok "$command resolves into the configured closure" ;;
@@ -185,11 +185,11 @@ fi
 # shadow pkgs.python3 in every login shell, which is why the venv had to be last.
 extra="$(python3 -c "
 import os
-allowed = {'repoman', 'copyroom', 'gitman', 'docman'}
+allowed = {'repoman', 'copyroom', 'gitman', 'docman', 'templateer'}
 found = {p for p in os.listdir('$configured/bin') if not p.startswith('.')}
 print(' '.join(sorted(found - allowed)))" 2>/dev/null)"
 if [ -z "$extra" ]; then
-  ok "the closure holds only the four manager commands"
+  ok "the closure holds only the five manager commands"
 else
   bad "the closure holds unexpected commands that could shadow system binaries: $extra"
 fi
