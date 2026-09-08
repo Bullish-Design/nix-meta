@@ -1293,6 +1293,23 @@
         "type": "github"
       }
     },
+    "templateer": {
+      "flake": false,
+      "locked": {
+        "lastModified": 1788750417,
+        "narHash": "sha256-YDB2ML1orEd3tq0j6BOZqkjiBnqb+oeG4RwlNPNUE8Y=",
+        "ref": "refs/tags/v0.4.0",
+        "rev": "08d5b0b3f9a9a3f40c36b35fa2ce936faefcf8c7",
+        "revCount": 43,
+        "type": "git",
+        "url": "https://github.com/Bullish-Design/templateer_v2"
+      },
+      "original": {
+        "ref": "refs/tags/v0.4.0",
+        "type": "git",
+        "url": "https://github.com/Bullish-Design/templateer_v2"
+      }
+    },
     "treefmt-nix": {
       "inputs": {
         "nixpkgs": [
@@ -1322,19 +1339,20 @@
         "gitman": "gitman",
         "nixpkgs": "nixpkgs_4",
         "pyjutsu": "pyjutsu",
-        "repoman": "repoman_2"
+        "repoman": "repoman_2",
+        "templateer": "templateer"
       },
       "locked": {
-        "lastModified": 1788823582,
-        "narHash": "sha256-ktxAuqE0zhh9XUj0ekvvkIUhOjbGWhncZo48ZUgJEKo=",
-        "ref": "refs/tags/v0.3.5",
-        "rev": "1a46d39232a71295693bc17b4bf7e92890f8c181",
-        "revCount": 58,
+        "lastModified": 1788876719,
+        "narHash": "sha256-xtYW6NHpzeVTFLG2UnnOMWfNvm+jz1KHpHUrIuYxrGQ=",
+        "ref": "refs/tags/v0.3.6",
+        "rev": "c95b0fe3c805326727bb7a699d3a0b4e300ec19a",
+        "revCount": 62,
         "type": "git",
         "url": "https://github.com/Bullish-Design/vendomat"
       },
       "original": {
-        "ref": "refs/tags/v0.3.5",
+        "ref": "refs/tags/v0.3.6",
         "type": "git",
         "url": "https://github.com/Bullish-Design/vendomat"
       }
