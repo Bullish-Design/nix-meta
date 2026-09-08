@@ -1445,16 +1445,16 @@
         "uv2nix": "uv2nix_2"
       },
       "locked": {
-        "lastModified": 1788899308,
-        "narHash": "sha256-mSO96R8hn/rr8QdVHFNj4gOFEOBd4vlkoEP7vXxH+zg=",
-        "ref": "refs/tags/v0.3.8",
-        "rev": "6f5d4e87d0cfd067dcedd4640d4732461567d1a5",
-        "revCount": 71,
+        "lastModified": 1788903639,
+        "narHash": "sha256-DWttpe/36TOMqDAGRyU5mAFDcTKqV3dqGZN6HbEtMJo=",
+        "ref": "refs/tags/v0.3.9",
+        "rev": "511e70f7b2ab440f0ea51d74d77c7969042d6814",
+        "revCount": 73,
         "type": "git",
         "url": "https://github.com/Bullish-Design/vendomat"
       },
       "original": {
-        "ref": "refs/tags/v0.3.8",
+        "ref": "refs/tags/v0.3.9",
         "type": "git",
         "url": "https://github.com/Bullish-Design/vendomat"
       }
