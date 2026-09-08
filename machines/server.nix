@@ -131,7 +131,7 @@ in
   networking.firewall.interfaces.tailscale0.allowedTCPPorts = [ 22 8077 ];
 
   # Accept the ESP32 microphone stream on the wired LAN only.
-  networking.firewall.interfaces.eno1.allowedUDPPorts = [ 54500 ];
+  networking.firewall.interfaces.eno1.allowedUDPPorts = [ 54500 54501 ];
 
   # Developer workflow policy is host-owned: the shared profile provides the
   # tools and user-relative defaults, while this box sets its own log root.
