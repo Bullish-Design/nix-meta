@@ -188,16 +188,16 @@
     "copyroom": {
       "flake": false,
       "locked": {
-        "lastModified": 1786504231,
-        "narHash": "sha256-oqVk99ASAkwl3j3peL6MtobL1V4W0jIyx0S32hh8MwA=",
-        "ref": "refs/tags/v0.7.4",
-        "rev": "5d6f807006b7cdc08d469707ffa3f88d3762e457",
-        "revCount": 57,
+        "lastModified": 1788890371,
+        "narHash": "sha256-29Cpq/w74XYgVoPIX1otM4rJgKTMokRftqkJ5TWWNJg=",
+        "ref": "refs/tags/v0.7.7",
+        "rev": "eeba42561724c1319f48c354751933b2893488e1",
+        "revCount": 73,
         "type": "git",
         "url": "https://github.com/Bullish-Design/copyroom"
       },
       "original": {
-        "ref": "refs/tags/v0.7.4",
+        "ref": "refs/tags/v0.7.7",
         "type": "git",
         "url": "https://github.com/Bullish-Design/copyroom"
       }
@@ -316,16 +316,16 @@
     "docman": {
       "flake": false,
       "locked": {
-        "lastModified": 1788800621,
-        "narHash": "sha256-mqRHVsQWTvOTeQSV/CF6pDneegb5/22dWINJSRYAjxY=",
-        "ref": "refs/tags/v0.2.0",
-        "rev": "be02887bef46136a8d91ab9e95355b39061bf153",
-        "revCount": 19,
+        "lastModified": 1788890093,
+        "narHash": "sha256-35iLQo6w3kuap4hEXWbdRjjYxU75tK1UF1fj4ckJ8Sg=",
+        "ref": "refs/tags/v0.2.1",
+        "rev": "0bf9116ae2a000f81f537df8e2ded0a2f1033964",
+        "revCount": 21,
         "type": "git",
         "url": "https://github.com/Bullish-Design/docman"
       },
       "original": {
-        "ref": "refs/tags/v0.2.0",
+        "ref": "refs/tags/v0.2.1",
         "type": "git",
         "url": "https://github.com/Bullish-Design/docman"
       }
@@ -549,16 +549,16 @@
     "gitman": {
       "flake": false,
       "locked": {
-        "lastModified": 1788789918,
-        "narHash": "sha256-W/0dAXgmRuQ0eD4O9Gefn0lsQ7Bz43lrniI8jOefmM0=",
-        "ref": "refs/tags/v0.6.1",
-        "rev": "a0df153b91c1ebed9347feda66b49cc1a4a08f68",
-        "revCount": 100,
+        "lastModified": 1788890211,
+        "narHash": "sha256-WFqLJbDGv3jGkjonXSQQkjuL4XYZd5vqNhD0tFSCh2s=",
+        "ref": "refs/tags/v0.6.2",
+        "rev": "9babc9a202547a0cfd6957e47b22205b85e0895f",
+        "revCount": 106,
         "type": "git",
         "url": "https://github.com/Bullish-Design/gitman"
       },
       "original": {
-        "ref": "refs/tags/v0.6.1",
+        "ref": "refs/tags/v0.6.2",
         "type": "git",
         "url": "https://github.com/Bullish-Design/gitman"
       }
@@ -1445,16 +1445,16 @@
         "uv2nix": "uv2nix_2"
       },
       "locked": {
-        "lastModified": 1788889282,
-        "narHash": "sha256-mG1oE/4a/jE3nFTsDpXK59ciYC9mk9gTi2bBSWFHuXE=",
-        "ref": "refs/tags/v0.3.7",
-        "rev": "b40d59f9511b5689894fd2f14d37ae3cb159f392",
-        "revCount": 67,
+        "lastModified": 1788899308,
+        "narHash": "sha256-mSO96R8hn/rr8QdVHFNj4gOFEOBd4vlkoEP7vXxH+zg=",
+        "ref": "refs/tags/v0.3.8",
+        "rev": "6f5d4e87d0cfd067dcedd4640d4732461567d1a5",
+        "revCount": 71,
         "type": "git",
         "url": "https://github.com/Bullish-Design/vendomat"
       },
       "original": {
-        "ref": "refs/tags/v0.3.7",
+        "ref": "refs/tags/v0.3.8",
         "type": "git",
         "url": "https://github.com/Bullish-Design/vendomat"
       }

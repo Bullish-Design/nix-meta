@@ -39,7 +39,7 @@
     # shell must resolve the SAME store paths for the same commands. Making vendomat
     # follow the system nixpkgs forks the closure in two — same source, same version,
     # different build — which is the duplication this whole design removes.
-    vendomat.url = "git+https://github.com/Bullish-Design/vendomat?ref=refs/tags/v0.3.7";
+    vendomat.url = "git+https://github.com/Bullish-Design/vendomat?ref=refs/tags/v0.3.8";
 
     nix-paseo = {
       url = "git+file:///home/andrew/Documents/Projects/nix-paseo?ref=main";
