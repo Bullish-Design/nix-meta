@@ -272,18 +272,18 @@
         ]
       },
       "locked": {
-        "lastModified": 1789049549,
-        "narHash": "sha256-+KEX0BTZ3XLDCf97pADxEaCPKKmMfIjERYGbYkCFqco=",
-        "ref": "main",
-        "rev": "04315857d8c48318fa2d06adfad7f9d7c0a4c426",
-        "revCount": 387,
+        "lastModified": 1789061655,
+        "narHash": "sha256-jt+SyeX/1bVHlEhOZn6JR1rWk8ROTjGo5pQJ0RqU4M4=",
+        "ref": "refs/tags/v0.5.0",
+        "rev": "cfe5b81941c3b7fbfa7be06709eab3dadc1a2bac",
+        "revCount": 392,
         "type": "git",
-        "url": "file:///home/andrew/Documents/Projects/devman"
+        "url": "https://github.com/Bullish-Design/devman"
       },
       "original": {
-        "ref": "main",
+        "ref": "refs/tags/v0.5.0",
         "type": "git",
-        "url": "file:///home/andrew/Documents/Projects/devman"
+        "url": "https://github.com/Bullish-Design/devman"
       }
     },
     "devman_2": {
