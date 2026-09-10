@@ -633,11 +633,11 @@
         ]
       },
       "locked": {
-        "lastModified": 1786647124,
-        "narHash": "sha256-v7mojHsm/XlW42M2SANp/RrFtQg67M9jewQe8pil2WU=",
+        "lastModified": 1789056400,
+        "narHash": "sha256-tq6Ji6+m/wUfdljv9rIeVFlJjAVzguXRlzJ8WZgLz+A=",
         "ref": "main",
-        "rev": "c34dc831df1922704dd0226b532ce03423a9ee9d",
-        "revCount": 268,
+        "rev": "4be325043194898b5a1ab8045ac84b75226e8744",
+        "revCount": 306,
         "type": "git",
         "url": "ssh://git@github.com/Bullish-Design/loci-core.git"
       },
@@ -657,16 +657,16 @@
         ]
       },
       "locked": {
-        "lastModified": 1786654248,
-        "narHash": "sha256-C5YKya8RUxBLaayGQW0rqZbfLQ2eUXb1Oj6e3BJDMhY=",
+        "lastModified": 1789056532,
+        "narHash": "sha256-ir+YO3CX+cYRLlP4npr02iXYG+KMb497EnmnKIFnHKo=",
         "owner": "Bullish-Design",
         "repo": "loci.nvim",
-        "rev": "c7b1d2ee0d9eb50b79799ecc867ca6736f1f9985",
+        "rev": "133dad16d062b6ff3a8218b26544d52e147c3315",
         "type": "github"
       },
       "original": {
         "owner": "Bullish-Design",
-        "ref": "v0.3.0",
+        "ref": "v0.3.1",
         "repo": "loci.nvim",
         "type": "github"
       }
@@ -722,11 +722,11 @@
         "nixpkgs-neovim": "nixpkgs-neovim"
       },
       "locked": {
-        "lastModified": 1786656296,
-        "narHash": "sha256-db/r8e1+8V+9GdxNCjUVC/ljvfTP8NjZGia/SvKh20U=",
+        "lastModified": 1789056854,
+        "narHash": "sha256-NMvBNiwdaXKeIxmRxfavjQ7MA8ViQNRPGVy8oDYsxFA=",
         "owner": "Bullish-Design",
         "repo": "nix-nvim",
-        "rev": "efd50b5f7de52239a1631b1e396b46a55d199516",
+        "rev": "7431b8ea8fa55fef76df72b655b3962e1a9e8888",
         "type": "github"
       },
       "original": {
@@ -790,11 +790,11 @@
         "repoman": "repoman"
       },
       "locked": {
-        "lastModified": 1787680207,
-        "narHash": "sha256-zUQZVaTdi/4lWC7l1cjy5ohs8M1SLTSEp/19Q/eueHY=",
+        "lastModified": 1789056893,
+        "narHash": "sha256-LxtiaMT2NNPXGP184LqvGJAXY4gEmaCZ+qAZsJCf9ig=",
         "ref": "main",
-        "rev": "b47170974d1fd0baecebbc92b68d6f8d5368e3c9",
-        "revCount": 73,
+        "rev": "75d4041b341dbff79d6217ec45eb863e60bdf36a",
+        "revCount": 75,
         "type": "git",
         "url": "file:///home/andrew/Documents/Projects/nix-terminal"
       },
@@ -1145,18 +1145,18 @@
         ]
       },
       "locked": {
-        "lastModified": 1787596043,
-        "narHash": "sha256-R8xOVIVUumiCYNbZrvi5qSNLLlvb5WWfXtQJ+gNZN6Y=",
-        "ref": "main",
-        "rev": "5a8dd670baeace4eda1ec02da0f5e12a9ad2440a",
-        "revCount": 128,
+        "lastModified": 1788823452,
+        "narHash": "sha256-G9ke+XOt5uK6gweQca1ARnF+8WCfpiwHA9Zaal3DGYg=",
+        "ref": "refs/tags/v0.7.5",
+        "rev": "cd34bfd4845d6dde310d3a263816c86cad977a9f",
+        "revCount": 154,
         "type": "git",
-        "url": "file:///home/andrew/Documents/Projects/repoman"
+        "url": "https://github.com/Bullish-Design/repoman"
       },
       "original": {
-        "ref": "main",
+        "ref": "refs/tags/v0.7.5",
         "type": "git",
-        "url": "file:///home/andrew/Documents/Projects/repoman"
+        "url": "https://github.com/Bullish-Design/repoman"
       }
     },
     "repoman_2": {
