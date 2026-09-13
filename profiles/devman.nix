@@ -30,12 +30,20 @@ in
     # accumulated state.
     lingerUsers = [ username ];
 
+    # THE MACHINE PLANE CUTOVER (devman project 038, §10). Vendomat now owns
+    # generation, activation, and rollback; the registry Dagu reads is the
+    # active generation's own tree, not the compatibility shell-entry
+    # registry every consumer repository used to write on its own shell
+    # entry. `stateDir` stays at devman's default — watcher state and project
+    # metadata outlive any one generation, and Vendomat's own generation store
+    # lives at $HOME/.local/state/vendomat/devman, entirely separate from it.
+    registryDir = "$HOME/.local/state/vendomat/devman/active";
+
     # Everything else is devman's default and is deliberately not repeated:
     # ports 8080 and 50055, the five queues (light 4, normal 2, heavy 1, gpu 1,
-    # exclusive 1), DAGU_HOME at %h/.local/share/dagu, the registry at
-    # $HOME/.local/share/devman, seven-day history retention, and the profile
-    # roots prepended to the unit's PATH. Restating a default here would be a
-    # second place to keep in sync with the flake.
+    # exclusive 1), DAGU_HOME at %h/.local/share/dagu, seven-day history
+    # retention, and the profile roots prepended to the unit's PATH. Restating
+    # a default here would be a second place to keep in sync with the flake.
     #
     # The two ports are the only thing this host shares with anything else. Both
     # were free when this was written; a second Dagu fails loudly on the
