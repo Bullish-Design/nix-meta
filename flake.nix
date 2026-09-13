@@ -200,8 +200,9 @@
     #
     # The machine consumes the reviewed Project 038 link work at an exact
     # commit until it is included in the next published devman tag. The rev
-    # now also carries the independent link adapter (038 Stages 16 and 17), so
-    # this machine gets `devman-link` on its PATH through
+    # carries the independent link adapter and its machine-installed link-only
+    # module (038 Stages 16–18), so this machine gets `devman-link` on its PATH
+    # and `/share/devman/link-module.nix` through
     # `services.devman-dagu.installLinkAdapter`, which defaults to true. The
     # renderer's duplicate copy is gone, so a rollback is a pin to an earlier
     # rev rather than an option.
@@ -209,7 +210,7 @@
     # NixOS module takes `pkgs` from this machine and never reads devman's own
     # nixpkgs input, which serves that flake's `packages` and `checks` alone.
     devman = {
-      url = "git+https://github.com/Bullish-Design/devman?rev=3353b5819ff14158c9611512b3478c6deadcec84";
+      url = "git+https://github.com/Bullish-Design/devman?rev=edd0b62834d9c9d8ac61d44f56219b63afb60bdf";
       inputs.nixpkgs.follows = "nixpkgs";
     };
 
