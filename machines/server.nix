@@ -54,6 +54,13 @@ in
     # SilverBullet — each registers a distinct --set-path route and each
     # ExecStop removes only its own, so the two never clobber each other.
     inputs.pytuin.nixosModules.pytuin-server
+
+    # Machine delivery of the vendomat consumer module (vendomat project 039).
+    # Installs `/run/current-system/sw/share/vendomat/{consumer-module.nix,
+    # machine.json}` and the `vendomat` command, so every repository on this
+    # box reaches the module through the central overlay instead of its own
+    # vendomat flake input.
+    inputs.vendomat.nixosModules.default
   ];
 
   # ── Bootloader: systemd-boot on the EFI partition at /boot (UEFI) ───────────

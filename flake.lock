@@ -313,6 +313,26 @@
         "type": "github"
       }
     },
+    "devman_3": {
+      "inputs": {
+        "nixpkgs": "nixpkgs_4"
+      },
+      "locked": {
+        "lastModified": 1789243182,
+        "narHash": "sha256-Pvs3mWxQmD/AMf5SQheZjd1rJicqnkGjeKFYywMBV3Q=",
+        "ref": "refs/tags/v0.5.2",
+        "rev": "8e7c3be6c8c02e7438cf3bb0b7be086b0e98ee12",
+        "revCount": 423,
+        "type": "git",
+        "url": "https://github.com/Bullish-Design/devman"
+      },
+      "original": {
+        "ref": "refs/tags/v0.5.2",
+        "rev": "8e7c3be6c8c02e7438cf3bb0b7be086b0e98ee12",
+        "type": "git",
+        "url": "https://github.com/Bullish-Design/devman"
+      }
+    },
     "docman": {
       "flake": false,
       "locked": {
@@ -991,6 +1011,22 @@
       }
     },
     "nixpkgs_4": {
+      "locked": {
+        "lastModified": 1787135253,
+        "narHash": "sha256-RD2kNWCG+Bjo6h+JVjWVNntZs2GtRoeY2xHjts/FNkA=",
+        "owner": "NixOS",
+        "repo": "nixpkgs",
+        "rev": "ffb3c9b700e759be2ef13237c9d8f953b32a1e46",
+        "type": "github"
+      },
+      "original": {
+        "owner": "NixOS",
+        "ref": "nixos-unstable",
+        "repo": "nixpkgs",
+        "type": "github"
+      }
+    },
+    "nixpkgs_5": {
       "inputs": {
         "nixpkgs-src": "nixpkgs-src"
       },
@@ -1434,9 +1470,10 @@
     "vendomat": {
       "inputs": {
         "copyroom": "copyroom",
+        "devman": "devman_3",
         "docman": "docman",
         "gitman": "gitman",
-        "nixpkgs": "nixpkgs_4",
+        "nixpkgs": "nixpkgs_5",
         "pyjutsu": "pyjutsu",
         "pyproject-build-systems": "pyproject-build-systems",
         "pyproject-nix": "pyproject-nix",
@@ -1445,16 +1482,16 @@
         "uv2nix": "uv2nix_2"
       },
       "locked": {
-        "lastModified": 1788903639,
-        "narHash": "sha256-DWttpe/36TOMqDAGRyU5mAFDcTKqV3dqGZN6HbEtMJo=",
-        "ref": "refs/tags/v0.3.9",
-        "rev": "511e70f7b2ab440f0ea51d74d77c7969042d6814",
-        "revCount": 73,
+        "lastModified": 1789515750,
+        "narHash": "sha256-/itkTpBF5g1U1xIGPO+CQQRT948SpnivIAZwMCqrS1I=",
+        "ref": "refs/tags/v0.4.0",
+        "rev": "7826c9ef3a9040b63cf924cbcfeb88203c9d28f1",
+        "revCount": 94,
         "type": "git",
         "url": "https://github.com/Bullish-Design/vendomat"
       },
       "original": {
-        "ref": "refs/tags/v0.3.9",
+        "ref": "refs/tags/v0.4.0",
         "type": "git",
         "url": "https://github.com/Bullish-Design/vendomat"
       }
