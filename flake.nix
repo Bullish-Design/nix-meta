@@ -198,13 +198,16 @@
     # with `git+file:`. A `github:` input hits the GitHub API rate limit on every
     # evaluation. (devman FINDINGS.md B4, corrected; CONCEPT.md §3.2.)
     #
-    # The machine consumes the reviewed Project 038 link bridge at an exact
-    # commit until that bridge is included in the next published devman tag.
+    # The machine consumes the reviewed Project 038 link work at an exact
+    # commit until it is included in the next published devman tag. The rev
+    # now also carries the independent link adapter (038 Stage 16, B), so this
+    # machine gets `devman-link` on its PATH through
+    # `services.devman-dagu.installLinkAdapter`, which defaults to true.
     # `follows` here only removes a duplicate nixpkgs node from the lock. The
     # NixOS module takes `pkgs` from this machine and never reads devman's own
     # nixpkgs input, which serves that flake's `packages` and `checks` alone.
     devman = {
-      url = "git+https://github.com/Bullish-Design/devman?rev=0cc025760f863741be3af689c364979b07183338";
+      url = "git+https://github.com/Bullish-Design/devman?rev=8974c4c04544f2418d3a8df8422dcae64c01649e";
       inputs.nixpkgs.follows = "nixpkgs";
     };
 
