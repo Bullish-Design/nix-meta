@@ -198,19 +198,17 @@
     # with `git+file:`. A `github:` input hits the GitHub API rate limit on every
     # evaluation. (devman FINDINGS.md B4, corrected; CONCEPT.md §3.2.)
     #
-    # The machine consumes the reviewed Project 038 link work at an exact
-    # commit until it is included in the next published devman tag. The rev
-    # carries the independent link adapter and its machine-installed link-only
-    # module (038 Stages 16–18), so this machine gets `devman-link` on its PATH
-    # and `/share/devman/link-module.nix` through
-    # `services.devman-dagu.installLinkAdapter`, which defaults to true. The
-    # renderer's duplicate copy is gone, so a rollback is a pin to an earlier
-    # rev rather than an option.
+    # The Project 038 link work that once needed a bare-rev pin is now in the
+    # published tag: `v0.7.0` carries the independent link adapter and its
+    # machine-installed link-only module (038 Stages 16-18), so this machine
+    # gets `devman-link` on its PATH and `/share/devman/link-module.nix`
+    # through `services.devman-dagu.installLinkAdapter`, which defaults to
+    # true. A rollback is a pin to an earlier tag.
     # `follows` here only removes a duplicate nixpkgs node from the lock. The
     # NixOS module takes `pkgs` from this machine and never reads devman's own
     # nixpkgs input, which serves that flake's `packages` and `checks` alone.
     devman = {
-      url = "git+https://github.com/Bullish-Design/devman?rev=28b05a7044aa12eebd4aaf8da4c4eb302d79bf6d";
+      url = "git+https://github.com/Bullish-Design/devman?ref=refs/tags/v0.7.0";
       inputs.nixpkgs.follows = "nixpkgs";
     };
 
