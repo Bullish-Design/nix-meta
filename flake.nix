@@ -47,7 +47,7 @@
     # `/run/current-system/sw/share/repoman/module/devenv.nix`, and each repository's
     # central `devenv.local.nix` imports it from that stable path instead of
     # declaring its own `repoman` input.
-    repoman.url = "git+https://github.com/Bullish-Design/repoman?ref=refs/tags/v0.8.0";
+    repoman.url = "git+https://github.com/Bullish-Design/repoman?ref=refs/tags/v0.8.1";
 
     nix-paseo = {
       url = "git+file:///home/andrew/Documents/Projects/nix-paseo?ref=main";
