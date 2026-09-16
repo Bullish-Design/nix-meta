@@ -61,6 +61,12 @@ in
     # box reaches the module through the central overlay instead of its own
     # vendomat flake input.
     inputs.vendomat.nixosModules.default
+
+    # Machine delivery of the repoman consumer module (repoman project 039).
+    # Installs `/run/current-system/sw/share/repoman/module/devenv.nix`, so every
+    # repository on this box reaches the module through the central overlay
+    # instead of its own repoman flake input.
+    inputs.repoman.nixosModules.default
   ];
 
   # ── Bootloader: systemd-boot on the EFI partition at /boot (UEFI) ───────────

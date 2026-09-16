@@ -41,6 +41,14 @@
     # different build — which is the duplication this whole design removes.
     vendomat.url = "git+https://github.com/Bullish-Design/vendomat?ref=refs/tags/v0.4.1";
 
+    # Project 039 (repoman half): the repoman devenv meta-module, machine-installed.
+    # This ONE pin replaces the twenty-three per-repository `devenv.yaml` pins the
+    # measurement found (2026-09-15). `nixosModules.default` installs
+    # `/run/current-system/sw/share/repoman/module/devenv.nix`, and each repository's
+    # central `devenv.local.nix` imports it from that stable path instead of
+    # declaring its own `repoman` input.
+    repoman.url = "git+https://github.com/Bullish-Design/repoman?ref=refs/tags/v0.8.0";
+
     nix-paseo = {
       url = "git+file:///home/andrew/Documents/Projects/nix-paseo?ref=main";
       inputs.nixpkgs.follows = "nixpkgs";
