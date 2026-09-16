@@ -47,7 +47,11 @@
     # `/run/current-system/sw/share/repoman/module/devenv.nix`, and each repository's
     # central `devenv.local.nix` imports it from that stable path instead of
     # declaring its own `repoman` input.
-    repoman.url = "git+https://github.com/Bullish-Design/repoman?ref=refs/tags/v0.8.1";
+    # v0.8.2 gives `.repoman/project.toml` a `cliProvider` field. The ten repositories
+    # that decline the store toolchain hold that opt-out in `repoman.cliProvider`, the
+    # compatibility option slated for removal; without a manifest home, withdrawing it
+    # would flip all ten onto a store closure they never imported.
+    repoman.url = "git+https://github.com/Bullish-Design/repoman?ref=refs/tags/v0.8.2";
 
     nix-paseo = {
       url = "git+file:///home/andrew/Documents/Projects/nix-paseo?ref=main";
