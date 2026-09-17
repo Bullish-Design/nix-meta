@@ -763,11 +763,11 @@
         "paseo": "paseo"
       },
       "locked": {
-        "lastModified": 1788883507,
-        "narHash": "sha256-kt5wUBgh9/nLbZawOS1lFfbIrVLt8RRnyI/IPwEz0fc=",
+        "lastModified": 1789659898,
+        "narHash": "sha256-dJwynP82iMw0fXBLLt1NudLg1gSLeBXsql6alGRs/+k=",
         "ref": "main",
-        "rev": "eb65f7060388c2cc363c7f28791cfbabe697a540",
-        "revCount": 31,
+        "rev": "902234bbd9363f2a71d7a17cd7ffcd6d706591f6",
+        "revCount": 38,
         "type": "git",
         "url": "file:///home/andrew/Documents/Projects/nix-paseo"
       },
@@ -1069,16 +1069,16 @@
         ]
       },
       "locked": {
-        "lastModified": 1788307654,
-        "narHash": "sha256-JUVjE32qS29ZNh1tSOLy9YtyPD3+qjhz+W30lWtVqaw=",
+        "lastModified": 1789035428,
+        "narHash": "sha256-zYUj7CGz+i+w0elysbU+Sup+NACsBoIEqCu8WHA24PE=",
         "owner": "getpaseo",
         "repo": "paseo",
-        "rev": "9400a49af670fdb5db4af58e73f8df98588dbea9",
+        "rev": "b8e24677e12b226c7c38c1c3a40649daa9f1152f",
         "type": "github"
       },
       "original": {
         "owner": "getpaseo",
-        "ref": "v0.7.2",
+        "ref": "v0.8.0",
         "repo": "paseo",
         "type": "github"
       }
