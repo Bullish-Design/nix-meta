@@ -569,16 +569,16 @@
     "gitman": {
       "flake": false,
       "locked": {
-        "lastModified": 1788890211,
-        "narHash": "sha256-WFqLJbDGv3jGkjonXSQQkjuL4XYZd5vqNhD0tFSCh2s=",
-        "ref": "refs/tags/v0.6.2",
-        "rev": "9babc9a202547a0cfd6957e47b22205b85e0895f",
-        "revCount": 106,
+        "lastModified": 1789697351,
+        "narHash": "sha256-ZkNQq4xjdpCULwkyJnx8WWO7w7BDZzWm/ovp3wfZnsc=",
+        "ref": "refs/tags/v0.9.1",
+        "rev": "251c7a3eff6f1bf4ea938d7b581d573c0fc500f1",
+        "revCount": 162,
         "type": "git",
         "url": "https://github.com/Bullish-Design/gitman"
       },
       "original": {
-        "ref": "refs/tags/v0.6.2",
+        "ref": "refs/tags/v0.9.1",
         "type": "git",
         "url": "https://github.com/Bullish-Design/gitman"
       }
@@ -1102,16 +1102,16 @@
     "pyjutsu": {
       "flake": false,
       "locked": {
-        "lastModified": 1788789606,
-        "narHash": "sha256-6812Epm//3hIahYINRTsMLXTMYd6JrZG9T5Ucz0dxJg=",
-        "ref": "refs/tags/v0.21.1",
-        "rev": "90ba9a5e65e353992369025c1507342cd39f009b",
-        "revCount": 157,
+        "lastModified": 1789662262,
+        "narHash": "sha256-6lT0IJt0A7YSVV32w6nI6Vf/L1mzQ5Ufx7BSHPr/k4o=",
+        "ref": "refs/tags/v0.22.0",
+        "rev": "1a2a913e9505571bee7262072ef9a503101082c1",
+        "revCount": 163,
         "type": "git",
         "url": "https://github.com/Bullish-Design/Pyjutsu"
       },
       "original": {
-        "ref": "refs/tags/v0.21.1",
+        "ref": "refs/tags/v0.22.0",
         "type": "git",
         "url": "https://github.com/Bullish-Design/Pyjutsu"
       }
@@ -1518,16 +1518,16 @@
         "uv2nix": "uv2nix_2"
       },
       "locked": {
-        "lastModified": 1789519576,
-        "narHash": "sha256-yGD6gAv5GED6I7n0t+q/lKKhgJjVfl40hOUl2/RGegA=",
-        "ref": "refs/tags/v0.4.1",
-        "rev": "8df3046e36e8eeb4885b84e68af2524dc1d1eb19",
-        "revCount": 97,
+        "lastModified": 1789697802,
+        "narHash": "sha256-YYhF6sPvLUHdH39gYG2Va2Xq6sfx39QTzXlAow4eJg4=",
+        "ref": "refs/tags/v0.4.2",
+        "rev": "d6048ea067a7197f9b1231c48771a1cdc92d179a",
+        "revCount": 101,
         "type": "git",
         "url": "https://github.com/Bullish-Design/vendomat"
       },
       "original": {
-        "ref": "refs/tags/v0.4.1",
+        "ref": "refs/tags/v0.4.2",
         "type": "git",
         "url": "https://github.com/Bullish-Design/vendomat"
       }
