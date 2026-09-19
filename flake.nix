@@ -31,15 +31,14 @@
     # its bin on the login shell's PATH, replacing the mutable venv used by the
     # retired machine bootstrap path.
     #
-    # Pinned to a published tag, like every other first-party input here: this lock
-    # decides the toolchain revision, so a floating ref would make "which repoman is on
-    # my PATH" unanswerable.
+    # Pinned to the exact reviewed link-plane commit: this lock decides the toolchain
+    # revision, so a floating ref would make "which repoman is on my PATH" unanswerable.
     # NO `inputs.nixpkgs.follows`. Vendomat pins the same nixpkgs the devenv stack uses,
     # and that pin is what makes the closure shared: a devenv consumer and this login
     # shell must resolve the SAME store paths for the same commands. Making vendomat
     # follow the system nixpkgs forks the closure in two — same source, same version,
     # different build — which is the duplication this whole design removes.
-    vendomat.url = "git+https://github.com/Bullish-Design/vendomat?ref=refs/tags/v0.4.2";
+    vendomat.url = "git+https://github.com/Bullish-Design/vendomat?rev=519fcf24f84c925de6ede812163da6e840ee69c4";
 
     # Project 039 (repoman half): the repoman devenv meta-module, machine-installed.
     # This ONE pin replaces the twenty-three per-repository `devenv.yaml` pins the
@@ -49,7 +48,7 @@
     # declaring its own `repoman` input.
     # The project manifest supplies each repository's manager roster. The shared closure
     # is now the only provider for the pure-CLI managers.
-    repoman.url = "git+https://github.com/Bullish-Design/repoman?ref=refs/tags/v0.8.2";
+    repoman.url = "git+https://github.com/Bullish-Design/repoman?rev=88ba18d4c3eec778ed4dfa04a67f9417fd02429f";
 
     nix-paseo = {
       url = "git+file:///home/andrew/Documents/Projects/nix-paseo?ref=main";
