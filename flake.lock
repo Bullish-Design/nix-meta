@@ -50,11 +50,10 @@
         ]
       },
       "locked": {
-        "lastModified": 1785707615,
-        "narHash": "sha256-7YNO22A3QnTEhXnfrjnHDxduBduvR7VdC2wmLxPq+Qg=",
-        "ref": "refs/heads/main",
-        "rev": "d9b69592ed0e1560bf689d3e018ff57b56986240",
-        "revCount": 28,
+        "lastModified": 1789847567,
+        "narHash": "sha256-zqlTeEwgZWrr6oQgOACvkf3wU0OnpirJxtXIpS4IjUY=",
+        "rev": "db7edbcd0851faac1a3613632e80b97a65eec0c5",
+        "revCount": 45,
         "type": "git",
         "url": "file:///home/andrew/Documents/Projects/atuout"
       },
