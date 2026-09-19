@@ -177,6 +177,14 @@ in
       };
     };
 
+    # The devman-panel local plugin. Paseo rewrites config.json on every
+    # service start, so the source must be declared here to survive a rebuild.
+    # The plugin code and its node_modules are host state under ~/.paseo.
+    plugins.sources.devman-panel = {
+      path = "/home/andrew/.paseo/plugins/devman-panel";
+      enabled = true;
+    };
+
     # Temporary bootstrap posture. Do not add sops password plumbing yet.
     authentication.requirePassword = false;
     # Pi inherits this runtime-only API credential when Paseo launches it.
