@@ -27,9 +27,9 @@
 
     nixos-core.url = "git+https://github.com/Bullish-Design/nixos-core.git?ref=main";
 
-    # The shared RepoMan command closure (vendomat Face D). profiles/developer.nix puts
-    # its bin on the login shell's PATH, replacing the mutable venv at
-    # ~/.local/share/repoman/venv that `repoman-sync --machine` used to build.
+    # The shared RepoMan command closure (Vendomat). profiles/developer.nix puts
+    # its bin on the login shell's PATH, replacing the mutable venv used by the
+    # retired machine bootstrap path.
     #
     # Pinned to a published tag, like every other first-party input here: this lock
     # decides the toolchain revision, so a floating ref would make "which repoman is on
@@ -47,10 +47,8 @@
     # `/run/current-system/sw/share/repoman/module/devenv.nix`, and each repository's
     # central `devenv.local.nix` imports it from that stable path instead of
     # declaring its own `repoman` input.
-    # v0.8.2 gives `.repoman/project.toml` a `cliProvider` field. The ten repositories
-    # that decline the store toolchain hold that opt-out in `repoman.cliProvider`, the
-    # compatibility option slated for removal; without a manifest home, withdrawing it
-    # would flip all ten onto a store closure they never imported.
+    # The project manifest supplies each repository's manager roster. The shared closure
+    # is now the only provider for the pure-CLI managers.
     repoman.url = "git+https://github.com/Bullish-Design/repoman?ref=refs/tags/v0.8.2";
 
     nix-paseo = {
