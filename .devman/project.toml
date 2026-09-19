@@ -1,0 +1,4 @@
+schema = 1
+project = "nix-meta"
+groups = ["base"]
+policy = "stable"
