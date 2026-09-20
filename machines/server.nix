@@ -1,4 +1,4 @@
-{ config, inputs, pkgs, ... }:
+{ config, inputs, lib, pkgs, ... }:
 
 let
   # The account that owns ~/Documents/Projects on the box.
@@ -313,7 +313,27 @@ in
   # data directories, so the service would simply refuse to start against the
   # v17 cluster. Changing this pin is a deliberate dump/restore, never a
   # side effect of an unrelated edit.
-  services.postgresql.package = pkgs.postgresql_17;
+  services.postgresql = {
+    enable = true;
+    package = pkgs.postgresql_17;
+    ensureDatabases = [ "agentman" ];
+    ensureUsers = [
+      {
+        name = "agentman";
+        ensureDBOwnership = true;
+        ensureClauses = { login = true; };
+      }
+    ];
+    # The daemon runs as the developer user while connecting as the dedicated
+    # database role. Keep credentials out of tracked configuration and use
+    # PostgreSQL peer authentication over its local Unix socket.
+    authentication = lib.mkBefore ''
+      local agentman agentman peer map=agentman
+    '';
+    identMap = lib.mkAfter ''
+      agentman andrew agentman
+    '';
+  };
 
   # nixpkgs still packages the Go 2.9.0 line (and its expression cannot build
   # the Rust tree). Override with a source build of the 2.10.0 tag

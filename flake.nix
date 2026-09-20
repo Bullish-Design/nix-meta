@@ -25,20 +25,59 @@
       inputs.nixpkgs.follows = "devenv-nixpkgs";
     };
 
-    nixos-core.url = "git+https://github.com/Bullish-Design/nixos-core.git?ref=main";
+    nixos-core.url = "git+file:///home/andrew/Documents/Projects/nixos-core?rev=5b13f985d171d4ce8f6c1945184a90fb76e1ed4f";
 
     # The shared RepoMan command closure (Vendomat). profiles/developer.nix puts
     # its bin on the login shell's PATH, replacing the mutable venv used by the
     # retired machine bootstrap path.
     #
-    # Pinned to a published tag: this lock decides the toolchain revision, so a
-    # floating ref would make "which repoman is on my PATH" unanswerable.
+    # This is a personal-machine configuration, so consume the local published
+    # checkout. The commit pin still answers "which agentman is on my PATH"
+    # without requiring root to authenticate to GitHub during a rebuild.
     # NO `inputs.nixpkgs.follows`. Vendomat pins the same nixpkgs the devenv stack uses,
     # and that pin is what makes the closure shared: a devenv consumer and this login
     # shell must resolve the SAME store paths for the same commands. Making vendomat
     # follow the system nixpkgs forks the closure in two — same source, same version,
     # different build — which is the duplication this whole design removes.
-    vendomat.url = "git+https://github.com/Bullish-Design/vendomat?ref=refs/tags/v0.4.3";
+    agentman = {
+      url = "git+file:///home/andrew/Documents/Projects/agentman?ref=refs/tags/v0.0.2";
+      flake = false;
+    };
+
+    # Vendomat's roster inputs are private first-party repositories. Keep the
+    # complete machine-local toolchain graph on git+file as well; localizing
+    # only the vendomat root still leaves Nix fetching these through GitHub.
+    copyroom = {
+      url = "git+file:///home/andrew/Documents/Projects/copyroom?rev=a70445a00e1920c3071e51a0e34e571204134ead";
+      flake = false;
+    };
+    docman = {
+      url = "git+file:///home/andrew/Documents/Projects/docman?rev=3d19943cb1eeac4f51d815cefa96603d35434cbd";
+      flake = false;
+    };
+    gitman = {
+      url = "git+file:///home/andrew/Documents/Projects/gitman?rev=d2bee86b14c662b7340e8a8c1730492b1476df73";
+      flake = false;
+    };
+    pyjutsu = {
+      url = "git+file:///home/andrew/Documents/Projects/pyjutsu?rev=4b54928d0e7477e899ffe909abd2052255d129cf";
+      flake = false;
+    };
+    templateer = {
+      url = "git+file:///home/andrew/Documents/Projects/templateer_v2?rev=0c9ef435a54d5218bc9a0d3ba3a854723c9809ca";
+      flake = false;
+    };
+    vendomat = {
+      url = "git+file:///home/andrew/Documents/Projects/vendomat?rev=ec02a9e62471ccc001ee39ff1d7cf29798c26fc8";
+      inputs.agentman.follows = "agentman";
+      inputs.copyroom.follows = "copyroom";
+      inputs.docman.follows = "docman";
+      inputs.gitman.follows = "gitman";
+      inputs.pyjutsu.follows = "pyjutsu";
+      inputs.repoman.follows = "repoman";
+      inputs.templateer.follows = "templateer";
+      inputs.devman.follows = "devman";
+    };
 
     # Project 039 (repoman half): the repoman devenv meta-module, machine-installed.
     # This ONE pin replaces the twenty-three per-repository `devenv.yaml` pins the
@@ -48,7 +87,7 @@
     # declaring its own `repoman` input.
     # The project manifest supplies each repository's manager roster. The shared closure
     # is now the only provider for the pure-CLI managers.
-    repoman.url = "git+https://github.com/Bullish-Design/repoman?ref=refs/tags/v0.9.1";
+    repoman.url = "git+file:///home/andrew/Documents/Projects/repoman?rev=46b040efd3f911ada13a117ad9894e07f0fc86d6";
 
     nix-paseo = {
       url = "git+file:///home/andrew/Documents/Projects/nix-paseo?ref=main";
@@ -56,7 +95,7 @@
     };
 
     home-manager = {
-      url = "git+https://github.com/nix-community/home-manager.git?ref=master";
+      url = "github:nix-community/home-manager?ref=master";
       inputs.nixpkgs.follows = "nixpkgs";
     };
 
@@ -66,7 +105,7 @@
     # here. The box decrypts with its own SSH host key (age identity); the
     # encrypted store + recipients live inside the nix-secrets flake.
     nix-secrets = {
-      url = "git+ssh://git@github.com/Bullish-Design/nix-secrets.git?ref=main";
+      url = "git+file:///home/andrew/Documents/Projects/nix-secrets?rev=f2549fa835dfe7c7449406cdecb65ae4b962e457";
       inputs.nixpkgs.follows = "nixpkgs";
     };
 
@@ -97,6 +136,25 @@
       inputs.nixpkgs.follows = "nixpkgs";
     };
 
+    # This personal machine keeps the terminal stack and its private local
+    # dependencies in sibling checkouts, so root does not fetch them from
+    # GitHub during a rebuild.
+    nixbuild = {
+      url = "git+file:///home/andrew/Documents/Projects/nixbuild?rev=de2b364c78a20bf182c71af73958a88ce8994d87";
+      inputs.nixpkgs.follows = "nixpkgs";
+    };
+    nix-nvim = {
+      url = "git+file:///home/andrew/Documents/Projects/nix-nvim?rev=7431b8ea8fa55fef76df72b655b3962e1a9e8888";
+      inputs.loci-nvim.follows = "loci-nvim";
+    };
+    loci-nvim = {
+      url = "git+file:///home/andrew/Documents/Projects/loci.nvim?rev=133dad16d062b6ff3a8218b26544d52e147c3315";
+      inputs.loci-core.follows = "loci-core";
+    };
+    loci-core = {
+      url = "git+file:///home/andrew/Documents/Projects/loci-core?ref=refs/tags/v0.4.4";
+    };
+
     # The interactive terminal environment (zsh/atuin/starship/nvim/tmux) — the
     # rich shell you get over SSH and inside zelligate web terminals. The tower
     # is a host worked IN directly, which is exactly this flake's purpose, so it
@@ -105,6 +163,10 @@
     nix-terminal = {
       url = "git+file:///home/andrew/Documents/Projects/nix-terminal?ref=main";
       inputs.nixpkgs.follows = "nixpkgs";
+      inputs.nix-nvim.follows = "nix-nvim";
+      inputs.nixbuild.follows = "nixbuild";
+      inputs.devman.follows = "devman";
+      inputs.repoman.follows = "repoman";
       inputs.devman.inputs.devenv.follows = "devenv";
     };
 
@@ -189,7 +251,7 @@
     # no GitHub token is needed to fetch it. Its own nixpkgs input is only for its
     # checks; `follows` keeps the fleet on one nixpkgs.
     silverbullet-server = {
-      url = "git+ssh://git@github.com/Bullish-Design/silverbullet-server.git?ref=main";
+      url = "git+file:///home/andrew/Documents/Projects/silverbullet-server?rev=bc9bb4f0145b5fa82a706128b0763be1ae2ada90";
       inputs.nixpkgs.follows = "nixpkgs";
     };
 
@@ -217,7 +279,7 @@
     # NixOS module takes `pkgs` from this machine and never reads devman's own
     # nixpkgs input, which serves that flake's `packages` and `checks` alone.
     devman = {
-      url = "git+https://github.com/Bullish-Design/devman?ref=refs/tags/v0.7.0";
+      url = "git+file:///home/andrew/Documents/Projects/devman?rev=4c9927ada27a5c12a5ee2acdf8ad85648f7aafa1";
       inputs.nixpkgs.follows = "nixpkgs";
     };
 
@@ -237,7 +299,7 @@
     # Native inference service module. The repository is not a flake, so keep
     # it as a source input and import its NixOS module through `inputs`.
     inferference = {
-      url = "git+ssh://git@github.com/Bullish-Design/inferference.git?ref=fix/restore-mi25-power-table";
+      url = "git+file:///home/andrew/Documents/Projects/inferference?rev=926a45ae5134c8963179104ad8534c8f72ccf323";
       flake = false;
     };
   };

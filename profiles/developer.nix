@@ -9,8 +9,8 @@ let
   # ignored while pkgs.devenv supplied the binary (023-toolchain P4).
   pinnedDevenv = inputs.devenv.packages.${pkgs.stdenv.hostPlatform.system}.default;
 
-  # The shared RepoMan command closure: repoman, copyroom, gitman and docman, built
-  # once as Nix Python applications and content-addressed. One immutable derivation per
+  # The shared command closure: repoman, copyroom, docman, gitman, templateer and
+  # agentman, built once as Nix Python applications and content-addressed. One immutable derivation per
   # source revision, so every shell that names this input resolves the same store paths.
   repomanToolchain =
     inputs.vendomat.packages.${pkgs.stdenv.hostPlatform.system}.repoman-toolchain-core;
@@ -136,10 +136,10 @@ in
           # and every devenv target CPython 3.13. pyjutsu ships cp313-abi3,
           # which cannot load on 3.12.
           #
-          # The RepoMan shared toolchain's console scripts, for interactive use.
+          # The shared toolchain's console scripts, for interactive use.
           #
           # This USED to point at ~/.local/share/repoman/venv/bin: one mutable
-          # virtualenv, installed from four live working trees by `repoman-sync
+          # virtualenv, installed from live working trees by `repoman-sync
           # --machine`, with no rollback. It is now a Nix closure — immutable,
           # content-addressed, pinned by this flake's lock, and rolled back by
           # `nixos-rebuild --rollback` like everything else.
@@ -148,12 +148,43 @@ in
           # `home.sessionPath`) because that is emitted after the PATH export in
           # hm-session-vars.sh and therefore appends. The original reason was that
           # the venv's bin/ held python, python3 and python3.13 and would shadow
-          # pkgs.python3 in every login shell. The closure holds only the four
-          # manager commands, so that specific hazard is gone — but the profile's
+          # pkgs.python3 in every login shell. The closure holds only manager
+          # commands, so that specific hazard is gone — but the profile's
           # rule stands: developer tooling never shadows a Nix-managed binary.
           home.sessionVariablesExtra = ''
             export PATH="$PATH''${PATH:+:}${repomanToolchain}/bin"
           '';
+
+          # One user socket serves every repository. The socket is enabled; the
+          # service has no WantedBy and is started only by the first request.
+          systemd.user.sockets.agentman = {
+            Unit.Description = "agentman daemon socket";
+            Socket = {
+              ListenStream = "%t/agentman.sock";
+              SocketMode = "0600";
+              Accept = "no";
+            };
+            Install.WantedBy = [ "sockets.target" ];
+          };
+
+          systemd.user.services.agentman = {
+            Unit = {
+              Description = "agentman daemon";
+              Requires = [ "agentman.socket" ];
+              After = [ "agentman.socket" ];
+            };
+            Service = {
+              # Apply the packaged schema at the machine boundary. The daemon
+              # itself never creates tables while serving requests; this runs
+              # before the first socket-activated daemon process.
+              ExecStartPre = "${repomanToolchain}/bin/agentman migrate";
+              ExecStart = "${repomanToolchain}/bin/agentman serve --systemd-socket";
+              Environment = [
+                "AGENTMAN_DATABASE_URL=postgresql+asyncpg://agentman@/agentman?host=/run/postgresql"
+              ];
+              Restart = "on-failure";
+            };
+          };
 
           # DISABLED 2026-08-01 with the shellij input (see flake.nix note).
           # programs.shellij = {
