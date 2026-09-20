@@ -1215,16 +1215,16 @@
         "nixpkgs": "nixpkgs_4"
       },
       "locked": {
-        "lastModified": 1789860764,
-        "narHash": "sha256-FUp5JTdppfqkjjc5mGBwZR5SAI3Y3WfADjCuMp9bGyE=",
-        "ref": "refs/heads/main",
-        "rev": "88ba18d4c3eec778ed4dfa04a67f9417fd02429f",
-        "revCount": 193,
+        "lastModified": 1789862950,
+        "narHash": "sha256-SiIRy3CMRYV6u5OV7CL6dyjN2dVcXf3dqVblUjZtgFQ=",
+        "ref": "refs/tags/v0.9.1",
+        "rev": "7c5b79b995e1942a78dbce8b8677969d3ef11233",
+        "revCount": 195,
         "type": "git",
         "url": "https://github.com/Bullish-Design/repoman"
       },
       "original": {
-        "rev": "88ba18d4c3eec778ed4dfa04a67f9417fd02429f",
+        "ref": "refs/tags/v0.9.1",
         "type": "git",
         "url": "https://github.com/Bullish-Design/repoman"
       }
@@ -1517,16 +1517,16 @@
         "uv2nix": "uv2nix_2"
       },
       "locked": {
-        "lastModified": 1789859509,
-        "narHash": "sha256-wjBqp1M+OZq4Qc6kA2X2HedBvIg/CASttXls5ihbwpk=",
-        "ref": "refs/heads/main",
-        "rev": "519fcf24f84c925de6ede812163da6e840ee69c4",
-        "revCount": 104,
+        "lastModified": 1789862849,
+        "narHash": "sha256-h4/A8vwUE99LvkhQs6p+KuatpD21+0li+71eWT0r9Pw=",
+        "ref": "refs/tags/v0.4.3",
+        "rev": "04ee9bcaa0f1c7a6b081fb84acc338ca29fcbc5b",
+        "revCount": 106,
         "type": "git",
         "url": "https://github.com/Bullish-Design/vendomat"
       },
       "original": {
-        "rev": "519fcf24f84c925de6ede812163da6e840ee69c4",
+        "ref": "refs/tags/v0.4.3",
         "type": "git",
         "url": "https://github.com/Bullish-Design/vendomat"
       }
