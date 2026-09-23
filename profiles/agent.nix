@@ -165,6 +165,9 @@ in
           subconscious = {
             baseUrl = "https://api.subconscious.dev/v1";
             api = "openai-completions";
+            # Resolve the token from the sops-nix runtime file. The command
+            # resolver keeps it out of Home Manager output and works for both
+            # interactive Pi and Paseo-launched Pi processes.
             apiKey = "!cat /run/secrets/subconscious-api-key";
             headers = {
               "x-subconscious-client" = "pi";
