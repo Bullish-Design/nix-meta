@@ -7,7 +7,7 @@
     # Pi changes rapidly and is used by Paseo as an external CLI. Keep its
     # package evaluation on an independently locked nixpkgs commit, so routine
     # system nixpkgs bumps cannot change the Pi binary unexpectedly.
-    pi-nixpkgs.url = "github:NixOS/nixpkgs/567a49d1913ce81ac6e9582e3553dd90a955875f";
+    pi-nixpkgs.url = "github:NixOS/nixpkgs/6774f7bc253789b113a4f39285dc0fa100abeacc";
 
     # Keep the developer-environment toolchain independent from the system
     # package set. This lets us adopt a new devenv release when it needs a newer

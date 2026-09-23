@@ -762,11 +762,11 @@
         "paseo": "paseo"
       },
       "locked": {
-        "lastModified": 1790195481,
-        "narHash": "sha256-k0dFfM2SRr0i8fMqB6DCvFGpdW3dRN8w4y7v3N9mk28=",
+        "lastModified": 1790200594,
+        "narHash": "sha256-EHvuEdv7f4OSYRfqY6wnZC9NsGo5rUXAhsr1N5cGDdA=",
         "ref": "main",
-        "rev": "ff898c101c7aa4d9341c3dcee5cc260c4835d9ed",
-        "revCount": 45,
+        "rev": "f93083a84ff468dfb2eee75284ff264ed1d5c2dc",
+        "revCount": 46,
         "type": "git",
         "url": "file:///home/andrew/Documents/Projects/nix-paseo"
       },
@@ -1084,17 +1084,17 @@
     },
     "pi-nixpkgs": {
       "locked": {
-        "lastModified": 1781577229,
-        "narHash": "sha256-lrp67w8AulE9Ks53n27I45ADSzbOCn4H+CNW1Ck8B+8=",
+        "lastModified": 1790046670,
+        "narHash": "sha256-MYiI+CzL0tuWgRPjGsKCDHqYs2T3OzMlMQWOYWG0qso=",
         "owner": "NixOS",
         "repo": "nixpkgs",
-        "rev": "567a49d1913ce81ac6e9582e3553dd90a955875f",
+        "rev": "6774f7bc253789b113a4f39285dc0fa100abeacc",
         "type": "github"
       },
       "original": {
         "owner": "NixOS",
         "repo": "nixpkgs",
-        "rev": "567a49d1913ce81ac6e9582e3553dd90a955875f",
+        "rev": "6774f7bc253789b113a4f39285dc0fa100abeacc",
         "type": "github"
       }
     },
