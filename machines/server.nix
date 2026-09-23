@@ -160,6 +160,7 @@ in
 
   nix-paseo.paseo = {
     enable = true;
+    subconscious.enable = true;
 
     user = "andrew";
     group = "users";
@@ -187,9 +188,6 @@ in
 
     # Temporary bootstrap posture. Do not add sops password plumbing yet.
     authentication.requirePassword = false;
-    # Pi inherits this runtime-only API credential when Paseo launches it.
-    # authentication.environmentFile =
-    #   config.sops.templates."paseo-deepseek.env".path;
   };
 
   # DISABLED 2026-08-01 with the structured-agents input: native inference

@@ -6,6 +6,24 @@ let
   piPkgs = import inputs.pi-nixpkgs { inherit system; };
   atuinPackage = inputs.atuin.packages.${system}.atuin;
   username = config.nixos-core.base.username;
+  subconsciousModels = [
+    {
+      id = "subconscious/glm-5.3-marathon";
+      name = "GLM 5.3 Marathon";
+      contextWindow = 1048576;
+      maxTokens = 131072;
+      input = [ "text" ];
+      reasoning = true;
+    }
+    {
+      id = "subconscious/deepseek-v4-flash-marathon";
+      name = "DeepSeek V4 Flash Marathon";
+      contextWindow = 1048576;
+      maxTokens = 131072;
+      input = [ "text" ];
+      reasoning = true;
+    }
+  ];
 in
 
 {
@@ -70,6 +88,10 @@ in
     programs.zsh.initContent = lib.mkAfter ''
       if [[ -r /run/secrets/deepseek-api-key ]]; then
         export DEEPSEEK_API_KEY="$(< /run/secrets/deepseek-api-key)"
+      fi
+
+      if [[ -r /run/secrets/subconscious-api-key ]]; then
+        export SUBCONSCIOUS_API_KEY="$(< /run/secrets/subconscious-api-key)"
       fi
     '';
 
@@ -139,6 +161,16 @@ in
               };
             }
           ];
+
+          subconscious = {
+            baseUrl = "https://api.subconscious.dev/v1";
+            api = "openai-completions";
+            apiKey = "!cat /run/secrets/subconscious-api-key";
+            headers = {
+              "x-subconscious-client" = "pi";
+            };
+            models = subconsciousModels;
+          };
         };
       };
 

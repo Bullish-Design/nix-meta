@@ -1,6 +1,9 @@
 # Local run artifacts (test logs, telemetry). Never tracked.
 /artifacts/
 
+# Local provider credentials. Never track API keys.
+.env
+
 # Ignore build outputs from performing a nix-build or `nix build` command
 result
 result-*
