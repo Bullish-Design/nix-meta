@@ -16,8 +16,8 @@ let
       reasoning = true;
     }
     {
-      id = "subconscious/deepseek-v4-flash-marathon";
-      name = "DeepSeek V4 Flash Marathon";
+      id = "subconscious/deepseek-v4.1-flash-marathon";
+      name = "DeepSeek V4.1 Flash Marathon";
       contextWindow = 1048576;
       maxTokens = 131072;
       input = [ "text" ];
