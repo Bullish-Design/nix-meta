@@ -134,7 +134,20 @@ config.nix-meta.developer.packages = with pkgs; [
 ```
 
 `repoman` is supplied by the developer profile. `gitman` runs from its pinned
-repository environment: `devenv --dir ~/Documents/Projects/gitman shell -- gitman status`.
+repository environment. Enter the devenv shell in the gitman repo. Then `cd`
+into the target repo before the `gitman` call:
+
+```bash
+cd ~/Documents/Projects/gitman && devenv shell -- bash -c 'cd ~/Documents/Projects/nix-meta && gitman status'
+```
+
+Never run `devenv` from inside the target repo. It overwrites that repo's
+`devenv.lock` with gitman's own input closure and drops the repo's real
+inputs.
+
+Earlier documentation used `devenv --dir <path>`. devenv 2.2.2 removed
+`--dir`. The `--from path:` flag does not replace it: that flag loads gitman's
+config but evaluates it against the current directory.
 
 ### Add shell alias for all machines
 Update `profiles/developer.nix` under `zsh.aliases`:
