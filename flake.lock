@@ -1,5 +1,22 @@
 {
   "nodes": {
+    "agentman": {
+      "flake": false,
+      "locked": {
+        "lastModified": 1789928595,
+        "narHash": "sha256-YsCtWqZFFJLLEXbANi8oUx4JDKYIkRVg0dNqKNxEQ7A=",
+        "ref": "refs/tags/v0.0.2",
+        "rev": "4870686dbddf26653d9e9db13bc1babcf73271a6",
+        "revCount": 54,
+        "type": "git",
+        "url": "ssh://git@github.com/Bullish-Design/agentman.git"
+      },
+      "original": {
+        "ref": "refs/tags/v0.0.2",
+        "type": "git",
+        "url": "ssh://git@github.com/Bullish-Design/agentman.git"
+      }
+    },
     "argentic": {
       "inputs": {
         "nixpkgs": [
@@ -1504,6 +1521,7 @@
     },
     "vendomat": {
       "inputs": {
+        "agentman": "agentman",
         "copyroom": "copyroom",
         "devman": "devman_3",
         "docman": "docman",
@@ -1517,16 +1535,16 @@
         "uv2nix": "uv2nix_2"
       },
       "locked": {
-        "lastModified": 1789862849,
-        "narHash": "sha256-h4/A8vwUE99LvkhQs6p+KuatpD21+0li+71eWT0r9Pw=",
-        "ref": "refs/tags/v0.4.3",
-        "rev": "04ee9bcaa0f1c7a6b081fb84acc338ca29fcbc5b",
-        "revCount": 106,
+        "lastModified": 1790624223,
+        "narHash": "sha256-gQRVWeVkSbcltP7wfpQDrkV2aSBNrSt8wLr59RFRgBo=",
+        "ref": "refs/tags/v0.4.4",
+        "rev": "2a46a3bcfdf4fa355ca454ccbed264bc20223c01",
+        "revCount": 108,
         "type": "git",
         "url": "https://github.com/Bullish-Design/vendomat"
       },
       "original": {
-        "ref": "refs/tags/v0.4.3",
+        "ref": "refs/tags/v0.4.4",
         "type": "git",
         "url": "https://github.com/Bullish-Design/vendomat"
       }

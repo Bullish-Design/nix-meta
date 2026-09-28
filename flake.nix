@@ -38,7 +38,7 @@
     # shell must resolve the SAME store paths for the same commands. Making vendomat
     # follow the system nixpkgs forks the closure in two — same source, same version,
     # different build — which is the duplication this whole design removes.
-    vendomat.url = "git+https://github.com/Bullish-Design/vendomat?ref=refs/tags/v0.4.3";
+    vendomat.url = "git+https://github.com/Bullish-Design/vendomat?ref=refs/tags/v0.4.4";
 
     # Project 039 (repoman half): the repoman devenv meta-module, machine-installed.
     # This ONE pin replaces the twenty-three per-repository `devenv.yaml` pins the
