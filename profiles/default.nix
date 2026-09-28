@@ -27,14 +27,4 @@ inputs:
   # devenv tasks. Stacked on `developer`, which installs the devenv launcher the
   # plane's workflow steps call.
   devman = import ./devman.nix inputs;
-
-  # The local forge (Forgejo + Actions runner) on its own drive. This box is the
-  # upstream for every repository worked on here; GitHub is a downstream push
-  # mirror. Stacked on `secrets` — the runner registration token comes from
-  # sops — and on `developer` for the toolchain its workflows call.
-  #
-  # NOT wired into any machine yet: it needs nvme1n1 reformatted and mounted at
-  # /srv/forge, which cannot happen while that disk is the running root. See the
-  # forge drive block in machines/server.nix.
-  forge = import ./forge.nix inputs;
 }

@@ -23,7 +23,6 @@ in
     "tailscale-auth-key"
     "subconscious-api-key"
     # "deepseek-api-key"  # DISABLED: key material not yet provisioned in secrets.yaml
-    # "forgejo-runner-token"  # DISABLED: material not yet provisioned in secrets.yaml
   ];
 
   nix-secrets.secrets.secrets."subconscious-api-key" = {
@@ -51,25 +50,6 @@ in
   #   content = ''
   #     DEEPSEEK_API_KEY=${config.sops.placeholder."deepseek-api-key"}
   #   '';
-  # };
-
-  # The Forgejo Actions runner registration token (profiles/forge.nix). Generate
-  # it once the forge is up, as the forgejo user:
-  #
-  #   forgejo --config /srv/forge/state/custom/conf/app.ini \
-  #     actions generate-runner-token
-  #
-  # then put that value in nix-secrets' secrets.yaml and enable the name above.
-  # The runner re-registers from the token on first start and then holds its own
-  # credential in its state directory, so rotating the token does not invalidate
-  # a registered runner.
-  #
-  # DISABLED: forgejo-runner-token material not yet provisioned in secrets.yaml.
-  # nix-secrets.secrets.secrets."forgejo-runner-token" = {
-  #   owner = "gitea-runner";
-  #   group = "gitea-runner";
-  #   mode = "0400";
-  #   restartUnits = [ "gitea-runner-forge.service" ];
   # };
 
   # Consume tailscale-auth-key for declarative tailnet re-auth. The provider owns

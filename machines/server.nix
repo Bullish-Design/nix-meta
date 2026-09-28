@@ -658,38 +658,4 @@ in
     fsType = "ext4";
     options = [ "defaults" "nofail" ];
   };
-
-  # ── The forge drive ─────────────────────────────────────────────────────────
-  #
-  # nvme1n1 (NX-512 512GB), reformatted ext4 and given one job: hold the local
-  # forge. profiles/forge.nix puts Forgejo's repository root, state, and the
-  # Actions cache under this mount, so this box is the upstream for every
-  # repository worked on here and GitHub is a downstream push mirror.
-  #
-  # WHY THIS DISK. It is the old system disk, freed once the 4TB took over as
-  # root. Giving it a single job with a single owner means the forge is one
-  # filesystem to back up, one filesystem to fsck, and one filesystem whose loss
-  # costs a re-clone from GitHub rather than the machine.
-  #
-  # WHY ext4 AND NOT btrfs. This disk's job changed. As disposable build scratch
-  # a btrfs learning sandbox cost nothing to lose; holding the authoritative copy
-  # of 72 repositories, it is not disposable. Forgejo's own history is the
-  # snapshot mechanism here, and restic covers the rest. Nothing left for
-  # copy-on-write to earn.
-  #
-  # NOT ACTIVE YET. This disk is still the running root. It can only be
-  # reformatted after the 4TB migration has held for long enough to give up the
-  # rollback it provides. nofail keeps this entry inert until the label exists,
-  # and profiles/forge.nix is deliberately absent from this machine's profile
-  # list in flake.nix until then.
-  #
-  #   mkfs.ext4 -m 1 -L FORGE /dev/nvme1n1
-  #
-  # -m 1 rather than the default 5%: no process writes here as root under
-  # pressure, so 25GB of reserve buys nothing.
-  fileSystems."/srv/forge" = {
-    device = "/dev/disk/by-label/FORGE";
-    fsType = "ext4";
-    options = [ "defaults" "nofail" ];
-  };
 }

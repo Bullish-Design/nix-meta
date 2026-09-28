@@ -265,11 +265,6 @@
         # profiles.terminal restored: nix-terminal now consumes nix-nvim (the
         # loci-rich config promoted from ~/.dotfiles/nvim) instead of the retired,
         # broken nixvim input.
-        #
-        # profiles.forge is written and exported but NOT in this list. It needs
-        # /srv/forge mounted, which needs nvme1n1 reformatted, which cannot
-        # happen while nvme1n1 is the running root. Append it at the forge
-        # cutover; see the forge drive block in machines/server.nix.
         server = mkMachine "server" [ profiles.minimal profiles.terminal profiles.developer profiles.gpu-compute profiles.agent profiles.secrets profiles.devman ];
       };
     };
