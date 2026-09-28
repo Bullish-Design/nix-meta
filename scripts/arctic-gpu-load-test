@@ -8,6 +8,14 @@ if [ "${EUID:-$(id -u)}" -ne 0 ]; then
   exit 2
 fi
 
+script_dir="${BASH_SOURCE[0]%/*}"
+source "$script_dir/lib/amd-gpu-devices.sh"
+load_amd_gpu_devices || exit 2
+if [ "${#AMD_GPU_BDFS[@]}" -ne 2 ]; then
+  echo "FAIL: dual-GPU load requires exactly two configured AMD GPUs" >&2
+  exit 2
+fi
+
 artifact_dir="artifacts/arctic-gpu-load-$(date -u +%Y%m%dT%H%M%SZ)"
 mkdir -p "$artifact_dir" || exit 2
 log_file="$artifact_dir/load.log"
@@ -26,8 +34,10 @@ if [ -z "$bench" ]; then
   exit 2
 fi
 
-gpu0=/sys/bus/pci/devices/0000:19:00.0
-gpu1=/sys/bus/pci/devices/0000:67:00.0
+gpu0_bdf="${AMD_GPU_BDFS[0]}"
+gpu1_bdf="${AMD_GPU_BDFS[1]}"
+gpu0="/sys/bus/pci/devices/$gpu0_bdf"
+gpu1="/sys/bus/pci/devices/$gpu1_bdf"
 pids=()
 failure=0
 
@@ -110,6 +120,8 @@ echo "started=$(date -Is)"
 echo "artifact_dir=$artifact_dir"
 echo "kernel=$(uname -r)"
 echo "bench=$bench"
+echo "gpu0_bdf=$gpu0_bdf"
+echo "gpu1_bdf=$gpu1_bdf"
 [ "$(uname -r)" = 6.18.38 ] || { echo "FAIL: kernel is not 6.18.38"; exit 1; }
 pgrep -x rocblas-bench >/dev/null 2>&1 && { echo "FAIL: rocblas-bench is already running"; exit 1; }
 

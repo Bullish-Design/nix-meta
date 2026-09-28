@@ -1,6 +1,9 @@
-{ config, pkgs, ... }:
+{ config, lib, pkgs, ... }:
 
 let
+  gpuPciDevices = config.nix-meta.gpu-compute.amd.pciDevices;
+  gpuPciDevicesForShell = lib.concatMapStringsSep " " lib.escapeShellArg gpuPciDevices;
+
   # Keep the system kernel unchanged. The driver source is taken from the
   # nixpkgs testing source where it is currently available, but compiled and
   # installed as an out-of-tree module for this host's selected kernel.
@@ -72,7 +75,7 @@ let
   '';
 
   # This watchdog is the normal controller for the mapped GPU duct fan. It
-  # starts high, uses both stable GPU PCI paths, and returns high on every
+  # starts high, uses the configured GPU PCI paths, and returns high on every
   # error. CoolerControl leaves the ARCTIC fan unmanaged; it remains the
   # localhost UI and hardware monitor.
   fanWatchdog = pkgs.writeShellScript "arctic-fan-watchdog" ''
@@ -220,7 +223,8 @@ let
       fi
 
       max_junction=""
-      for pci in /sys/bus/pci/devices/0000:19:00.0 /sys/bus/pci/devices/0000:67:00.0; do
+      for bdf in ${gpuPciDevicesForShell}; do
+        pci="/sys/bus/pci/devices/$bdf"
         if ! sensor="$(find_junction_sensor "$pci")"; then
           echo "GPU junction sensor missing at $pci; forcing safe high" >&2
           exit 1
@@ -305,6 +309,13 @@ let
   '';
 in
 {
+  assertions = [
+    {
+      assertion = config.nix-meta.gpu-compute.amd.enable && (builtins.length gpuPciDevices == 2);
+      message = "The ARCTIC GPU fan watchdog requires exactly two configured AMD GPU PCI addresses.";
+    }
+  ];
+
   boot.extraModulePackages = [ arcticFanController ];
   boot.kernelModules = [ "arctic_fan_controller" ];
 

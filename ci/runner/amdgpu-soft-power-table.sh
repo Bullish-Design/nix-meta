@@ -6,7 +6,7 @@ TABLE=""
 EXPECTED_CURRENT_SHA="87adbd7dec9615e6455fed3ef31b468f5c49063e40f27061f672b06b057c7784"
 EXPECTED_TARGET_SHA="13309ea2cc3c288f4acb105dd0e8a33a3fb712423d6febf3f401c1720d7f4db2"
 
-usage() { echo "usage: $0 --bdf 0000:19:00.0 --table /path/to/table.pp_table" >&2; exit 3; }
+usage() { echo "usage: $0 --bdf <PCI-BDF> --table /path/to/table.pp_table" >&2; exit 3; }
 while (($#)); do
   case "$1" in
     --bdf) BDF="$2"; shift 2;;

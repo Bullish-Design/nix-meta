@@ -1,4 +1,4 @@
-# NixOS module for the reviewed 150 W soft PowerPlay table on both MI25 cards.
+# Optional NixOS module for the reviewed 150 W MI25 PowerPlay table.
 { config, lib, pkgs, ... }:
 
 let
@@ -45,11 +45,8 @@ in
           };
         };
       }));
-      default = [
-        { bdf = "0000:19:00.0"; table = ./mi25-card0-150.pp_table; }
-        { bdf = "0000:67:00.0"; table = ./mi25-card0-150.pp_table; }
-      ];
-      description = "Both MI25 cards receive the reviewed 150 W table by default.";
+      default = [ ];
+      description = "MI25 cards selected by the AMD MI25 hardware profile.";
     };
   };
 

@@ -49,6 +49,16 @@ if [ "${EUID:-$(id -u)}" -ne 0 ]; then
   exit 2
 fi
 
+script_dir="${BASH_SOURCE[0]%/*}"
+source "$script_dir/lib/amd-gpu-devices.sh"
+if ! load_amd_gpu_devices; then
+  exit 2
+fi
+if [ "${#AMD_GPU_BDFS[@]}" -ne 2 ]; then
+  echo "FAIL: this fan-controller test requires exactly two configured AMD GPUs" >&2
+  exit 2
+fi
+
 required_commands=(
   awk cat date find grep journalctl kill ls lsmod modinfo readlink
   nix pgrep sensors seq sleep ss stat systemctl uname
@@ -219,9 +229,10 @@ snapshot_controller() {
 }
 
 snapshot_gpu() {
-  local pci h f
+  local bdf pci h f
   echo "=== stable PCI GPU snapshot ==="
-  for pci in /sys/bus/pci/devices/0000:19:00.0 /sys/bus/pci/devices/0000:67:00.0; do
+  for bdf in "${AMD_GPU_BDFS[@]}"; do
+    pci="/sys/bus/pci/devices/$bdf"
     echo "PCI=$pci"
     echo "driver=$(readlink -f "$pci/driver" 2>/dev/null || echo NOT_FOUND)"
     for h in "$pci"/hwmon/hwmon*; do
@@ -236,8 +247,9 @@ snapshot_gpu() {
 }
 
 check_gpu_sensors() {
-  local pci sensor value
-  for pci in /sys/bus/pci/devices/0000:19:00.0 /sys/bus/pci/devices/0000:67:00.0; do
+  local bdf pci sensor value
+  for bdf in "${AMD_GPU_BDFS[@]}"; do
+    pci="/sys/bus/pci/devices/$bdf"
     if [ "$(readlink -f "$pci/driver" 2>/dev/null)" != "/sys/bus/pci/drivers/amdgpu" ]; then
       fail "GPU driver is not amdgpu at $pci"
       continue
@@ -475,7 +487,7 @@ test_pwm_response() {
 }
 
 test_low_temperature_curve() {
-  local h sensor value max_junction pwm i
+  local h bdf pci sensor value max_junction pwm i
   echo "=== low-temperature curve test ==="
   force_all_high || return 1
   if ! systemctl is-active --quiet arctic-fan-watchdog.service; then
@@ -486,7 +498,8 @@ test_low_temperature_curve() {
 
   h="$(find_arctic_hwmon)" || return 1
   max_junction=0
-  for pci in /sys/bus/pci/devices/0000:19:00.0 /sys/bus/pci/devices/0000:67:00.0; do
+  for bdf in "${AMD_GPU_BDFS[@]}"; do
+    pci="/sys/bus/pci/devices/$bdf"
     sensor="$(find_gpu_sensor "$pci" junction)" || return 1
     value="$(cat "$sensor")" || return 1
     case "$value" in

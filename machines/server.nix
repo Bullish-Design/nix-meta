@@ -83,10 +83,14 @@ in
   boot.supportedFilesystems = [ "btrfs" "ntfs" "vfat" ];
   hardware.enableRedistributableFirmware = true;
 
-  # This headless workstation has AMD GPUs. NVIDIA remains available through
-  # the same profile, but both backends are explicit independent feature flags.
+  # Select the optional V620 policy for this host. Change the model to "mi25"
+  # to restore the old MI25 power policy. PCI addresses belong to this machine.
   nix-meta.gpu-compute = {
-    amd.enable = true;
+    amd = {
+      enable = true;
+      model = "v620";
+      pciDevices = [ "0000:19:00.0" "0000:67:00.0" ];
+    };
     nvidia.enable = false;
   };
 
