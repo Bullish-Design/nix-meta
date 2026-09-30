@@ -1232,16 +1232,16 @@
         "nixpkgs": "nixpkgs_4"
       },
       "locked": {
-        "lastModified": 1789862950,
-        "narHash": "sha256-SiIRy3CMRYV6u5OV7CL6dyjN2dVcXf3dqVblUjZtgFQ=",
-        "ref": "refs/tags/v0.9.1",
-        "rev": "7c5b79b995e1942a78dbce8b8677969d3ef11233",
-        "revCount": 195,
+        "lastModified": 1790791678,
+        "narHash": "sha256-ByAHofOPS8lZRRLEjxre/zqujysIc/5Gp7LpxZkW2RA=",
+        "ref": "refs/tags/v0.9.2",
+        "rev": "2e6197124c41d58366d77fc1131d35d4ca4e9982",
+        "revCount": 203,
         "type": "git",
         "url": "https://github.com/Bullish-Design/repoman"
       },
       "original": {
-        "ref": "refs/tags/v0.9.1",
+        "ref": "refs/tags/v0.9.2",
         "type": "git",
         "url": "https://github.com/Bullish-Design/repoman"
       }
