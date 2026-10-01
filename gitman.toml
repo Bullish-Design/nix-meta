@@ -1,5 +1,5 @@
 trunk = "main"
 
 [publish]
-verify = ["bash", "-c", "nix flake check --no-build && nix eval --raw .#nixosConfigurations.server.config.system.build.toplevel.drvPath > /dev/null"]
+verify = ["bash", "-c", "nix flake check --no-build && nix build --no-link .#checks.x86_64-linux.atuin-server-runtime && nix eval --raw .#nixosConfigurations.server.config.system.build.toplevel.drvPath > /dev/null"]
 verify_timeout = 3600
