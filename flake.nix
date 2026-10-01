@@ -65,8 +65,16 @@
     # `nixosModules.secrets` and gets sops-nix transitively — we never re-pin it
     # here. The box decrypts with its own SSH host key (age identity); the
     # encrypted store + recipients live inside the nix-secrets flake.
+    #
+    # Consumed from the LOCAL working copy, pinned to a TAG. `git+file:` keeps
+    # the encrypted store on this box — a secret reaches the rebuild as soon as
+    # it is committed and tagged here, with no push to GitHub in the loop. The
+    # tag is what keeps that honest: `git+file:` sees committed files only, so a
+    # bare path or a branch ref would let an in-progress edit to the store slip
+    # into a rebuild. Bump the tag to adopt a new secret, exactly like the
+    # vendomat/repoman/devman pins above.
     nix-secrets = {
-      url = "git+ssh://git@github.com/Bullish-Design/nix-secrets.git?ref=main";
+      url = "git+file:///home/andrew/Documents/Projects/nix-secrets?ref=refs/tags/v0.1.0";
       inputs.nixpkgs.follows = "nixpkgs";
     };
 
@@ -106,6 +114,13 @@
       url = "git+file:///home/andrew/Documents/Projects/nix-terminal?ref=main";
       inputs.nixpkgs.follows = "nixpkgs";
       inputs.devman.inputs.devenv.follows = "devenv";
+    };
+
+    # Shared Hindsight service and declarative Claude/Codex/Pi wiring. This is
+    # a direct composer input: nix-paseo does not depend on Mnemonix.
+    mnemonix = {
+      url = "git+file:///home/andrew/Documents/Projects/mnemonix?ref=refs/tags/v0.1.0";
+      inputs.nixpkgs.follows = "nixpkgs";
     };
 
     # Shellij is developed on this server and supplies the Home Manager module
@@ -265,7 +280,7 @@
         # profiles.terminal restored: nix-terminal now consumes nix-nvim (the
         # loci-rich config promoted from ~/.dotfiles/nvim) instead of the retired,
         # broken nixvim input.
-        server = mkMachine "server" [ profiles.minimal profiles.terminal profiles.developer profiles.gpu-compute profiles.agent profiles.secrets profiles.devman ];
+        server = mkMachine "server" [ profiles.minimal profiles.terminal profiles.developer profiles.gpu-compute profiles.agent profiles.secrets profiles.devman profiles.mnemonix ];
       };
     };
 }

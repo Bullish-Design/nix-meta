@@ -1,8 +1,13 @@
 inputs:
-{ config, ... }:
+{ config, lib, ... }:
 
 let
   inherit (inputs) nix-secrets;
+
+  # True once deepseek-api-key has material in the encrypted store. Everything
+  # that reads its placeholder is gated on this, so a rebuild succeeds while the
+  # secret is still unprovisioned.
+  hasDeepSeekKey = config.sops.secrets ? "deepseek-api-key";
 in
 {
   imports = [
@@ -22,35 +27,73 @@ in
   nix-secrets.secrets.activeNames = [
     "tailscale-auth-key"
     "subconscious-api-key"
-    # "deepseek-api-key"  # DISABLED: key material not yet provisioned in secrets.yaml
+    # Consumed by Pi (direct shells + Paseo subprocesses) AND by the Mnemonix
+    # Hindsight container. `warnOnMissingKeys` is true, so until the material
+    # lands in nix-secrets this name is dropped with an eval warning instead of
+    # failing the rebuild.
+    "deepseek-api-key"
   ];
 
-  nix-secrets.secrets.secrets."subconscious-api-key" = {
-    owner = config.nixos-core.base.username;
-    group = "users";
-    mode = "0400";
-    restartUnits = [ "paseo.service" ];
+  # Ownership overrides for the secrets this host consumes. One definition:
+  # two attribute paths under `nix-secrets.secrets.secrets` in one module body
+  # would be a duplicate-key error.
+  #
+  # Both entries are UNCONDITIONAL, and must stay that way. This option feeds
+  # nix-secrets' `mkSopsSecret`, which produces `sops.secrets` — so gating it on
+  # `hasDeepSeekKey` (which reads `sops.secrets`) is an infinite recursion.
+  # An override for a secret that has no material is inert: `effectiveNames`
+  # never looks it up.
+  nix-secrets.secrets.secrets = {
+    "subconscious-api-key" = {
+      owner = config.nixos-core.base.username;
+      group = "users";
+      mode = "0400";
+      restartUnits = [ "paseo.service" ];
+    };
+
+    # Pi reads this in interactive shells and as a Paseo subprocess, so the
+    # decrypted file is relaxed to the user. The Hindsight container reads a
+    # root-owned rendered template instead (below).
+    "deepseek-api-key" = {
+      owner = config.nixos-core.base.username;
+      group = "users";
+      mode = "0400";
+      restartUnits = [ "paseo.service" ];
+    };
   };
 
-  # Pi runs both in interactive shells and as a Paseo subprocess.  Keep the
-  # decrypted source readable only by its service/user, then render the form
-  # systemd expects without ever placing the value in the Nix store.
-  # DISABLED: deepseek-api-key material not yet provisioned in secrets.yaml.
-  # nix-secrets.secrets.secrets."deepseek-api-key" = {
-  #   owner = config.nixos-core.base.username;
-  #   group = "users";
-  #   mode = "0400";
-  #   restartUnits = [ "paseo.service" ];
-  # };
+  # Render the token into each consumer's expected shape. The value never
+  # reaches the Nix store: sops-nix substitutes the placeholder at activation.
+  #
+  # Gated on the key existing. `sops.placeholder` is derived from
+  # `sops.secrets`, so reading a placeholder for a secret that
+  # `warnOnMissingKeys` filtered out is an evaluation error, not a warning.
+  sops.templates = lib.mkIf hasDeepSeekKey {
+    "paseo-deepseek.env" = {
+      owner = config.nixos-core.base.username;
+      group = "users";
+      mode = "0400";
+      content = ''
+        DEEPSEEK_API_KEY=${config.sops.placeholder."deepseek-api-key"}
+      '';
+    };
 
-  # sops.templates."paseo-deepseek.env" = {
-  #   owner = config.nixos-core.base.username;
-  #   group = "users";
-  #   mode = "0400";
-  #   content = ''
-  #     DEEPSEEK_API_KEY=${config.sops.placeholder."deepseek-api-key"}
-  #   '';
-  # };
+    # The Hindsight container runs as root under its oci-containers unit, so
+    # this file stays root-owned at the module default. `restartUnits` couples
+    # rotation to the service: without it a rotated key is rendered but never
+    # picked up. The unit name follows the container backend, read from the
+    # Mnemonix module so the two cannot drift; `or` keeps this profile usable
+    # on a host that does not import it.
+    "mnemonix-hindsight.env" = {
+      mode = "0400";
+      restartUnits = [
+        "${config.services.mnemonix.hindsight.backend or "docker"}-mnemonix-hindsight.service"
+      ];
+      content = ''
+        HINDSIGHT_API_LLM_API_KEY=${config.sops.placeholder."deepseek-api-key"}
+      '';
+    };
+  };
 
   # Consume tailscale-auth-key for declarative tailnet re-auth. The provider owns
   # the secret *declaration*; nixos-core.base owns the *service* wiring — the

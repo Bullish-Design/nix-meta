@@ -669,11 +669,11 @@
         ]
       },
       "locked": {
-        "lastModified": 1789056400,
-        "narHash": "sha256-tq6Ji6+m/wUfdljv9rIeVFlJjAVzguXRlzJ8WZgLz+A=",
+        "lastModified": 1790811806,
+        "narHash": "sha256-p770YexnYzlvy8NH1vFE4whXST8/R+9xCEaheZ/OxN4=",
         "ref": "main",
-        "rev": "4be325043194898b5a1ab8045ac84b75226e8744",
-        "revCount": 306,
+        "rev": "1d98728253f38f255d95f13f81881c9e6b2751c7",
+        "revCount": 322,
         "type": "git",
         "url": "ssh://git@github.com/Bullish-Design/loci-core.git"
       },
@@ -705,6 +705,27 @@
         "ref": "v0.3.1",
         "repo": "loci.nvim",
         "type": "github"
+      }
+    },
+    "mnemonix": {
+      "inputs": {
+        "nixpkgs": [
+          "nixpkgs"
+        ]
+      },
+      "locked": {
+        "lastModified": 1790867072,
+        "narHash": "sha256-Xggi4sAooGOXnq/hsywMzMWeGyAJoRcrVhIZJZCNbVs=",
+        "ref": "refs/tags/v0.1.0",
+        "rev": "9387ed02fcae86e60fd3182eea0376da7ca5ac8f",
+        "revCount": 1,
+        "type": "git",
+        "url": "file:///home/andrew/Documents/Projects/mnemonix"
+      },
+      "original": {
+        "ref": "refs/tags/v0.1.0",
+        "type": "git",
+        "url": "file:///home/andrew/Documents/Projects/mnemonix"
       }
     },
     "nix": {
@@ -801,18 +822,18 @@
         "sops-nix": "sops-nix"
       },
       "locked": {
-        "lastModified": 1790195893,
-        "narHash": "sha256-fq31OQi6+LuB70qOAbc3grD0IJTbpgtsqyQraG20OMo=",
-        "ref": "main",
-        "rev": "f87dbb9d2e2e387863588bca40cfbaab0af515dc",
-        "revCount": 24,
+        "lastModified": 1790814898,
+        "narHash": "sha256-shlrC3ap0AnaahfUhG9Zb4L226iT+TGVr1f0mJhAqVw=",
+        "ref": "refs/tags/v0.1.0",
+        "rev": "58ae4ab184e31cb29cccc893d0a3345537415880",
+        "revCount": 26,
         "type": "git",
-        "url": "ssh://git@github.com/Bullish-Design/nix-secrets.git"
+        "url": "file:///home/andrew/Documents/Projects/nix-secrets"
       },
       "original": {
-        "ref": "main",
+        "ref": "refs/tags/v0.1.0",
         "type": "git",
-        "url": "ssh://git@github.com/Bullish-Design/nix-secrets.git"
+        "url": "file:///home/andrew/Documents/Projects/nix-secrets"
       }
     },
     "nix-terminal": {
@@ -1276,6 +1297,7 @@
         "fornix-host": "fornix-host",
         "home-manager": "home-manager",
         "inferference": "inferference",
+        "mnemonix": "mnemonix",
         "nix-paseo": "nix-paseo",
         "nix-secrets": "nix-secrets",
         "nix-terminal": "nix-terminal",

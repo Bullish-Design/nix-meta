@@ -23,6 +23,11 @@ inputs:
   # Declarative secrets (sops-nix): the box decrypts with its own SSH host key.
   secrets = import ./secrets.nix inputs;
 
+  # Shared agent memory: one Hindsight service plus the shared coding-agent
+  # configuration that points Claude Code, Codex and Pi at the same bank.
+  # Stacked on `agent`, which installs the three CLIs this configures.
+  mnemonix = import ./mnemonix.nix inputs;
+
   # The devman automation plane: one Dagu user service that runs each repo's own
   # devenv tasks. Stacked on `developer`, which installs the devenv launcher the
   # plane's workflow steps call.
