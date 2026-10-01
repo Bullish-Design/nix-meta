@@ -54,7 +54,7 @@ in
   # a subprocess. Its package comes from pi-nixpkgs rather than the host's main
   # nixpkgs pin, letting Pi be upgraded and rolled back independently.
   home-manager.users.${username} = {
-    # Codex sends PostToolUse.tool_response as a string, while Atuin 18.18.1
+    # Codex sends PostToolUse.tool_response as a string, while Atuin 18.23.0
     # expects an object. Codex sessions launched outside an Atuin-initialized
     # shell also lack ATUIN_SESSION. Normalize both inputs until the upstream
     # hook protocols converge.

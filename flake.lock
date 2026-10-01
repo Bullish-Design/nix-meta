@@ -46,16 +46,16 @@
         ]
       },
       "locked": {
-        "lastModified": 1785198569,
-        "narHash": "sha256-dPdD9U1CwuGbd1K/ljYwgTlAl9sSzt+dSuxLijLlyBQ=",
+        "lastModified": 1790034512,
+        "narHash": "sha256-NBn7C9ssLSXYrHWv5qWM5dZ2E8URbRJZOOCvHaNgxW4=",
         "owner": "atuinsh",
         "repo": "atuin",
-        "rev": "2aef17ff3637130bb03ab8c1f224abc14f3b2b43",
+        "rev": "78366dca8c4941731e06a2f81c0980cc2ccc3836",
         "type": "github"
       },
       "original": {
         "owner": "atuinsh",
-        "ref": "v18.18.1",
+        "ref": "v18.23.0",
         "repo": "atuin",
         "type": "github"
       }

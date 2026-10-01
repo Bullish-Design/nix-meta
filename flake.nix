@@ -136,15 +136,15 @@
     #   inputs.home-manager.follows = "home-manager";
     # };
 
-    # Atuin built with the native command-output capture service (PR #3510).
-    # atuout REQUIRES this — nixpkgs-unstable ships only 18.16.1 and the latest
-    # stable (18.17.1) predates the Semantic gRPC service; the capability first
-    # landed in v18.18.0-beta.2 and shipped stable in v18.18.1. The atuin repo
-    # ships its own flake (packages.atuin, built via fenix for rustc >= 1.97),
-    # so we consume it directly — no overlay, no cargoHash. Bump this tag to
-    # adopt a newer capture-capable atuin.
+    # Atuin includes native output capture (introduced by PR #3510). Release
+    # 18.22 replaced its old Semantic gRPC API with native `atuin output`
+    # storage/search; the separate atuout archiver still probes the old API.
+    # Consume Atuin's flake (packages.atuin, built via fenix) so client, daemon,
+    # and sync server share one upstream build.
+    # Keep the Home Manager package.version overrides in profiles/terminal.nix
+    # and machines/server.nix in sync with this release tag.
     atuin = {
-      url = "github:atuinsh/atuin/v18.18.1";
+      url = "github:atuinsh/atuin/v18.23.0";
       inputs.nixpkgs.follows = "nixpkgs";
     };
 

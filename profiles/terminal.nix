@@ -177,22 +177,26 @@ in
 
       # ── atuout: durable Atuin command-output capture ──────────────────────
       # atuout harvests Atuin's native OSC-133 output captures into a per-user
-      # SQLite store. It requires a capture-capable atuin daemon (>= 18.18.0-beta.2)
-      # and a shell wrapped by `atuin pty-proxy`. nix-terminal enables atuin above
-      # with the modern history widget; here we add the three things atuout needs.
+      # SQLite store. This archiver still probes Atuin's pre-18.22 Semantic gRPC
+      # service; newer Atuin releases use native `atuin output` storage/search.
+      # Keep the existing archiver/store available, but its shell hook warns and
+      # cannot harvest native captures until it gains support for the new API.
 
-      # Swap the nixpkgs atuin (18.16.1, no capture service) for the flake build
-      # that ships PR #3510's Semantic gRPC service. atuin's own atuin.nix sets
+      # Swap the nixpkgs atuin (18.16.1, no capture service) for the pinned flake
+      # build that ships PR #3510's Semantic gRPC service. atuin's own atuin.nix sets
       # `name` but no `version`; HM's atuin module reads `package.version`
       # (versionAtLeast for the socket dir), so add it back via overrideAttrs.
       programs.atuin.package =
         inputs.atuin.packages.${pkgs.stdenv.hostPlatform.system}.atuin.overrideAttrs
-          (_: { version = "18.18.0-beta.2"; });
+          (_: { version = "18.23.0"; });
 
       # Run the atuin daemon as a systemd user service (HM manages it). atuout
       # talks to it over the Unix socket below (see `atuinSocketPath` above).
       programs.atuin.daemon.enable = true;
       programs.atuin.settings.daemon.socket_path = atuinSocketPath;
+      # Output capture is opt-in in Atuin. Enable Atuin's native local capture
+      # and `atuin output` search; the legacy atuout archiver cannot harvest it.
+      programs.atuin.settings.output.enabled = true;
 
       # pty-proxy init MUST run before atuout's harvest hook. Its emitted code
       # `exec`s the shell into the proxy PTY (setting ATUIN_PTY_PROXY_ACTIVE) and

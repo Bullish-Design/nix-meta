@@ -280,7 +280,7 @@ in
   # can create an account.
   services.pytuin.server = {
     enable = true;
-    # Same 18.18.1 build the clients run (inputs.atuin), not nixpkgs' 18.16.1
+    # Same 18.23.0 build the clients run (inputs.atuin), not nixpkgs' 18.16.1
     # default — keeping both ends of the sync protocol on one version removes
     # any record-store skew question. That flake's package ships `atuin-server`
     # alongside `atuin`.
@@ -293,7 +293,7 @@ in
     # Rust compile of the same source. Keep the two expressions in sync.
     package =
       inputs.atuin.packages.${pkgs.stdenv.hostPlatform.system}.atuin.overrideAttrs
-        (_: { version = "18.18.0-beta.2"; });
+        (_: { version = "18.23.0"; });
     host = "127.0.0.1"; # Serve proxies to loopback; nothing is bound publicly
     port = 8888;
     openRegistration = false; # see the bootstrap note above before flipping
