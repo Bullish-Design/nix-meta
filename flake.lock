@@ -1584,9 +1584,9 @@
         "url": "https://github.com/Bullish-Design/vendomat"
       },
       "original": {
-        "rev": "bd26fea8a2124bb4b1bbd8721418d831b4c2bf13",
         "type": "git",
-        "url": "https://github.com/Bullish-Design/vendomat"
+        "url": "https://github.com/Bullish-Design/vendomat",
+        "rev": "bd26fea8a2124bb4b1bbd8721418d831b4c2bf13"
       }
     }
   },

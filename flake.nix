@@ -261,6 +261,7 @@
     let
       inherit (nixpkgs) lib;
       system = "x86_64-linux";
+      pkgs = nixpkgs.legacyPackages.${system};
 
       # Import profile builders
       profiles = import ./profiles inputs;
@@ -273,7 +274,7 @@
       };
     in
     {
-    nixosConfigurations = {
+      nixosConfigurations = {
         # Minimal headless server (Dell Precision 5820). The wsl/desktop skeleton
         # hosts were retired for this bring-up; grow the fleet back out from the
         # box via `nixos-rebuild switch --flake .#server`.
@@ -282,5 +283,30 @@
         # broken nixvim input.
         server = mkMachine "server" [ profiles.minimal profiles.terminal profiles.developer profiles.gpu-compute profiles.agent profiles.secrets profiles.backup profiles.devman profiles.mnemonix ];
       };
+
+      checks.${system}.atuin-server-runtime =
+        let
+          serverConfig = self.nixosConfigurations.server.config;
+          serverPackage = serverConfig.services.pytuin.server.package;
+          clientPackage = serverConfig.home-manager.users.andrew.programs.atuin.package;
+        in
+        assert serverPackage.outPath == clientPackage.outPath;
+        pkgs.runCommand "atuin-server-runtime" { } ''
+          client_version="$(${pkgs.coreutils}/bin/env -i \
+            HOME="$TMPDIR" \
+            PATH=${lib.makeBinPath [ pkgs.coreutils ]} \
+            ${clientPackage}/bin/atuin --version)"
+          server_version="$(${pkgs.coreutils}/bin/env -i \
+            HOME="$TMPDIR" \
+            PATH=${lib.makeBinPath [ pkgs.coreutils ]} \
+            ${serverPackage}/bin/atuin-server --version)"
+
+          echo "client_version=$client_version"
+          echo "server_version=$server_version"
+
+          test "$client_version" = "atuin 18.23.0 (NO_GIT)"
+          test "$server_version" = "atuin-server 18.23.0"
+          touch "$out"
+        '';
     };
 }

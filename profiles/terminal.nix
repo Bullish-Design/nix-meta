@@ -21,6 +21,10 @@ let
   atuinSocketPath =
     let uid = config.users.users.${username}.uid or null;
     in "/run/user/${toString (if uid == null then 1000 else uid)}/atuin.sock";
+
+  # Keep the client, daemon, PTY proxy, and sync server on the same repaired
+  # source build. machines/server.nix imports this same package helper.
+  atuinPackage = import ../nix/atuin-18.23.0.nix { inherit inputs lib pkgs; };
 in
 {
   # nix-terminal is Home-Manager config, so ensure HM is wired. On the server
@@ -172,6 +176,10 @@ in
           # directly if that ever needs changing.
           syncAddress = "https://server.tail770f47.ts.net/atuin";
           autoSync = true;
+
+          # Home Manager owns Codex hooks as a read-only store link. Its
+          # generated file already contains Atuin hooks, so skip that writer.
+          agentHooks = [ "claude-code" "pi" ];
         };
       };
 
@@ -182,13 +190,10 @@ in
       # Keep the existing archiver/store available, but its shell hook warns and
       # cannot harvest native captures until it gains support for the new API.
 
-      # Swap the nixpkgs atuin (18.16.1, no capture service) for the pinned flake
-      # build that ships PR #3510's Semantic gRPC service. atuin's own atuin.nix sets
-      # `name` but no `version`; HM's atuin module reads `package.version`
-      # (versionAtLeast for the socket dir), so add it back via overrideAttrs.
-      programs.atuin.package =
-        inputs.atuin.packages.${pkgs.stdenv.hostPlatform.system}.atuin.overrideAttrs
-          (_: { version = "18.23.0"; });
+      # Swap nixpkgs' older Atuin for the pinned and repaired 18.23.0 source
+      # build. The helper also supplies the version metadata Home Manager reads
+      # and repairs atuin-server's missing OpenSSL RUNPATH.
+      programs.atuin.package = atuinPackage;
 
       # Run the atuin daemon as a systemd user service (HM manages it). atuout
       # talks to it over the Unix socket below (see `atuinSocketPath` above).

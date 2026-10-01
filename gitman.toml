@@ -1,5 +1,7 @@
 trunk = "main"
 
 [publish]
-verify = ["bash", "-c", "nix flake check --no-build && nix eval --raw .#nixosConfigurations.server.config.system.build.toplevel.drvPath > /dev/null"]
+# System evaluation fetches the Rust channel metadata that Atuin's Fenix
+# package needs. Run it before `nix flake check --no-build` evaluates outputs.
+verify = ["bash", "-c", "nix eval --raw .#nixosConfigurations.server.config.system.build.toplevel.drvPath > /dev/null && nix flake check --no-build && nix build --no-link .#checks.x86_64-linux.atuin-server-runtime"]
 verify_timeout = 3600

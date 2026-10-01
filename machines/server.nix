@@ -3,6 +3,10 @@
 let
   # The account that owns ~/Documents/Projects on the box.
   user = "andrew";
+
+  # One package output owns the client, daemon, PTY proxy, and sync server.
+  # profiles/terminal.nix imports this same helper.
+  atuinPackage = import ../nix/atuin-18.23.0.nix { inherit inputs lib pkgs; };
 in
 {
   imports = [
@@ -285,15 +289,9 @@ in
     # any record-store skew question. That flake's package ships `atuin-server`
     # alongside `atuin`.
     #
-    # The overrideAttrs is byte-identical to profiles/terminal.nix's on purpose:
-    # it makes this the SAME derivation the client already builds, so the
-    # closure carries one atuin, not two. Dropping it would be harmless
-    # semantically (services.atuin only calls `atuin-server` and never reads
-    # `.version`) but would fork the derivation hash and trigger a second full
-    # Rust compile of the same source. Keep the two expressions in sync.
-    package =
-      inputs.atuin.packages.${pkgs.stdenv.hostPlatform.system}.atuin.overrideAttrs
-        (_: { version = "18.23.0"; });
+    # Shared with profiles/terminal.nix so the closure carries one source build,
+    # including the package-level atuin-server OpenSSL RUNPATH repair.
+    package = atuinPackage;
     host = "127.0.0.1"; # Serve proxies to loopback; nothing is bound publicly
     port = 8888;
     openRegistration = false; # see the bootstrap note above before flipping
