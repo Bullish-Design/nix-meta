@@ -19,9 +19,9 @@ restic 0.19.0
 | a repository check succeeds | **NOT MET** |
 | the restore gate restores three exact files and `cmp` matches | **NOT MET** |
 | `EVIDENCE.md` records the result | partial — this document records the work done |
-| the repository changes have landed and been pushed | **MET** — both lanes landed and pushed to origin; the `nix-secrets` tag and the `nix-meta` re-pin are still outstanding (see §8) |
+| the repository changes have landed and been pushed | **MET** — both lanes landed and pushed to origin; the `nix-secrets` tag `v0.1.1` and the `nix-meta` re-pin are both complete (see §8) |
 
-**Phase 0 is not complete.** Three operator actions block it; see
+**Phase 0 is not complete.** Two operator actions block it; see
 `IMPLEMENTATION.md` §B.
 
 ---

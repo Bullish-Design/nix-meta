@@ -52,13 +52,17 @@ decision does.
 `/mnt/shared` stays out of Phase 0. It is declared at
 `machines/server.nix:620` as an `ntfs3` automount and holds 129 GiB of
 unadjudicated data. Phase F stays blocked until that data has its own verified
-policy. `profiles/backup.nix:510` asserts that the repository is not under
+policy. `profiles/backup.nix:516` asserts that the repository is not under
 `/mnt/shared`.
+
+The profile is enabled on the host: `machines/server.nix:668` sets
+`nix-meta.backup.enable = true` with `mountPoint = "/mnt/wd_green1"`, matching
+the decision above.
 
 ### No repository initialization is needed
 
 The repository at `/mnt/wd_green1/restic` already exists. There is nothing to
-initialize. `profiles/backup.nix:359` sets `initialize = false`, and that
+initialize. `profiles/backup.nix:363` sets `initialize = false`, and that
 setting stays permanent — it was never conditional on which disk is primary.
 
 The path to a working backup from here is three steps, in order:
@@ -99,7 +103,7 @@ hasPassword = config.sops.secrets ? "restic-password";
 active = cfg.enable && hasPassword;
 ```
 
-`profiles/backup.nix:340` emits a loud warning when the profile is enabled and
+`profiles/backup.nix:343` emits a loud warning when the profile is enabled and
 the secret has not arrived. A silently inert backup profile is the failure this
 phase exists to prevent.
 
@@ -124,13 +128,70 @@ That is a circle. The backup needs the restic password. The password is
 encrypted to keys that only exist on the host the backup protects. Lose the
 host and the backup cannot be opened.
 
-**Decision.** Break the circle before the backup is relied on. Either is
-enough; both is better:
+**The structural fact about restic keys.** A restic repository has exactly
+one master key. Every entry under `keys/` wraps that same master key under a
+per-key scrypt-derived key. `internal/repository/key.go`'s `AddKey()` copies
+the existing master key when `key add` runs; it cannot mint a new one. So any
+key grants bit-identical access to the same plaintext, whatever its own
+password strength. A repository is only as strong as its weakest key. This is
+the repository format, not a setting.
 
-1. Add a third recipient that is **not** on this host, then
-   `secret-rotate --updatekeys`. Prove it decrypts:
-   `SOPS_AGE_KEY_FILE=<off-host> sops -d secrets/secrets.yaml > /dev/null`.
-2. Escrow the `restic-password` value in an off-host password manager.
+**The KDF, measured on this host.** restic derives each key with scrypt, from
+`github.com/elithrar/simple-scrypt`, via `internal/crypto/kdf.go`.
+`internal/repository/key.go` sets `KDFTimeout = 500ms` and `KDFMemory = 60`
+MiB, and recalibrates on every `key add`. On this host (a Xeon W-2125),
+`key add` wrote `N=32768, r=8, p=6` into the key file — about 32 MiB per
+guess. The calibration targets wall-clock time on the machine that ran
+`key add`, not a security margin, so the parameters are chosen to feel
+instant to the operator. An attacker pays the recorded `N/r/p` forever: the
+parameters sit in the key file in cleartext, by necessity.
+
+**Restic enforces no password strength.** A key with password `1234` was
+accepted with exit 0 and no warning. An empty password is possible with
+`--new-insecure-no-password`. The strength of a human-held key is entirely
+the human's responsibility.
+
+**Required passphrase strength, with the reasoning.** Cost-per-guess is fixed
+once the key is written, so keyspace is the only lever left. The EFF long
+wordlist has 7776 words, about 12.925 bits per word: 6 words ≈ 77.5 bits,
+7 ≈ 90.5 bits, 8 ≈ 103.4 bits. Even at a deliberately pessimistic 10^9
+guesses per second — far beyond what 32 MiB memory-hard scrypt realistically
+allows — a 7-word phrase needs about 1.3×10^18 seconds to exhaust. That
+attacker-throughput figure is an order-of-magnitude assumption, not a
+measurement; no GPU benchmark was run. **Recommend 7 words. Never fewer than
+6. Generate the phrase by dice or a tool. Never invent it by hand.**
+
+**The three options, compared.**
+
+| Option | What it stores | What can leak | Survives host loss | Ongoing maintenance | Adds a new restic credential? |
+|---|---|---|---|---|---|
+| 1. A second restic key, passphrase held by a human | Nothing — the phrase lives only in a person's memory | The phrase, if coerced or guessed | Yes | None | **Yes** — per the structural fact above, it is a new, independently-crackable key |
+| 2. Escrow the random password in an off-host password manager | The exact generated secret, in a third-party vault | That vendor account, or a vendor breach | Yes | Renew vault access over time | No — it is the same credential, not a new one |
+| 3. A third age recipient on separate hardware | An age keypair, private half off-host | Loss or clone of that device | Yes | Update `.sops.yaml` and run `updatekeys` on change; the device must stay reachable for years | No — it operates at the SOPS layer and never touches restic's key list |
+
+Option 1 is the only one that adds a new attackable credential to the restic
+repository. It also has no redundancy: the phrase lives only in one person's
+memory, so forgetting it, or that person being unavailable, permanently
+loses that path. Severity is **high** if it is the sole recovery mechanism.
+Treat it as a supplementary path only, never as the only one.
+
+**Recommendation.** Combine options 2 and 3; together they are the real
+recovery path. Prove option 3 decrypts, with the real path to the off-host
+identity in place of the placeholder:
+
+```bash
+SOPS_AGE_KEY_FILE=/path/to/off-host-identity \
+  sops -d secrets/secrets.yaml > /dev/null
+```
+
+Option 1 is optional convenience on top of options 2 and 3. If adopted, it is
+a second, parallel unlock path, not a backup of the first.
+
+An earlier draft of this design called option 1 the cleanest fix, on the
+grounds that it has "nothing to leak." That was wrong on both counts: the
+structural fact above means option 1's key is exactly as strong, and exactly
+as weak, as every other key in the repository, and a memory-only passphrase
+is itself a single point of failure.
 
 No off-host recipient exists today and none was invented. This is recorded as
 blocker B3 in `IMPLEMENTATION.md`. `nix-secrets/RUNBOOK.md` §3a states the
@@ -178,7 +239,7 @@ fails loudly instead of racing it.
 
 ## 5. Never initialize automatically
 
-**Decision.** `initialize = false` at `profiles/backup.nix:359`, permanently.
+**Decision.** `initialize = false` at `profiles/backup.nix:363`, permanently.
 
 The NixOS restic module's `initialize = true` path runs
 `restic cat config || restic init` in `preStart`
@@ -199,8 +260,8 @@ The module hardcodes `RESTIC_CACHE_DIR = "/var/cache/restic-backups-<name>"`
 has 26 GB free of 444 GB.
 
 **Decision.** Override it per unit with `lib.mkForce`
-(`profiles/backup.nix:395` and `:586`), pointing at
-`<mountPoint>/restic-cache`. `profiles/backup.nix:510` asserts the cache is
+(`profiles/backup.nix:399` and `:590`), pointing at
+`<mountPoint>/restic-cache`. `profiles/backup.nix:531` asserts the cache is
 under the mount point.
 
 The module's `CacheDirectory=` still creates an empty
@@ -246,7 +307,7 @@ claimed. The signal is local and persistent
 | a journal excerpt of the failed unit | `…/last-failure.log`, mode 0600, because it names paths under `/home` |
 | a journal error | `logger -t restic-backup -p daemon.err` |
 | live terminal sessions | `wall` |
-| the next interactive login | `environment.interactiveShellInit`, `profiles/backup.nix:496` |
+| the next interactive login | `environment.interactiveShellInit`, `profiles/backup.nix:500` |
 | a stalled schedule | `restic-backup-health`, daily, fails past 36 hours |
 
 The marker is cleared only by a success (`profiles/backup.nix:158`). The
@@ -256,7 +317,7 @@ own, so it cannot recurse.
 
 A per-run alert cannot see a backup that stopped running at all. The health
 timer is for that case, and it carries **no** `RequiresMountsFor`
-(`profiles/backup.nix:441`) so it still runs and still fails when the disk is
+(`profiles/backup.nix:445`) so it still runs and still fails when the disk is
 gone.
 
 ### Explicit failure behaviour
@@ -273,10 +334,10 @@ gone.
 ## 9. What the backup does not prove
 
 **PostgreSQL.** A live cluster lives at `/var/lib/postgresql/17`
-(`machines/server.nix:318`, pinned to `postgresql_17`). Atuin uses it.
+(`machines/server.nix:320`, pinned to `postgresql_17`). Atuin uses it.
 Copying live cluster files is **not** a valid database backup.
 
-`profiles/backup.nix:550` adds a logical `pg_dumpall` stream into the same
+`profiles/backup.nix:553` adds a logical `pg_dumpall` stream into the same
 repository, behind `nix-meta.backup.postgres.enable`, default off. The owner
 question is settled: the generated `pg_hba.conf` carries
 `local all postgres peer map=postgres` and the default `identMap` maps only
@@ -298,7 +359,7 @@ running container's volume does not prove application consistency. This has no
 solution yet and must be settled before Phase E.
 
 **Docker layers.** `/var/lib/docker/overlay2` and `/var/lib/docker/buildkit`
-are excluded (`profiles/backup.nix:255`). Images are rebuildable from their
+are excluded (`profiles/backup.nix:272`). Images are rebuildable from their
 sources; the build cache alone was 36.37 GB. Named volumes stay in.
 
 ---

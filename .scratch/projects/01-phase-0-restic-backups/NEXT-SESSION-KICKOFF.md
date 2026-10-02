@@ -198,7 +198,7 @@ must run as the `postgres` OS user (`runuser -u postgres`), never as root.
 ### SOPS and nix-secrets
 
 - Exactly two recipients, both on this host: `&tower` (host SSH key) and
-  `&author` (user SSH key). See blocker 3 above.
+  `&author` (user SSH key). See item 2 above.
 - `sops` is 3.13.3. `sops set --value-stdin` requires **JSON** on stdin, not
   raw plaintext — this was measured, not assumed.
 - `nix-secrets` tag `v0.1.0` is lightweight and local-only, and names commit
@@ -229,7 +229,7 @@ must run as the `postgres` OS user (`runuser -u postgres`), never as root.
 ### nix-meta verify gate
 
 `gitman.toml:4` — `nix flake check --no-build` followed by
-`nix eval --raw .#nixosConfigurations.server.config.system.build.toplevel.drvPath`.
+`nix eval --raw '.#nixosConfigurations.server.config.system.build.toplevel.drvPath'`.
 Inside a Gitman workspace under `.worktrees/`, use the `path:$PWD` flake
 form: the workspace is untracked in the outer git tree, and Nix's git
 fetcher refuses it otherwise.

@@ -1,8 +1,8 @@
 # Phase 0 — restic system backups
 
 **Status:** BLOCKED on two operator actions. The target disk is decided, the
-repository exists, the profile is enabled, and the repository work is done
-and verified.
+repository exists, the profile is enabled, and the `nix-meta` and
+`nix-secrets` changes are landed and verified.
 **Opened:** 2026-10-01
 **Host:** `server` (Dell Precision 5820, Xeon W-2125, 128 GB RAM)
 **Parent project:** `vendomat/.scratch/projects/07-local-depot-release-bus/IMPLEMENTATION.md`, Phase 0
