@@ -28,10 +28,12 @@ in
     apiPort = 8891;
     uiPort = 9991;
 
-    # Keep all model calls disabled until a local provider is configured.
-    # In particular, Hindsight must not inherit the DeepSeek credential used by
-    # other agent workflows on this host.
-    provider = "none";
+    # Keep all extraction and reflection on the loopback Inferference router.
+    # The model ID must be loaded there; the Mnemonix module supplies a local
+    # placeholder key for Hindsight's OpenAI-compatible client.
+    provider = "openai";
+    model = "qwen38-27b";
+    baseUrl = "http://127.0.0.1:8100/v1";
   };
 
   # ── The shared agent configuration ─────────────────────────────────────────
