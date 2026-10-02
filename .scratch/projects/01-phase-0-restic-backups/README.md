@@ -32,9 +32,11 @@ Phase 0 is complete only when all five hold:
 3. The restore gate restores three exact files and `cmp` matches each.
 4. `EVIDENCE.md` records the result.
 5. The repository changes have landed and been pushed. **MET** — see
-   `EVIDENCE.md` §8. The tag and the re-pin are still outstanding.
+   `EVIDENCE.md` §8. The tag and the re-pin are also done.
 
-Items 1 through 4 do not hold yet. See "What blocks this" below.
+Items 1 through 4 (`restic snapshots`, the repository check, the restore
+gate, `EVIDENCE.md`) are **NOT MET**. Nothing has run on the host. See "What
+blocks this" below.
 
 ## What is done
 
@@ -58,7 +60,6 @@ Items 1 through 4 do not hold yet. See "What blocks this" below.
 | No WD Re disk is connected | a physical action | `IMPLEMENTATION.md` step B1 |
 | `sudo` requires a password | an interactive session | step B2 |
 | No off-host SOPS recipient exists | a decision and a key | step B3 |
-| `nix-secrets` has no version source, so it cannot be tagged | a decision | `IMPLEMENTATION.md` step B4, `DESIGN.md` §12 |
 
 The third is the one that matters most. Both current recipients of the
 encrypted store live on this one host. A `restic-password` that only this host

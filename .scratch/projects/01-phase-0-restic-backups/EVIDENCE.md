@@ -513,6 +513,75 @@ This is by design, not a bug.
 lock rev `58ae4ab1`, unchanged. This is now a fourth, open blocker — see
 `IMPLEMENTATION.md` §B4 and `DESIGN.md` §12.
 
+### The hand-made tag and the re-pin lane
+
+**The classifier refusal, for the record.** An agent attempted the same
+`git tag` command that later created `v0.1.1`. The permission classifier
+refused it with `Reason: [Auto-Mode Bypass]`, because the gitman-only rule
+for version control lives in this repository's own `AGENTS.md`. That refusal
+is why the user ran `git tag -a` by hand instead of an agent running it.
+
+**The tag.** The user created, by hand, an annotated tag on `nix-secrets`:
+
+| Field | Value |
+|---|---|
+| Tag name | `v0.1.1` |
+| Tag object | `3ecc2a60a1999630905c5d0f694f2226da6c8316` |
+| Points at commit | `f1aba8e2f998bf620c19c5ea8dee52d4f026bc89` (`nix-secrets` trunk tip) |
+| Pushed to origin | yes |
+| `v0.1.0`, for comparison | unchanged: lightweight, commit `58ae4ab184e31cb29cccc893d0a3345537415880`, still not an ancestor of trunk |
+
+**The re-pin lane.** A separate `nix-meta` lane, `phase-0-repin-nix-secrets`,
+moved the pin:
+
+```
+Gitman start [phase-0-repin-nix-secrets] — STARTED
+lane 'phase-0-repin-nix-secrets' created on main.
+note: workspace at /home/andrew/Documents/Projects/nix-meta/.worktrees/phase-0-repin-nix-secrets
+```
+
+`flake.nix:77` changed from `?ref=refs/tags/v0.1.0` to
+`?ref=refs/tags/v0.1.1`. `nix flake lock --update-input nix-secrets` refused
+once, because the workspace path is untracked in the outer git tree:
+
+```
+error: Path '.worktrees/phase-0-repin-nix-secrets/flake.nix' in the repository
+"/home/andrew/Documents/Projects/nix-meta" is not tracked by Git.
+```
+
+Retried with the `path:` flake form, `nix flake update nix-secrets --flake
+"path:$PWD"`, which succeeded:
+
+```
+Updated input 'nix-secrets':
+    'git+file:...?ref=refs/tags/v0.1.0&rev=58ae4ab184e31cb29cccc893d0a3345537415880' (2026-10-01)
+  → 'git+file:...?ref=refs/tags/v0.1.1&rev=f1aba8e2f998bf620c19c5ea8dee52d4f026bc89' (2026-10-02)
+```
+
+Lock `nix-secrets` node, before and after:
+
+| | `ref` | `rev` |
+|---|---|---|
+| Before | `refs/tags/v0.1.0` | `58ae4ab184e31cb29cccc893d0a3345537415880` |
+| After | `refs/tags/v0.1.1` | `f1aba8e2f998bf620c19c5ea8dee52d4f026bc89` |
+
+`git diff flake.lock` against trunk confirmed only the `nix-secrets` node
+changed (`lastModified`, `narHash`, `ref`, `rev`). No other input moved.
+
+This closes the blocker recorded above: the `nix-meta` re-pin to `v0.1.1`
+has now happened.
+
+**Verify.** `nix flake check --no-build "path:$PWD"` passed. The server
+`toplevel.drvPath`, evaluated both before (trunk `b8508a94`) and after (this
+lane), is the **same** derivation:
+`/nix/store/wbjk6lr9jz371zq56ai8q2wjd6ab9nmn-nixos-system-server-26.11.20260705.d407951.drv`.
+The lock moved, but the server derivation did not: `profiles/secrets.nix`
+does not yet list `restic-password` in `activeNames` (that step is C5, not
+done here), so the part of `nix-secrets` this re-pin touches is not yet
+wired into the server build. The restic-timers check,
+`config.systemd.timers` filtered for `restic.*`, returned `[]`: the backup
+profile stays inert.
+
 ---
 
 ## 9. Backup scope

@@ -74,7 +74,7 @@
     # into a rebuild. Bump the tag to adopt a new secret, exactly like the
     # vendomat/repoman/devman pins above.
     nix-secrets = {
-      url = "git+file:///home/andrew/Documents/Projects/nix-secrets?ref=refs/tags/v0.1.0";
+      url = "git+file:///home/andrew/Documents/Projects/nix-secrets?ref=refs/tags/v0.1.1";
       inputs.nixpkgs.follows = "nixpkgs";
     };
 

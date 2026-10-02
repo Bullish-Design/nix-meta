@@ -358,3 +358,20 @@ moved. It needs no tag and no raw `git`. The cost: it departs from the
 input, and a rev carries no human-readable version.
 
 Option 3 is the only one that needs neither a new file nor a rule exception.
+
+**Outcome.** The user chose a hand-made annotated tag (Option 2), as a
+deliberate, one-step exception to the gitman-only rule. An agent cannot
+perform this step: the permission classifier refused the same `git tag`
+command with `Reason: [Auto-Mode Bypass]`, because the gitman-only rule lives
+in this repository's own `AGENTS.md`. The user ran `git tag -a` by hand
+instead.
+
+`nix-secrets` now carries tag `v0.1.1`: annotated tag object `3ecc2a60`,
+pointing at commit `f1aba8e2`, which is `nix-secrets` trunk tip. The tag is
+pushed to origin. `v0.1.0` is untouched, still lightweight, still at
+`58ae4ab1`, still not an ancestor of trunk.
+
+This gap is filed against `gitman`, not left open, at
+`~/Documents/Projects/gitman/.scratch/projects/63-non-python-repo-versioning/ISSUE.md`.
+Until `gitman` can tag a repository with no uv project, the hand-tag
+exception must be re-granted by the user at every `nix-secrets` release.

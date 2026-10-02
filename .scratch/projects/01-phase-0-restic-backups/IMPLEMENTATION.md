@@ -126,7 +126,7 @@ explicitly. The password is then readable once with
 `sops -d --extract '["restic-password"]'` and must be stored off-host by hand.
 Option 3 alone leaves no way to decrypt the rest of the store after host loss.
 
-### B4. A version source for `nix-secrets`, so it can be tagged **[blocked: decision]**
+### B4. A version source for `nix-secrets`, so it can be tagged **[resolved: hand tag]**
 
 `gitman release` refuses to tag `nix-secrets`:
 
@@ -140,10 +140,6 @@ need a uv project". An explicit version does not bypass this:
 `gitman release --version 0.1.1` refuses the same way. `nix-secrets` has no
 `pyproject.toml`, so `gitman` has no version source to read.
 
-Without a tag, the `nix-meta` re-pin to `v0.1.1` (step C5) cannot happen.
-`nix-meta/flake.nix` still pins `nix-secrets` at `?ref=refs/tags/v0.1.0`,
-lock rev `58ae4ab1`.
-
 Three options, described with trade-offs in `DESIGN.md` §12:
 
 1. Add a minimal `pyproject.toml` and `uv.lock` to `nix-secrets`, so
@@ -151,7 +147,16 @@ Three options, described with trade-offs in `DESIGN.md` §12:
 2. Tag by hand with raw `git tag -a`, once per release.
 3. Pin `nix-meta`'s `nix-secrets` input by `rev` instead of by tag.
 
-The user must choose. None is recommended over the others here.
+**Resolution.** The user chose option 2 and tagged `nix-secrets` by hand:
+annotated tag `v0.1.1`, tag object `3ecc2a60`, commit `f1aba8e2`, pushed to
+origin. An agent could not do this step: the permission classifier refused
+the same `git tag` command, because the gitman-only rule lives in this
+repository's own `AGENTS.md`. `nix-meta` now pins `v0.1.1` (see C4). The
+underlying gap — `gitman` cannot tag a repository with no `uv` project — is
+filed at
+`~/Documents/Projects/gitman/.scratch/projects/63-non-python-repo-versioning/ISSUE.md`.
+Until `gitman` closes that gap, this hand-tag exception must be re-granted
+by the user at every `nix-secrets` release.
 
 ---
 
@@ -234,7 +239,7 @@ SOPS_AGE_KEY_FILE=<off-host-identity> \
   devenv shell -- sops -d secrets/secrets.yaml > /dev/null && echo OFF_HOST_OK
 ```
 
-### C4. Provision `restic-password` **[landed, pushed — release blocked by B4]**
+### C4. Provision `restic-password` **[landed, pushed, released, re-pinned]**
 
 The secret was generated straight into the store. Nobody read it, and it
 never reached a terminal, a log, or a shell history:
@@ -260,11 +265,21 @@ cd ~/Documents/Projects/gitman && devenv shell -- bash -c '
 `nix-secrets` has no `publish.verify`, so the verification above is manual and
 is recorded in `EVIDENCE.md` §8. Trunk moved `b1983547` → `f1aba8e2`.
 
-**Only the release remains.** `gitman release` refuses: `nix-secrets` has no
-`pyproject.toml`, so `uv version --short` fails and no tag can be cut. This
-is blocker B4 — see §B4 below and `DESIGN.md` §12. The next tag, once B4 is
-resolved, is still **`v0.1.1`**: `v0.1.0` already names `58ae4ab1`, which is
-not on trunk (`DESIGN.md` §10).
+**The release has happened.** `gitman release` still cannot tag
+`nix-secrets` — `uv version --short` still fails, blocker B4 (see §B4 above
+and `DESIGN.md` §12). The user tagged by hand instead: `v0.1.1` is an
+annotated tag, tag object `3ecc2a60`, pointing at commit `f1aba8e2`, which is
+`nix-secrets` trunk tip. The tag is pushed to origin. `v0.1.0` is unchanged,
+still at `58ae4ab1`, still not on trunk (`DESIGN.md` §10).
+
+**`nix-meta` now pins it.** `flake.nix:77` reads
+`?ref=refs/tags/v0.1.1`, and `flake.lock`'s `nix-secrets` node locks `ref
+refs/tags/v0.1.1` / `rev f1aba8e2`. Only the `nix-secrets` node moved in the
+lock. This is correctness hygiene, not a functional change: both `v0.1.0`
+and `v0.1.1` carry the same `restic-password` declaration, and the backup
+profile stays inert (`restic-password` still has no encrypted material, so
+no `restic.*` systemd timer exists). See `EVIDENCE.md` §8 for the full
+before/after record.
 
 ### C5. Activate the secret on `server` **[ready, needs C4]**
 
@@ -276,10 +291,13 @@ cd ~/Documents/Projects/gitman && devenv shell -- bash -c '
   gitman start phase-0-activate-restic-secret --workspace'
 ```
 
+Steps 1 and 2 below are **already done**, landed on trunk by a separate
+re-pin lane (see C4 and `EVIDENCE.md` §8). Steps 3 through 5 remain.
+
 In that workspace:
 
-1. Point `flake.nix:77` at `?ref=refs/tags/v0.1.1`.
-2. `nix flake lock --update-input nix-secrets`.
+1. ~~Point `flake.nix:77` at `?ref=refs/tags/v0.1.1`.~~ **Done.**
+2. ~~`nix flake lock --update-input nix-secrets`.~~ **Done.**
 3. Add `"restic-password"` to `nix-secrets.secrets.activeNames` at
    `profiles/secrets.nix:27`.
 4. Verify, then land and push:

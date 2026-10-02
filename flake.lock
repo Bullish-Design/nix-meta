@@ -822,16 +822,16 @@
         "sops-nix": "sops-nix"
       },
       "locked": {
-        "lastModified": 1790814898,
-        "narHash": "sha256-shlrC3ap0AnaahfUhG9Zb4L226iT+TGVr1f0mJhAqVw=",
-        "ref": "refs/tags/v0.1.0",
-        "rev": "58ae4ab184e31cb29cccc893d0a3345537415880",
+        "lastModified": 1790914513,
+        "narHash": "sha256-2d6WOKcqx0YtTYMvtHJ3BMitM1UWYdlyVZgR1xRm1Mk=",
+        "ref": "refs/tags/v0.1.1",
+        "rev": "f1aba8e2f998bf620c19c5ea8dee52d4f026bc89",
         "revCount": 26,
         "type": "git",
         "url": "file:///home/andrew/Documents/Projects/nix-secrets"
       },
       "original": {
-        "ref": "refs/tags/v0.1.0",
+        "ref": "refs/tags/v0.1.1",
         "type": "git",
         "url": "file:///home/andrew/Documents/Projects/nix-secrets"
       }

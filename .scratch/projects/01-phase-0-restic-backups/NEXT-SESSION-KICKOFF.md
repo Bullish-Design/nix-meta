@@ -204,13 +204,20 @@ must run as the `postgres` OS user (`runuser -u postgres`), never as root.
   Both the `nix-secrets` lane `phase-0-restic-password` and the `nix-meta`
   lane `phase-0-restic-backups` have since **landed and pushed**: `nix-secrets`
   trunk moved `b1983547` → `f1aba8e2`, and `nix-meta` trunk moved `1914dae` →
-  `dddd4b19`. **No `v0.1.1` tag exists, and the `nix-meta` re-pin has not
-  happened.** `gitman release` refuses to tag `nix-secrets`: it has no
-  `pyproject.toml`, so `uv version --short` fails. `nix-meta/flake.nix` still
-  pins `nix-secrets` at `?ref=refs/tags/v0.1.0`, lock rev `58ae4ab1`. This is
-  a new, fourth blocker — B4, the version source for `nix-secrets` — and it
-  is open. Account for it in your sequencing plan; do not plan to duplicate
-  the landing, which is already done.
+  `dddd4b19`. **`v0.1.1` now exists**: an annotated tag, tag object
+  `3ecc2a60`, pointing at commit `f1aba8e2` (`nix-secrets` trunk tip),
+  pushed to origin. `gitman release` still refuses to tag `nix-secrets` —
+  it has no `pyproject.toml`, so `uv version --short` fails — so the user
+  made the tag by hand with `git tag -a`, as a deliberate, one-step
+  exception to the gitman-only rule; an agent cannot do this step, because
+  the permission classifier refuses the same raw `git tag` mutation in this
+  repository. `nix-meta` is now pinned to `v0.1.1`: `flake.nix` reads
+  `?ref=refs/tags/v0.1.1`, and `flake.lock` locks `rev f1aba8e2`. The
+  version-source gap is not open; it is filed against `gitman` at
+  `~/Documents/Projects/gitman/.scratch/projects/63-non-python-repo-versioning/ISSUE.md`.
+  The hand-tag exception must be re-granted by the user at every future
+  `nix-secrets` release, until `gitman` closes that gap. Do not plan to
+  duplicate the landing or the re-pin, which are already done.
 - `nix-secrets` has no `publish.verify` and no `pyproject.toml`, so
   `gitman version` refuses there. Its verification is manual (`nix flake
   check --no-build` plus the functional tests recorded in `EVIDENCE.md` §4
