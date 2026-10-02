@@ -406,6 +406,15 @@ sudo "$restic_bin" --repo "$repo" \
   --password-file /run/secrets/restic-password cat config
 ```
 
+**Until this step's repository confirmation holds**, every `nixos-rebuild
+switch` on this host prints the activation-time warning added at
+`profiles/backup.nix:583` (`system.activationScripts.resticBackupNeedsInitWarning`):
+a multi-line note to stderr naming the repository path and the exact command
+to create one, then `exit 0`. That is expected, not a fault — it is the same
+loud-but-harmless signal the preflight check gives at run time, just earlier.
+It stops appearing once the repository this step confirms actually exists and
+has a `config` file.
+
 ### C7. Activate and inspect **[ready, needs C5, C6]**
 
 The option block itself is already landed on trunk (`machines/server.nix`,
@@ -432,6 +441,12 @@ profile's own warning and creates no `restic.*` unit at all. That is
 expected — it is the loud-but-inert state the profile is designed to produce,
 not a failure. Units appear only after C4 and C5 give the secret real
 material.
+
+**Before the repository at `/mnt/wd_green1/restic` is confirmed (C6)**, this
+same rebuild also prints the activation-time missing-repository warning (see
+the note under C6). Once C6's repository exists and C4/C5 have given the
+secret real material, both warnings stop and `systemctl cat` shows the real
+units below.
 
 ### C8. The restore gate **[ready, needs C7]**
 

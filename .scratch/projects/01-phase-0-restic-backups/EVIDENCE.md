@@ -747,3 +747,184 @@ When steps C1 and C6 to C10 run, add to this document:
 - the failure-path proof from C10
 
 Record no secret contents, no password value, and no private-key content.
+
+---
+
+## 13. The missing-repository warning (lane `phase-0-missing-repo-warning`)
+
+**Session:** 2026-10-02, in the lane's own workspace
+(`.worktrees/phase-0-missing-repo-warning`), covering the `write_needs_init`
+classification in the preflight script, the `needs-init` marker, the
+activation-time warning, and the updated failure/login signals.
+
+### 13.1 `nix flake check`
+
+```
+$ nix flake check --no-build "path:$PWD"
+checking NixOS configuration 'nixosConfigurations.server'...
+evaluation warning: nix-meta.backup is enabled but the secret 'restic-password' has no
+                    entry in config.sops.secrets, so NO backup units were created. ...
+all checks passed!
+```
+
+### 13.2 The server `toplevel.drvPath`, before and after
+
+```
+$ nix eval --raw "path:$PWD#nixosConfigurations.server.config.system.build.toplevel.drvPath"
+/nix/store/wbjk6lr9jz371zq56ai8q2wjd6ab9nmn-nixos-system-server-26.11.20260705.d407951.drv
+```
+
+**This is the SAME hash recorded in §6 for trunk before this lane's changes,
+not a different one.** That is the correct result, not a surprise once
+examined: every change in this lane — the `write_needs_init` classification
+inside `preflight`, the `needs-init` handling in the failure/success scripts,
+the login-hook addition, and the new `system.activationScripts.resticBackupNeedsInitWarning`
+— sits inside the same `lib.mkIf active { ... }` branch that already made the
+profile addition "bit-for-bit inert" when §6 first measured it. `active` is
+`cfg.enable && hasPassword`, and `hasPassword` is false on this host's real
+configuration (`restic-password` still has no sops material). A disabled
+`lib.mkIf` branch evaluates to `{}` regardless of what is written inside it,
+so none of this lane's code — including the new activation script — is ever
+forced into the evaluated config, and the derivation cannot move. The
+inert-path and active-path checks below (13.3, 13.4) confirm this directly:
+the gating is correct, and that correctness is exactly why the hash does not
+change this time.
+
+### 13.3 The inert path — still bit-for-bit inert
+
+```
+$ nix eval --json "path:$PWD#nixosConfigurations.server.config.systemd.timers" \
+    --apply 'ts: builtins.filter (n: builtins.match "restic.*" n != null) (builtins.attrNames ts)'
+[]
+
+$ nix eval --json "path:$PWD#nixosConfigurations.server.config.systemd.services" \
+    --apply 'ss: builtins.filter (n: builtins.match "restic.*" n != null) (builtins.attrNames ss)'
+[]
+
+$ nix eval --json "path:$PWD#nixosConfigurations.server.config.system.activationScripts" \
+    --apply 'a: builtins.filter (n: builtins.match ".*[Rr]estic.*" n != null) (builtins.attrNames a)'
+[]
+```
+
+No `restic.*` timer, no `restic.*` service, and no restic-named
+activation script exist while the profile is inactive. The new activation
+script is correctly gated.
+
+### 13.4 The active path — forced with `extendModules`
+
+`server.extendModules` with `nix-meta.backup.enable = true;` and a stand-in
+`sops.secrets."restic-password" = { mode = "0400"; };`:
+
+```
+$ nix eval --json -f active-check.nix
+{
+  "timers": ["restic-backup-health", "restic-backups-system", "restic-check-system"],
+  "services": ["restic-backup-failure@", "restic-backup-health", "restic-backups-system", "restic-check-system"],
+  "activationScripts": ["resticBackupNeedsInitWarning"],
+  "drv": "/nix/store/ivq3abl1mya0c0hfi03y8grqphga6q9a-nixos-system-server-26.11.20260705.d407951.drv"
+}
+```
+
+Units, timers, and the new activation script all appear once the profile is
+forced active — confirming the branch and its gating are both live code, not
+dead code that happens to evaluate to `{}` for unrelated reasons. The active
+`drv` differs from the inert one, as expected (it is a materially different
+configuration), while the inert one (13.2) stays unchanged from trunk.
+
+Building this active `.drv` (`nix build --no-link <path>^*`) built every one
+of the profile's shell-script derivations successfully —
+`restic-preflight-system`, `restic-backup-failure`, `restic-backup-success`,
+and `restic-backup-health` all show `building '...'...` with no error — and
+then failed only at `manifest.json` / `activate` / `dry-activate` /
+`toplevel`, because the stand-in `sops.secrets."restic-password"` has no real
+encrypted material in `secrets.yaml`:
+
+```
+> /nix/store/.../sops-install-secrets-0.0.1/bin/sops-install-secrets: manifest is not valid: secret restic-password in /nix/store/...-secrets.yaml is not valid: the key 'restic-password' cannot be found
+```
+
+This is the expected limit of a stand-in secret, not a defect in this
+change: it is exactly why the four script derivations (built successfully,
+below) are tested directly with `bash -n` and the functional harness in
+13.5/13.6, rather than by running the full activation.
+
+### 13.5 `bash -n` on every generated script
+
+```
+$ bash -n /nix/store/fg1va812i43rx98iwnwdiwbwcmd1pma1-restic-preflight-system   && echo OK
+OK
+$ bash -n /nix/store/d2d8chpnfdr8lz77isicsmkr4cirbm47-restic-backup-failure     && echo OK
+OK
+$ bash -n /nix/store/hn9inys5qi906jhffqirv36iisjfy46y-restic-backup-success     && echo OK
+OK
+$ bash -n /nix/store/2b4hqa6x2pydrsmgv5whg8vw3hd8cqb5-restic-backup-health      && echo OK
+OK
+```
+
+The activation script's `text` and the login hook's `interactiveShellInit`
+(both inline strings, not store paths) were each written to a temp file and
+also passed `bash -n` cleanly.
+
+### 13.6 Functional test — all four preflight cases, driven directly
+
+Following the same method as §5: the built `restic-preflight-system` script
+was copied to a writable temp tree, its baked-in absolute paths (`mount`,
+`repo`, `cache`, `pwfile`, and the `statusDir` literal) redirected with `sed`
+to throwaway paths under that tree, and `mountpoint`/`stat` stubbed (`stat`
+returns a distinct device number for `/` versus everything else, and an
+overridable `root:root 400` for the password-metadata query) so no real mount
+or ownership state was required. `restic` itself was stubbed to a no-op that
+only echoes its arguments; none of the four cases below reach it, since each
+fails at an earlier preflight condition.
+
+| Case | Setup | Output | Exit | `needs-init` written? |
+|---|---|---|---|---|
+| mount missing | plain directory, not a real mount point | `... is not a mount point. The backup disk is absent.` | 1 | **No** |
+| repository directory missing | mount "real" (stubbed), no `restic` dir under it | `... does not exist. Initialize it as an operator step; see .../needs-init.` | 1 | Yes — `status=directory-missing` |
+| directory present, no `config` | mount "real", `restic/` dir exists, empty | `... exists but holds no restic config file — something created a plain directory here, not a repository. See .../needs-init.` | 1 | Yes — `status=config-missing` |
+| repository valid, password file wrong mode/owner | mount "real", `restic/config` present, password file `andrew:users 644` | `... is andrew:users 644; expected root:root 400.` | 1 | **No** |
+
+Full `needs-init` marker content from the "repository directory missing"
+case (paths are the throwaway temp tree, not real host paths):
+
+```
+repository=/tmp/restic-functest.W8m5ML/mnt/restic
+mountpoint=/tmp/restic-functest.W8m5ML/mnt
+time=2026-10-02T17:44:29-04:00
+status=directory-missing
+detail=/tmp/restic-functest.W8m5ML/mnt/restic does not exist. No repository has been initialized at this path yet.
+
+This profile never creates a repository (initialize = false). Create one
+as a one-time operator step, now that /tmp/restic-functest.W8m5ML/mnt is proved mounted and is
+not the root filesystem:
+
+  sudo "$(nix build --no-link --print-out-paths 'nixpkgs#restic')/bin/restic" --repo '/tmp/restic-functest.W8m5ML/mnt/restic' --password-file '/tmp/restic-functest.W8m5ML/secrets/restic-password' init
+```
+
+The "directory present, no config" case produced the same shape with
+`status=config-missing` and a `detail` line that names the directory as
+"something other than restic created this directory", confirming the two
+sub-cases carry distinct text, not just a distinct status word.
+
+**The mount-missing and password-wrong cases never created
+`.../status/needs-init`**, confirmed by `[ -f ... ]` after each run. This is
+the boundary §4 depends on: a missing disk is never reported as, or treated
+as, a missing repository.
+
+### 13.7 The success script clears `needs-init` too
+
+`restic-backup-success`, redirected to a throwaway status directory
+pre-populated with `last-failure`, `last-failure.log`, and `needs-init`:
+
+```
+$ ls "$STATUS"   # before
+last-failure  last-failure.log  needs-init
+
+$ ./success.sh backup
+
+$ ls "$STATUS"   # after
+last-success-backup
+```
+
+All three markers were removed by one success run; only the new
+`last-success-backup` marker remains.

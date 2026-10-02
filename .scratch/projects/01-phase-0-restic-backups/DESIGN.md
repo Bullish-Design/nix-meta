@@ -52,7 +52,7 @@ decision does.
 `/mnt/shared` stays out of Phase 0. It is declared at
 `machines/server.nix:620` as an `ntfs3` automount and holds 129 GiB of
 unadjudicated data. Phase F stays blocked until that data has its own verified
-policy. `profiles/backup.nix:516` asserts that the repository is not under
+policy. `profiles/backup.nix:614` asserts that the repository is not under
 `/mnt/shared`.
 
 The profile is enabled on the host: `machines/server.nix:668` sets
@@ -62,7 +62,7 @@ the decision above.
 ### No repository initialization is needed
 
 The repository at `/mnt/wd_green1/restic` already exists. There is nothing to
-initialize. `profiles/backup.nix:363` sets `initialize = false`, and that
+initialize. `profiles/backup.nix:415` sets `initialize = false`, and that
 setting stays permanent — it was never conditional on which disk is primary.
 
 The path to a working backup from here is three steps, in order:
@@ -103,7 +103,7 @@ hasPassword = config.sops.secrets ? "restic-password";
 active = cfg.enable && hasPassword;
 ```
 
-`profiles/backup.nix:343` emits a loud warning when the profile is enabled and
+`profiles/backup.nix:394` emits a loud warning when the profile is enabled and
 the secret has not arrived. A silently inert backup profile is the failure this
 phase exists to prevent.
 
@@ -216,7 +216,8 @@ recorded.
 |---|---|---|
 | 1 | the mount point is a real mount point | `nofail` leaves an empty directory when the disk is absent |
 | 2 | the mount is not the root filesystem | the root filesystem is 95% full |
-| 3 | the repository directory exists and holds a `config` file | this profile never initializes a repository |
+| 3a | the repository directory exists | this profile never initializes a repository |
+| 3b | the repository directory holds a `config` file | a directory with no `config` is not a repository at all |
 | 4 | the password file exists and is `root:root 400` | a different owner or mode means something else wrote it |
 | 5 | the cache directory is on the backup disk | the module's default puts the cache on the root filesystem |
 
@@ -224,10 +225,35 @@ Condition 2 is implied by condition 1. It stays because a disagreement between
 them means something is wrong, and because filling the root filesystem is the
 worst outcome available.
 
-Each refusal exits 1 before restic opens the repository. All five were tested;
+Each refusal exits 1 before restic opens the repository. All six were tested;
 see `EVIDENCE.md` §5.
 
-`profiles/backup.nix:199` adds `RequiresMountsFor` for the mount point to every
+### Classifying a missing repository (3a and 3b)
+
+Conditions 3a and 3b are not merely two more `fail` calls. Each writes a
+distinct marker before failing, at `profiles/backup.nix:87` (the
+`write_needs_init` helper) and `:134`-`:141` (the two call sites):
+
+| Sub-case | `needs-init` `status` field | Why reported differently |
+|---|---|---|
+| 3a: the directory is absent | `directory-missing` | the ordinary case — nobody has initialized a repository here yet |
+| 3b: the directory exists, no `config` | `config-missing` | more alarming — something other than restic created this directory, so it is not an ordinary uninitialized repository |
+
+The marker (`/var/lib/restic-backup-status/needs-init`, written by
+`write_needs_init`) carries the repository path, the mount point, the
+timestamp, the sub-case, and the exact operator command to run — the same
+`restic init` invocation form used in `IMPLEMENTATION.md` steps C1b/C6
+(`nix build` to resolve the `restic` binary, then `--repo`/`--password-file`),
+quoted so it is safe to paste into zsh. It is cleared only on success,
+alongside `last-failure` (`profiles/backup.nix:219`).
+
+**Condition 1 (and 2) never write this marker.** `write_needs_init` is called
+only from the 3a/3b branches. A missing disk is not a missing repository:
+telling the operator to run `restic init` against an unmounted path is the
+exact failure `initialize = false` exists to prevent. This boundary was
+tested directly; see `EVIDENCE.md` §5.
+
+`profiles/backup.nix:251` adds `RequiresMountsFor` for the mount point to every
 unit, so systemd refuses to start them when the mount is not there.
 
 Step 6 of the script is a plain `restic unlock`. Without `--remove-all` it
@@ -235,11 +261,33 @@ removes only a stale lock — one whose owning process is gone. An active lock
 held by a concurrent operation survives, and the restic command that follows
 fails loudly instead of racing it.
 
+### The activation-time warning
+
+Waiting for the preflight check to run means the operator learns about a
+missing repository only when the timer fires — up to a day late. A second,
+independent check runs at every `nixos-rebuild switch`, via
+`system.activationScripts.resticBackupNeedsInitWarning`
+(`profiles/backup.nix:583`). It re-checks the same directory/`config`
+condition and prints the same operator command, but to stderr during
+activation rather than to a marker file.
+
+**It warns; it never fails.** The script ends with an unconditional `exit 0`,
+regardless of what it found. This is a deliberate departure from
+`nix-secrets/modules/secrets.nix`'s `nixSecretsValidateAgeKey`, which exits 1
+when the age identity is absent — correct there, because an absent age key
+makes *every* secret on the host undecryptable. A missing restic repository
+blocks only this one backup profile. Refusing to activate the whole system
+over a backup disk that is not ready yet would hold unrelated work hostage,
+and this profile is not important enough to justify that trade. The script is
+gated by the same `active` condition (`cfg.enable && hasPassword`) that gates
+every unit in this profile — it does not exist in `config.system.activationScripts`
+at all when the profile is inactive.
+
 ---
 
 ## 5. Never initialize automatically
 
-**Decision.** `initialize = false` at `profiles/backup.nix:363`, permanently.
+**Decision.** `initialize = false` at `profiles/backup.nix:415`, permanently.
 
 The NixOS restic module's `initialize = true` path runs
 `restic cat config || restic init` in `preStart`
@@ -260,8 +308,8 @@ The module hardcodes `RESTIC_CACHE_DIR = "/var/cache/restic-backups-<name>"`
 has 26 GB free of 444 GB.
 
 **Decision.** Override it per unit with `lib.mkForce`
-(`profiles/backup.nix:399` and `:590`), pointing at
-`<mountPoint>/restic-cache`. `profiles/backup.nix:531` asserts the cache is
+(`profiles/backup.nix:451` and `:688`), pointing at
+`<mountPoint>/restic-cache`. `profiles/backup.nix:629` asserts the cache is
 under the mount point.
 
 The module's `CacheDirectory=` still creates an empty
@@ -299,32 +347,48 @@ consistency. See §9.
 
 There is no proven remote notification channel on this host, and none was
 claimed. The signal is local and persistent
-(`profiles/backup.nix:127`, `:158`, `:173`):
+(`profiles/backup.nix:171`, `:210`, `:225`):
 
 | Mechanism | Where |
 |---|---|
 | a marker file that survives reboots | `/var/lib/restic-backup-status/last-failure`, mode 0644 |
+| a needs-init marker, when the repository itself is missing | `/var/lib/restic-backup-status/needs-init`, mode 0644 — see "Classifying a missing repository" below |
 | a journal excerpt of the failed unit | `…/last-failure.log`, mode 0600, because it names paths under `/home` |
-| a journal error | `logger -t restic-backup -p daemon.err` |
-| live terminal sessions | `wall` |
-| the next interactive login | `environment.interactiveShellInit`, `profiles/backup.nix:500` |
+| a journal error | `logger -t restic-backup -p daemon.err`, folding in the needs-init guidance when that marker is present |
+| live terminal sessions | `wall`, likewise folding in the needs-init guidance |
+| the next interactive login | `environment.interactiveShellInit`, `profiles/backup.nix:553`, prints both markers when present |
+| `nixos-rebuild switch` activation | `system.activationScripts.resticBackupNeedsInitWarning`, `profiles/backup.nix:583` — see §4 |
 | a stalled schedule | `restic-backup-health`, daily, fails past 36 hours |
 
-The marker is cleared only by a success (`profiles/backup.nix:158`). The
-failure recorder is a templated unit reached by
+The marker is cleared only by a success (`profiles/backup.nix:210`), which
+also clears `needs-init`. The failure recorder is a templated unit reached by
 `OnFailure=restic-backup-failure@%n.service`; it carries no `OnFailure` of its
 own, so it cannot recurse.
 
+### Classifying a missing repository
+
+A missing or invalid repository (preflight conditions 3a/3b, §4) is no longer
+indistinguishable from any other failure. `write_needs_init`
+(`profiles/backup.nix:87`) records the repository path, the mount point, the
+timestamp, the sub-case (`directory-missing` or `config-missing`), and the
+exact `restic init` command to run — quoted for zsh — before the unit fails.
+`restic-backup-failure` (`profiles/backup.nix:171`) then folds that guidance
+into both the journal error and the `wall` message, and the login hook
+(above) prints the marker's contents directly. The activation-time warning in
+§4 reaches the same information through an independent path, at
+`nixos-rebuild switch` time rather than waiting for a failed unit.
+
 A per-run alert cannot see a backup that stopped running at all. The health
 timer is for that case, and it carries **no** `RequiresMountsFor`
-(`profiles/backup.nix:445`) so it still runs and still fails when the disk is
+(`profiles/backup.nix:499`) so it still runs and still fails when the disk is
 gone.
 
 ### Explicit failure behaviour
 
 | Situation | Behaviour |
 |---|---|
-| the disk is missing | `RequiresMountsFor` and preflight condition 1 fail the unit; no repository and no cache are created on the root filesystem |
+| the disk is missing | `RequiresMountsFor` and preflight condition 1 fail the unit; no repository and no cache are created on the root filesystem; **no** `needs-init` marker is written |
+| the disk is mounted but the repository is missing or invalid | preflight condition 3a/3b fails the unit and writes `needs-init` with the exact operator command; `nixos-rebuild switch` warns about the same condition independently (§4) |
 | the disk is full | restic exits non-zero; the marker records it. No snapshot is deleted as an emergency response, and the failure evidence is preserved |
 | a stale repository lock | `restic unlock` clears it |
 | an active repository lock | it survives; the restic command fails loudly |
@@ -337,7 +401,7 @@ gone.
 (`machines/server.nix:320`, pinned to `postgresql_17`). Atuin uses it.
 Copying live cluster files is **not** a valid database backup.
 
-`profiles/backup.nix:553` adds a logical `pg_dumpall` stream into the same
+`profiles/backup.nix:652` adds a logical `pg_dumpall` stream into the same
 repository, behind `nix-meta.backup.postgres.enable`, default off. The owner
 question is settled: the generated `pg_hba.conf` carries
 `local all postgres peer map=postgres` and the default `identMap` maps only
@@ -362,7 +426,7 @@ running container's volume does not prove application consistency. This has no
 solution yet and must be settled before Phase E.
 
 **Docker layers.** `/var/lib/docker/overlay2` and `/var/lib/docker/buildkit`
-are excluded (`profiles/backup.nix:272`). Images are rebuildable from their
+are excluded (`profiles/backup.nix:324`). Images are rebuildable from their
 sources; the build cache alone was 36.37 GB. Named volumes stay in.
 
 ---

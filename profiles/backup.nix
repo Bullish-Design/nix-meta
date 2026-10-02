@@ -78,6 +78,40 @@ let
     cache=${lib.escapeShellArg cfg.cacheDir}
     pwfile=${lib.escapeShellArg passwordFile}
 
+    # Writes the needs-init marker. Only the two repository sub-cases of
+    # condition 3, below, call this — never condition 1 (the mount is
+    # absent) and never condition 2 (the mount is the root filesystem). A
+    # missing disk is not a missing repository: telling the operator to run
+    # `restic init` against an unmounted path is the exact failure
+    # `initialize = false` exists to prevent.
+    write_needs_init() {
+      kind="$1"
+      case "$kind" in
+        directory-missing)
+          detail="$repo does not exist. No repository has been initialized at this path yet."
+          ;;
+        config-missing)
+          detail="$repo exists but holds no restic config file. Something other than restic created this directory; this is not an ordinary uninitialized repository, so look there first."
+          ;;
+      esac
+      now="$(${pkgs.coreutils}/bin/date -Is)"
+      ${pkgs.coreutils}/bin/install -d -m 0755 ${statusDir}
+      {
+        echo "repository=$repo"
+        echo "mountpoint=$mount"
+        echo "time=$now"
+        echo "status=$kind"
+        echo "detail=$detail"
+        echo ""
+        echo "This profile never creates a repository (initialize = false). Create one"
+        echo "as a one-time operator step, now that $mount is proved mounted and is"
+        echo "not the root filesystem:"
+        echo ""
+        echo "  sudo \"\$(nix build --no-link --print-out-paths 'nixpkgs#restic')/bin/restic\" --repo '$repo' --password-file '$pwfile' init"
+      } > ${statusDir}/needs-init
+      ${pkgs.coreutils}/bin/chmod 0644 ${statusDir}/needs-init
+    }
+
     # 1. The backup disk must be mounted. `nofail` in machines/server.nix means
     #    an absent drive leaves a plain empty directory on the root filesystem.
     ${pkgs.util-linux}/bin/mountpoint -q "$mount" \
@@ -92,9 +126,19 @@ let
     [ "$root_dev" != "$mount_dev" ] \
       || fail "$mount resolves to the root filesystem (device $root_dev)."
 
-    # 3. The repository must already exist. This profile never initializes one.
-    [ -d "$repo" ] || fail "$repo does not exist. Initialize it as an operator step."
-    [ -f "$repo/config" ] || fail "$repo holds no restic config file."
+    # 3. The repository must already exist. This profile never initializes
+    #    one. Distinguish an absent directory from a directory that holds no
+    #    `config` file: the second means something already created a plain
+    #    directory where a repository should be, which is more alarming than
+    #    an ordinary not-yet-initialized disk, so it is reported differently.
+    if [ ! -d "$repo" ]; then
+      write_needs_init directory-missing
+      fail "$repo does not exist. Initialize it as an operator step; see ${statusDir}/needs-init."
+    fi
+    if [ ! -f "$repo/config" ]; then
+      write_needs_init config-missing
+      fail "$repo exists but holds no restic config file — something created a plain directory here, not a repository. See ${statusDir}/needs-init."
+    fi
 
     # 4. The password file must be present and tight. sops-nix writes it to
     #    /run/secrets at activation; a wrong owner or mode means something else
@@ -146,11 +190,19 @@ let
       > ${statusDir}/last-failure.log 2>/dev/null || true
     ${pkgs.coreutils}/bin/chmod 0600 ${statusDir}/last-failure.log
 
+    # The needs-init marker, when present, means this failure is a missing
+    # repository rather than an ordinary fault. Fold its guidance into both
+    # signals so the operator does not have to go looking for it separately.
+    guidance=""
+    if [ -f ${statusDir}/needs-init ]; then
+      guidance=" A restic repository is missing; see ${statusDir}/needs-init for the exact command to create one."
+    fi
+
     ${pkgs.util-linux}/bin/logger -t restic-backup -p daemon.err \
-      "$unit failed (result=$result exit=$code). See ${statusDir}/last-failure."
+      "$unit failed (result=$result exit=$code). See ${statusDir}/last-failure.$guidance"
 
     ${pkgs.util-linux}/bin/wall \
-      "restic backup: $unit FAILED at $now (result=$result exit=$code). Details in ${statusDir}/last-failure." \
+      "restic backup: $unit FAILED at $now (result=$result exit=$code). Details in ${statusDir}/last-failure.$guidance" \
       2>/dev/null || true
   '';
 
@@ -164,7 +216,7 @@ let
       echo "time=$(${pkgs.coreutils}/bin/date -Is)"
     } > "${statusDir}/last-success-$kind"
     ${pkgs.coreutils}/bin/chmod 0644 "${statusDir}/last-success-$kind"
-    ${pkgs.coreutils}/bin/rm -f ${statusDir}/last-failure ${statusDir}/last-failure.log
+    ${pkgs.coreutils}/bin/rm -f ${statusDir}/last-failure ${statusDir}/last-failure.log ${statusDir}/needs-init
   '';
 
   # Fails when the newest successful backup is older than `maxSuccessAge`, or
@@ -495,15 +547,61 @@ in
 
       # ── The login warning ─────────────────────────────────────────────────
       #
-      # One `test -f` on an interactive shell. It prints the marker, which holds
-      # no secret material, and points at the journal excerpt.
+      # One `test -f` per marker on an interactive shell. Each `sed` only runs
+      # when its marker is present, so an unaffected login pays no extra
+      # subprocess cost. Neither marker holds secret material.
       environment.interactiveShellInit = ''
         if [ -f ${statusDir}/last-failure ]; then
           printf '\033[1;31m!! restic backup FAILED\033[0m — %s\n' \
             "${statusDir}/last-failure" >&2
           ${pkgs.gnused}/bin/sed -n 's/^/   /p' ${statusDir}/last-failure >&2
         fi
+        if [ -f ${statusDir}/needs-init ]; then
+          printf '\033[1;33m!! restic repository missing\033[0m — %s\n' \
+            "${statusDir}/needs-init" >&2
+          ${pkgs.gnused}/bin/sed -n 's/^/   /p' ${statusDir}/needs-init >&2
+        fi
       '';
+
+      # ── The activation warning ──────────────────────────────────────────
+      #
+      # Runs at every `nixos-rebuild switch`, so the operator learns about a
+      # missing repository immediately instead of waiting up to a day for
+      # the timer. It only WARNS; it never fails the activation.
+      #
+      # `nix-secrets/modules/secrets.nix`'s `nixSecretsValidateAgeKey`
+      # activation script deliberately exits 1 when the age key is absent,
+      # because that absence makes every secret on the host undecryptable —
+      # a far larger failure than one backup profile. A missing restic
+      # repository blocks only this one backup. Refusing to activate the
+      # whole system over a backup disk that is not ready yet would hold
+      # unrelated work hostage, and this profile is not important enough to
+      # justify that. Do not "fix" this script to match that one's `exit 1`.
+      # Gated by sitting inside the `lib.mkIf active { ... }` block that
+      # opens this `config` branch — the same condition that gates every
+      # other attribute here. No separate mkIf is needed.
+      system.activationScripts.resticBackupNeedsInitWarning = {
+        text = ''
+          repo=${lib.escapeShellArg cfg.repository}
+          mount=${lib.escapeShellArg cfg.mountPoint}
+          pwfile=${lib.escapeShellArg passwordFile}
+
+          if ${pkgs.util-linux}/bin/mountpoint -q "$mount" 2>/dev/null \
+              && { [ ! -d "$repo" ] || [ ! -f "$repo/config" ]; }; then
+            {
+              echo ""
+              echo "restic backup: $repo does not exist (or has no restic config file)."
+              echo "This profile never creates a repository (initialize = false,"
+              echo "profiles/backup.nix). Create one as a one-time operator step:"
+              echo ""
+              echo "  sudo \"\$(nix build --no-link --print-out-paths 'nixpkgs#restic')/bin/restic\" --repo '$repo' --password-file '$pwfile' init"
+              echo ""
+              echo "Until then, restic-backups-${jobName}.service fails its preflight check."
+            } >&2
+          fi
+          exit 0
+        '';
+      };
 
       # The operator wrapper the restic module generates is `restic-system`. It
       # carries the repository, the password file and the cache directory, so a
