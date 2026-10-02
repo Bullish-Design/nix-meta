@@ -28,11 +28,10 @@ in
     apiPort = 8891;
     uiPort = 9991;
 
-    # The DeepSeek credential, rendered by profiles/secrets.nix into the env
-    # form the container expects. `or null` keeps this profile composable: a
-    # host without profiles.secrets still evaluates, starts the service, and
-    # gets an explicit warning that retain will fail.
-    environmentFile = config.sops.templates."mnemonix-hindsight.env".path or null;
+    # Keep all model calls disabled until a local provider is configured.
+    # In particular, Hindsight must not inherit the DeepSeek credential used by
+    # other agent workflows on this host.
+    provider = "none";
   };
 
   # ── The shared agent configuration ─────────────────────────────────────────

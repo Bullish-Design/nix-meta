@@ -27,10 +27,10 @@ in
   nix-secrets.secrets.activeNames = [
     "tailscale-auth-key"
     "subconscious-api-key"
-    # Consumed by Pi (direct shells + Paseo subprocesses) AND by the Mnemonix
-    # Hindsight container. `warnOnMissingKeys` is true, so until the material
-    # lands in nix-secrets this name is dropped with an eval warning instead of
-    # failing the rebuild.
+    # Consumed by Pi and Paseo. Mnemonix Hindsight deliberately does not receive
+    # this credential; its provider remains disabled until a local model exists.
+    # `warnOnMissingKeys` is true, so until the material lands in nix-secrets
+    # this name is dropped with an eval warning instead of failing the rebuild.
     "deepseek-api-key"
   ];
 
@@ -52,8 +52,7 @@ in
     };
 
     # Pi reads this in interactive shells and as a Paseo subprocess, so the
-    # decrypted file is relaxed to the user. The Hindsight container reads a
-    # root-owned rendered template instead (below).
+    # decrypted file is relaxed to the user.
     "deepseek-api-key" = {
       owner = config.nixos-core.base.username;
       group = "users";
@@ -78,26 +77,10 @@ in
       '';
     };
 
-    # The Hindsight container runs as root under its oci-containers unit, so
-    # this file stays root-owned at the module default. `restartUnits` couples
-    # rotation to the service: without it a rotated key is rendered but never
-    # picked up. The unit name follows the container backend, read from the
-    # Mnemonix module so the two cannot drift; `or` keeps this profile usable
-    # on a host that does not import it.
-    "mnemonix-hindsight.env" = {
-      mode = "0400";
-      restartUnits = [
-        "${config.services.mnemonix.hindsight.backend or "docker"}-mnemonix-hindsight.service"
-      ];
-      content = ''
-        HINDSIGHT_API_LLM_API_KEY=${config.sops.placeholder."deepseek-api-key"}
-      '';
-    };
   };
 
   # Consume tailscale-auth-key for declarative tailnet re-auth. The provider owns
   # the secret *declaration*; nixos-core.base owns the *service* wiring — the
   # consumer only names the secret and reads its path (RUNBOOK §5).
-  nixos-core.base.tailscale.authKeyFile =
-    config.sops.secrets."tailscale-auth-key".path;
+  nixos-core.base.tailscale.authKeyFile = config.sops.secrets."tailscale-auth-key".path;
 }
