@@ -21,6 +21,7 @@ umbrella guide.
 | `DESIGN.md` | the decisions, with `file:line` anchors |
 | `IMPLEMENTATION.md` | the ordered steps, and which are done |
 | `EVIDENCE.md` | measured facts, verification output, and the gate |
+| `NEXT-SESSION-KICKOFF.md` | the kickoff prompt for the next working session |
 
 ## The gate
 
@@ -30,9 +31,10 @@ Phase 0 is complete only when all five hold:
 2. A repository check succeeds.
 3. The restore gate restores three exact files and `cmp` matches each.
 4. `EVIDENCE.md` records the result.
-5. The repository changes have landed and been pushed.
+5. The repository changes have landed and been pushed. **MET** — see
+   `EVIDENCE.md` §8. The tag and the re-pin are still outstanding.
 
-None of the five hold yet. See "What blocks this" below.
+Items 1 through 4 do not hold yet. See "What blocks this" below.
 
 ## What is done
 
@@ -45,6 +47,9 @@ None of the five hold yet. See "What blocks this" below.
   composition. Both halves of nix-meta's verify gate pass.
 - The profile creates **no units** until an operator turns it on. Nothing on
   the host changed.
+- The `profiles/backup.nix` profile, the Phase 0 documents, and the
+  `nix-secrets` tooling fixes have all landed on trunk and reached origin,
+  in both `nix-meta` and `nix-secrets`. See `EVIDENCE.md` §8.
 
 ## What blocks this
 
@@ -53,6 +58,7 @@ None of the five hold yet. See "What blocks this" below.
 | No WD Re disk is connected | a physical action | `IMPLEMENTATION.md` step B1 |
 | `sudo` requires a password | an interactive session | step B2 |
 | No off-host SOPS recipient exists | a decision and a key | step B3 |
+| `nix-secrets` has no version source, so it cannot be tagged | a decision | `IMPLEMENTATION.md` step B4, `DESIGN.md` §12 |
 
 The third is the one that matters most. Both current recipients of the
 encrypted store live on this one host. A `restic-password` that only this host

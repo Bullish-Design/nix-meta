@@ -19,7 +19,7 @@ restic 0.19.0
 | a repository check succeeds | **NOT MET** |
 | the restore gate restores three exact files and `cmp` matches | **NOT MET** |
 | `EVIDENCE.md` records the result | partial — this document records the work done |
-| the repository changes have landed and been pushed | **NOT MET** — both lanes are described and verified, neither is landed |
+| the repository changes have landed and been pushed | **MET** — both lanes landed and pushed to origin; the `nix-secrets` tag and the `nix-meta` re-pin are still outstanding (see §8) |
 
 **Phase 0 is not complete.** Three operator actions block it; see
 `IMPLEMENTATION.md` §B.
@@ -434,6 +434,23 @@ origin. Nothing was discarded.
 refs/tags/v0.1.0`. So `nix-meta` **already** consumes the `restic-password`
 declaration. Only the material is missing. The next tag must be `v0.1.1`.
 
+**Landed and pushed.** After this evidence was gathered, lane
+`phase-0-restic-password` landed into `main` and the result reached origin:
+
+```
+Gitman land — LANDED
+landed phase-0-restic-password into main.
+```
+
+```
+Gitman push — PUSHED
+pushed main → origin @ f1aba8e2f998.
+```
+
+Trunk moved `b1983547` → `f1aba8e2`. The `v0.1.0` tag was **not** moved; it
+still names `58ae4ab1`, off the current trunk, for the reason given above.
+No new tag was created — see the refusal recorded in the lane table below.
+
 ### nix-meta
 
 ```
@@ -457,16 +474,44 @@ Phase 0 work is isolated in its own Gitman workspace at
 `.worktrees/phase-0-restic-backups`. The shared `nix-meta` working copy, which
 holds the Atuin lanes' draft content, was not edited.
 
+**Landed and pushed.** Before landing, both halves of the gate declared in
+`gitman.toml` passed again inside the lane's own workspace: `nix flake check
+--no-build` and the server `drvPath` eval. The eval printed
+`/nix/store/jgk76qyb7fvlbm0fnjiv5d65h7js1mjs-nixos-system-server-26.11.20260705.d407951.drv`,
+the same derivation as the old trunk, which proves the change was inert.
+Lane `phase-0-restic-backups` then landed into `main` and the result reached
+origin. Trunk moved `1914dae` → `dddd4b19`. The laneless workspace
+registration left behind was cleaned with `gitman workspace prune`; the
+directory was kept, not deleted.
+
+Both Atuin lanes were untouched throughout. They were `1 behind trunk` at
+`1914dae`; after `phase-0-restic-backups` landed, they read `2 behind trunk`.
+They remain published on origin.
+
 ### Lanes, commits, tags, pushes
 
 | Repository | Lane | State |
 |---|---|---|
-| `nix-secrets` | `phase-0-restic-password` | described, verified, **not landed** |
-| `nix-meta` | `phase-0-restic-backups` | described, verified, **not landed** |
+| `nix-secrets` | `phase-0-restic-password` | **landed** into `main` (`b1983547` → `f1aba8e2`), pushed to origin |
+| `nix-meta` | `phase-0-restic-backups` | **landed** into `main` (`1914dae` → `dddd4b19`), pushed to origin |
 
-No commit was landed. No tag was created. Nothing was pushed. Both lanes are
-held on purpose: landing `nix-secrets` now would force two release tags, and
-`IMPLEMENTATION.md` step C4 adds the encrypted material to the same lane.
+Both lanes landed and pushed. **No tag was created, and the `nix-meta`
+re-pin of `nix-secrets` did not happen.** `gitman release` refuses to tag
+`nix-secrets`:
+
+```
+Gitman release — REFUSED
+reason: uv version --short failed: error: No `pyproject.toml` found in current directory or any parent directory
+```
+
+`gitman/src/gitman/init.py:49` gives the reason: "no pyproject.toml version
+— version/release need a uv project". `gitman release --version 0.1.1`
+refuses the same way, so an explicit version does not bypass the uv read.
+This is by design, not a bug.
+
+`nix-meta/flake.nix` still pins `nix-secrets` at `?ref=refs/tags/v0.1.0`,
+lock rev `58ae4ab1`, unchanged. This is now a fourth, open blocker — see
+`IMPLEMENTATION.md` §B4 and `DESIGN.md` §12.
 
 ---
 

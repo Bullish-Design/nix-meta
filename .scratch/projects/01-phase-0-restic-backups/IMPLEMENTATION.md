@@ -126,6 +126,33 @@ explicitly. The password is then readable once with
 `sops -d --extract '["restic-password"]'` and must be stored off-host by hand.
 Option 3 alone leaves no way to decrypt the rest of the store after host loss.
 
+### B4. A version source for `nix-secrets`, so it can be tagged **[blocked: decision]**
+
+`gitman release` refuses to tag `nix-secrets`:
+
+```
+Gitman release — REFUSED
+reason: uv version --short failed: error: No `pyproject.toml` found in current directory or any parent directory
+```
+
+`gitman/src/gitman/init.py:49`: "no pyproject.toml version — version/release
+need a uv project". An explicit version does not bypass this:
+`gitman release --version 0.1.1` refuses the same way. `nix-secrets` has no
+`pyproject.toml`, so `gitman` has no version source to read.
+
+Without a tag, the `nix-meta` re-pin to `v0.1.1` (step C5) cannot happen.
+`nix-meta/flake.nix` still pins `nix-secrets` at `?ref=refs/tags/v0.1.0`,
+lock rev `58ae4ab1`.
+
+Three options, described with trade-offs in `DESIGN.md` §12:
+
+1. Add a minimal `pyproject.toml` and `uv.lock` to `nix-secrets`, so
+   `gitman release` works.
+2. Tag by hand with raw `git tag -a`, once per release.
+3. Pin `nix-meta`'s `nix-secrets` input by `rev` instead of by tag.
+
+The user must choose. None is recommended over the others here.
+
 ---
 
 ## C. Steps that run once B clears
@@ -190,11 +217,11 @@ echo "exit=$?"   # 12 means the repository refused the empty password
 
 Record both key IDs in `EVIDENCE.md`. Record neither password.
 
-### C3. Land `nix-secrets` and release it **[ready, needs B3]**
+### C3. Add the off-host recipient **[ready, needs B3]**
 
-The lane `phase-0-restic-password` is described and verified but **not landed**,
-on purpose: step C4 adds the encrypted material to the same lane, so the lane
-lands once and releases once.
+Lane `phase-0-restic-password` has since landed and pushed as part of step
+C4; see `EVIDENCE.md` §8. Only B3's decision and this re-encryption step
+remain open.
 
 ```bash
 # 1. Add the off-host recipient from B3 to secrets/.sops.yaml, then re-encrypt
@@ -207,10 +234,10 @@ SOPS_AGE_KEY_FILE=<off-host-identity> \
   devenv shell -- sops -d secrets/secrets.yaml > /dev/null && echo OFF_HOST_OK
 ```
 
-### C4. Provision `restic-password` **[ready, needs B3 and C3]**
+### C4. Provision `restic-password` **[landed, pushed — release blocked by B4]**
 
-Generate it straight into the store. Nobody reads it, and it never reaches a
-terminal, a log, or a shell history:
+The secret was generated straight into the store. Nobody read it, and it
+never reached a terminal, a log, or a shell history:
 
 ```bash
 cd ~/Documents/Projects/nix-secrets
@@ -220,19 +247,24 @@ head -c 32 /dev/urandom | base64 -w0 \
 devenv shell -- ./scripts/secret-ls | grep restic-password   # STORE must read "yes"
 ```
 
-Then verify, land, release and push:
+Verified, landed and pushed:
 
 ```bash
 cd ~/Documents/Projects/nix-secrets && nix flake check --no-build
 
 cd ~/Documents/Projects/gitman && devenv shell -- bash -c '
   cd ~/Documents/Projects/nix-secrets &&
-  gitman land && gitman push && gitman release'
+  gitman land && gitman push'
 ```
 
 `nix-secrets` has no `publish.verify`, so the verification above is manual and
-must be recorded in `EVIDENCE.md`. The next tag is **`v0.1.1`**: `v0.1.0`
-already names `58ae4ab1`, which is not on trunk (`DESIGN.md` §10).
+is recorded in `EVIDENCE.md` §8. Trunk moved `b1983547` → `f1aba8e2`.
+
+**Only the release remains.** `gitman release` refuses: `nix-secrets` has no
+`pyproject.toml`, so `uv version --short` fails and no tag can be cut. This
+is blocker B4 — see §B4 below and `DESIGN.md` §12. The next tag, once B4 is
+resolved, is still **`v0.1.1`**: `v0.1.0` already names `58ae4ab1`, which is
+not on trunk (`DESIGN.md` §10).
 
 ### C5. Activate the secret on `server` **[ready, needs C4]**
 

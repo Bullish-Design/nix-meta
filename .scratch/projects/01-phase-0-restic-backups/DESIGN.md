@@ -297,6 +297,9 @@ declaration, through `v0.1.0`. Only the encrypted material is missing.
 a lock file is a published fact. `v0.1.0` stays as a historical tag whose
 commit is not an ancestor of trunk.
 
+The lane has since landed and pushed. The release has not: `gitman release`
+has no version source to read in `nix-secrets`. See §12.
+
 ---
 
 ## 11. Schedule
@@ -314,3 +317,44 @@ Retention: `--keep-daily 7 --keep-weekly 4 --keep-monthly 6`, run as
 `TimeoutStartSec=infinity`, `IOSchedulingClass=idle` and `Nice=10` on the
 backup and check units: the first run copies about 107 GiB to a 5400 rpm disk
 while the host keeps serving.
+
+---
+
+## 12. Tagging nix-secrets
+
+`gitman release` cannot tag `nix-secrets`. It refuses:
+
+```
+Gitman release — REFUSED
+reason: uv version --short failed: error: No `pyproject.toml` found in current directory or any parent directory
+```
+
+`gitman/src/gitman/init.py:49`: "no pyproject.toml version — version/release
+need a uv project". `gitman release --version 0.1.1` refuses the same way, so
+an explicit version does not bypass the `uv` read. This is by design.
+
+Three options. Each is described below with its trade-off. None is
+recommended over the others; the choice is the user's, because it sets a
+fleet-wide convention (see `IMPLEMENTATION.md` §B4).
+
+**Option 1 — add a minimal `pyproject.toml` and `uv.lock` to `nix-secrets`.**
+`gitman release` then works, and all version control stays inside `gitman`.
+`nix-secrets/devenv.nix` already configures `languages.python` with a
+uv-managed venv, so the files are not foreign to the repository. The cost:
+a Python project file in a repository that ships only Nix modules and shell
+scripts. The same question then applies to `nix-meta`, `nixos-core`,
+`nix-terminal` and `nixbuild`, none of which has a `pyproject.toml` either.
+
+**Option 2 — tag by hand with raw `git tag -a`, once per release.** This
+matches what `nix-nvim` and `nix-paseo` already do. The cost: it breaks the
+standing rule that all version control goes through `gitman`, and a
+hand-made tag is not gated by `publish.verify`.
+
+**Option 3 — pin by `rev` instead of by tag.** Change the `nix-meta` input to
+`git+file:///home/andrew/Documents/Projects/nix-secrets?rev=<commit>`. A rev
+is immutable, so it gives a stronger guarantee than a tag, which can be
+moved. It needs no tag and no raw `git`. The cost: it departs from the
+`?ref=refs/tags/vN` convention that Phase B plans to use for every depot
+input, and a rev carries no human-readable version.
+
+Option 3 is the only one that needs neither a new file nor a rule exception.
