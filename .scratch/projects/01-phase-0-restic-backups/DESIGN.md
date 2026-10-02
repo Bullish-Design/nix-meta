@@ -41,18 +41,18 @@ as a replacement for the primary disk. It solves single-disk risk: with a
 second copy, no single drive failure loses the only backup.
 
 **The point the NAS does not solve, stated plainly.** A second copy removes
-single-disk risk. It does not remove the key-recovery circularity described
-in §3. Both copies would still be encrypted to `restic-password`, and that
-secret is encrypted only to two keys that live on the host the backup
-protects. Losing the host locks both copies — the NAS copy included. Off-host
-escrow or a third SOPS recipient (§3) is still required before the backup can
-be relied on for host loss. Adding a NAS does not change this; only §3's
-decision does.
+single-disk risk. It does not add confidentiality. The repository is
+passwordless (§2): anyone who obtains either copy's files can read it, with
+no key to lose and no key to steal. A second copy on a NAS is equally
+readable by anyone who obtains it. Protection there rests on storage-side
+access control and on append-only or object-lock mechanisms, not on
+repository encryption. See §3 for why the former key-recovery circularity no
+longer applies.
 
 `/mnt/shared` stays out of Phase 0. It is declared at
 `machines/server.nix:620` as an `ntfs3` automount and holds 129 GiB of
 unadjudicated data. Phase F stays blocked until that data has its own verified
-policy. `profiles/backup.nix:614` asserts that the repository is not under
+policy. `profiles/backup.nix:628` asserts that the repository is not under
 `/mnt/shared`.
 
 The profile is enabled on the host: `machines/server.nix:668` sets
@@ -62,153 +62,129 @@ the decision above.
 ### No repository initialization is needed
 
 The repository at `/mnt/wd_green1/restic` already exists. There is nothing to
-initialize. `profiles/backup.nix:415` sets `initialize = false`, and that
+initialize. `profiles/backup.nix:429` sets `initialize = false`, and that
 setting stays permanent — it was never conditional on which disk is primary.
 
-The path to a working backup from here is three steps, in order:
-
-1. Adjudicate the existing repository **read-only** — confirm it opens and
-   list its snapshots, without writing to it.
-2. Replace the repository's current empty password (`--insecure-no-password`)
-   with a real one, using restic's add/verify/remove key sequence.
-3. Activate the profile by giving `restic-password` encrypted material in
-   `nix-secrets` (§2).
+The repository was created with `--insecure-no-password` (see §2): it needs
+no key sequence and no secret. The path to a working backup from here is one
+step: adjudicate the existing repository **read-only** — confirm it opens and
+list its snapshots, without writing to it. `IMPLEMENTATION.md` step C1 is
+that step.
 
 ---
 
 ## 2. Where the secret comes from
 
-**Decision.** `restic-password`, delivered by sops-nix to
-`/run/secrets/restic-password` as `root:root 0400`. The profile reads the
-path, never the value.
+**Decision.** There is no secret. The repository is passwordless: every
+restic invocation carries `--insecure-no-password`, injected by a wrapped
+restic package (`profiles/backup.nix:60`, `resticPackage`). This is the
+user's decision, reaffirmed after review. It is implemented, not
+re-argued, here.
 
-`nix-secrets` is the naming authority. The name is declared at
-`nix-secrets/modules/secrets.nix:49`, inside the `canonicalNames` list that
-starts at `:39`.
+**What `--insecure-no-password` does and does not mean.** The repository
+format stays the standard restic encrypted format internally. What changes
+is the key: it is derived from nothing, instead of from a passphrase. So
+possessing the repository files is equivalent to possessing the data —
+there is no secret standing between an attacker (or an operator) and the
+plaintext. `--insecure-no-password` means no password to create, distribute,
+or lose. It does not mean plaintext repository files, disabled encryption,
+or removed encryption CPU cost. The honest description is "passwordless
+restic repositories, not unencrypted restic repositories."
 
-`nix-secrets` filters active names that have no encrypted material:
+**The accepted trade-off.** Removing the password removes the password
+lifecycle entirely: no key to generate, no key to distribute, no key to
+escrow, no key to lose, no recovery design needed for it. In exchange, the
+repository's confidentiality now depends entirely on who can read the
+repository's files — filesystem permissions on the local disk today, and
+storage-side access control on any future second copy. This is the
+trade-off the user chose, with the reasoning stated above. See §3 for the
+recovery-design consequence, and the note under §1 above for the planned
+NAS.
 
-- `nix-secrets/modules/secrets.nix:121` — `availableKeys`, read from the
-  cleartext key names in `secrets.yaml`
-- `:128` — `missingKeys`
-- `:133` — `effectiveNames`, which drops a missing key with a warning
+**The restic module's assertion.** `services.restic.backups.<name>` asserts
+`passwordFile != null || environmentFile != null`
+(`nixpkgs/nixos/modules/services/backup/restic.nix:385`). Like the
+`pg_hba.conf` anchors in §9, this one points into nixpkgs, an external
+pinned dependency, and moves whenever that pin moves. This profile sets
+`environmentFile` to an empty store file (`profiles/backup.nix:73`,
+`emptyEnvironment`) and never sets `passwordFile`, satisfying the assertion
+without any secret material.
 
-So `config.sops.secrets."restic-password"` can be **absent at evaluation
-time**. Reading `.path` on an absent secret is an evaluation error, not a
-warning. `profiles/secrets.nix:10` already solves this for
-`deepseek-api-key`, and `profiles/backup.nix:45` uses the same guard:
+**Why a wrapped package, not a per-invocation flag.** The NixOS restic
+module does not expose `--insecure-no-password` as an option, and it invokes
+restic for several different operations — `init`, `backup`, `unlock`,
+`forget`, `prune`, `check` — through `lib.getExe backup.package`, and again
+for the generated operator wrapper. `profiles/backup.nix:60` wraps `restic`
+with `pkgs.symlinkJoin` plus `makeWrapper`, so every one of those
+invocations carries the flag, with no gap an added operation could fall
+through.
 
-```nix
-hasPassword = config.sops.secrets ? "restic-password";
-active = cfg.enable && hasPassword;
-```
-
-`profiles/backup.nix:394` emits a loud warning when the profile is enabled and
-the secret has not arrived. A silently inert backup profile is the failure this
-phase exists to prevent.
-
-The host's active list is `profiles/secrets.nix:27`. It does **not** yet name
-`restic-password`, so nothing on the host reads it.
+`nix-secrets` keeps `restic-password` declared in its canonical name list
+(`nix-secrets/modules/secrets.nix:49`), unused. Removing a canonical name
+from that inventory is a separate repository's release and is not touched
+here; the name simply has no reader left in `nix-meta`.
+`profiles/secrets.nix:27`'s active list never named it.
 
 ---
 
-## 3. The recovery circle, and how to break it
+## 3. The recovery circularity is dissolved
 
-The age identity IS the host SSH key — `nix-secrets/modules/secrets.nix:156`
-defaults `ageKeySource` to `/etc/ssh/ssh_host_ed25519_key`.
+**Superseded.** This section previously analyzed a key-recovery circularity:
+the `restic-password` secret was encrypted to two SOPS recipients
+(`&tower`, derived from `/etc/ssh/ssh_host_ed25519_key`, and `&author`,
+derived from `~/.ssh/id_ed25519`), both living on the one host the backup
+protects. Losing the host would have locked the backup along with it. The
+analysis went on to cover restic's one-master-key structure, its scrypt KDF
+parameters as measured on this host, the lack of any enforced password
+strength, an EFF-wordlist passphrase-strength recommendation, and a
+three-option comparison (a human-held recovery key, off-host password-manager
+escrow, and a third off-host SOPS recipient), recommending the latter two
+combined.
 
-The store has two recipients, and **both live on this one host**:
+**Why it changed.** The user chose the passwordless design (§2) instead. With
+`--insecure-no-password`, there is no restic password and no restic key at
+all — nothing to encrypt, nothing to escrow, nothing to recover. The problem
+this section solved no longer exists, because its subject does not exist. The
+whole analysis above is recorded here as history, not deleted silently,
+because a later reader should be able to see what the previous design was and
+why it was replaced rather than wonder where it went.
 
-- `nix-secrets/secrets/.sops.yaml:30` — `&tower`, derived from
-  `/etc/ssh/ssh_host_ed25519_key`
-- `nix-secrets/secrets/.sops.yaml:35` — `&author`, derived from
-  `~/.ssh/id_ed25519`
+**What takes its place.** Confidentiality for the repository now rests
+entirely on who can read its files, not on a key. `profiles/backup.nix`'s
+repository stays `root:root 0700` on the local disk, so the existing
+filesystem permission is the only protection today. The planned NAS, once it
+exists, does not change this: a second copy's files are equally readable by
+anyone who obtains them, because there is still no key standing between the
+files and the data. Protection for a remote or second copy must come from
+storage-side access control and from append-only or object-lock mechanisms,
+not from repository encryption — the "Authentication Model" and
+"Local + Remote Strategy" sections of the source concept document describe
+this split: repository-level credentials (none, here) are a separate
+question from backend/transport authentication (SSH keys, access
+credentials, and so on), which still applies normally to any remote backend
+added later.
 
-That is a circle. The backup needs the restic password. The password is
-encrypted to keys that only exist on the host the backup protects. Lose the
-host and the backup cannot be opened.
+**Consequence for `nix-secrets`.** `restic-password` stays declared in
+`nix-secrets`'s canonical name inventory
+(`nix-secrets/modules/secrets.nix:49`), unused, by deliberate choice (§2).
+Blocker B3 (an off-host SOPS recipient for this secret) is resolved by this
+same change: there is no secret left for it to protect, so the blocker is
+retired, not merely deferred. `IMPLEMENTATION.md` §B marks it so.
 
-**The structural fact about restic keys.** A restic repository has exactly
-one master key. Every entry under `keys/` wraps that same master key under a
-per-key scrypt-derived key. `internal/repository/key.go`'s `AddKey()` copies
-the existing master key when `key add` runs; it cannot mint a new one. So any
-key grants bit-identical access to the same plaintext, whatever its own
-password strength. A repository is only as strong as its weakest key. This is
-the repository format, not a setting.
-
-**The KDF, measured on this host.** restic derives each key with scrypt, from
-`github.com/elithrar/simple-scrypt`, via `internal/crypto/kdf.go`.
-`internal/repository/key.go` sets `KDFTimeout = 500ms` and `KDFMemory = 60`
-MiB, and recalibrates on every `key add`. On this host (a Xeon W-2125),
-`key add` wrote `N=32768, r=8, p=6` into the key file — about 32 MiB per
-guess. The calibration targets wall-clock time on the machine that ran
-`key add`, not a security margin, so the parameters are chosen to feel
-instant to the operator. An attacker pays the recorded `N/r/p` forever: the
-parameters sit in the key file in cleartext, by necessity.
-
-**Restic enforces no password strength.** A key with password `1234` was
-accepted with exit 0 and no warning. An empty password is possible with
-`--new-insecure-no-password`. The strength of a human-held key is entirely
-the human's responsibility.
-
-**Required passphrase strength, with the reasoning.** Cost-per-guess is fixed
-once the key is written, so keyspace is the only lever left. The EFF long
-wordlist has 7776 words, about 12.925 bits per word: 6 words ≈ 77.5 bits,
-7 ≈ 90.5 bits, 8 ≈ 103.4 bits. Even at a deliberately pessimistic 10^9
-guesses per second — far beyond what 32 MiB memory-hard scrypt realistically
-allows — a 7-word phrase needs about 1.3×10^18 seconds to exhaust. That
-attacker-throughput figure is an order-of-magnitude assumption, not a
-measurement; no GPU benchmark was run. **Recommend 7 words. Never fewer than
-6. Generate the phrase by dice or a tool. Never invent it by hand.**
-
-**The three options, compared.**
-
-| Option | What it stores | What can leak | Survives host loss | Ongoing maintenance | Adds a new restic credential? |
-|---|---|---|---|---|---|
-| 1. A second restic key, passphrase held by a human | Nothing — the phrase lives only in a person's memory | The phrase, if coerced or guessed | Yes | None | **Yes** — per the structural fact above, it is a new, independently-crackable key |
-| 2. Escrow the random password in an off-host password manager | The exact generated secret, in a third-party vault | That vendor account, or a vendor breach | Yes | Renew vault access over time | No — it is the same credential, not a new one |
-| 3. A third age recipient on separate hardware | An age keypair, private half off-host | Loss or clone of that device | Yes | Update `.sops.yaml` and run `updatekeys` on change; the device must stay reachable for years | No — it operates at the SOPS layer and never touches restic's key list |
-
-Option 1 is the only one that adds a new attackable credential to the restic
-repository. It also has no redundancy: the phrase lives only in one person's
-memory, so forgetting it, or that person being unavailable, permanently
-loses that path. Severity is **high** if it is the sole recovery mechanism.
-Treat it as a supplementary path only, never as the only one.
-
-**Recommendation.** Combine options 2 and 3; together they are the real
-recovery path. Prove option 3 decrypts, with the real path to the off-host
-identity in place of the placeholder:
-
-```bash
-SOPS_AGE_KEY_FILE=/path/to/off-host-identity \
-  sops -d secrets/secrets.yaml > /dev/null
-```
-
-Option 1 is optional convenience on top of options 2 and 3. If adopted, it is
-a second, parallel unlock path, not a backup of the first.
-
-An earlier draft of this design called option 1 the cleanest fix, on the
-grounds that it has "nothing to leak." That was wrong on both counts: the
-structural fact above means option 1's key is exactly as strong, and exactly
-as weak, as every other key in the repository, and a memory-only passphrase
-is itself a single point of failure.
-
-No off-host recipient exists today and none was invented. This is recorded as
-blocker B3 in `IMPLEMENTATION.md`. `nix-secrets/RUNBOOK.md` §3a states the
-same constraint for the next reader.
-
-**Phase E consequence.** A fresh install generates a NEW host key, and sops-nix
-then cannot decrypt anything. `/etc/ssh/ssh_host_ed25519_key` must be restored
-before the first activation on the replacement system. The restore gate in §7
-therefore includes that exact file. Its contents are never displayed or
-recorded.
+**Phase E note, unaffected by this change.** A fresh install still generates
+a NEW host SSH key, and the rest of the `nix-secrets` store (the other nine
+canonical secrets) is still encrypted to that host's identity, for reasons
+that have nothing to do with restic. `/etc/ssh/ssh_host_ed25519_key` must
+still be restored before the first activation on a replacement system, for
+those other secrets. The restore gate in §7 includes that file for that
+reason, unrelated to this section's former subject.
 
 ---
 
 ## 4. The preflight check
 
 **Decision.** No restic command runs until five conditions hold. The script is
-`profiles/backup.nix:68`, shared by the backup unit (as
+`profiles/backup.nix:95`, shared by the backup unit (as
 `backupPrepareCommand`, which lands first in `preStart`) and by the check unit
 (as `ExecStartPre`).
 
@@ -218,7 +194,7 @@ recorded.
 | 2 | the mount is not the root filesystem | the root filesystem is 95% full |
 | 3a | the repository directory exists | this profile never initializes a repository |
 | 3b | the repository directory holds a `config` file | a directory with no `config` is not a repository at all |
-| 4 | the password file exists and is `root:root 400` | a different owner or mode means something else wrote it |
+| 4 | the repository actually opens (`restic cat config`) | proves the repository is readable, not merely that a path exists — there is no password file to check in this design |
 | 5 | the cache directory is on the backup disk | the module's default puts the cache on the root filesystem |
 
 Condition 2 is implied by condition 1. It stays because a disagreement between
@@ -231,8 +207,8 @@ see `EVIDENCE.md` §5.
 ### Classifying a missing repository (3a and 3b)
 
 Conditions 3a and 3b are not merely two more `fail` calls. Each writes a
-distinct marker before failing, at `profiles/backup.nix:87` (the
-`write_needs_init` helper) and `:134`-`:141` (the two call sites):
+distinct marker before failing, at `profiles/backup.nix:113` (the
+`write_needs_init` helper) and `:159`-`:166` (the two call sites):
 
 | Sub-case | `needs-init` `status` field | Why reported differently |
 |---|---|---|
@@ -242,10 +218,10 @@ distinct marker before failing, at `profiles/backup.nix:87` (the
 The marker (`/var/lib/restic-backup-status/needs-init`, written by
 `write_needs_init`) carries the repository path, the mount point, the
 timestamp, the sub-case, and the exact operator command to run — the same
-`restic init` invocation form used in `IMPLEMENTATION.md` steps C1b/C6
-(`nix build` to resolve the `restic` binary, then `--repo`/`--password-file`),
+`restic init` invocation form used in `IMPLEMENTATION.md` step C1
+(`nix build` to resolve the `restic` binary, then `--insecure-no-password`),
 quoted so it is safe to paste into zsh. It is cleared only on success,
-alongside `last-failure` (`profiles/backup.nix:219`).
+alongside `last-failure` (`profiles/backup.nix:246`).
 
 **Condition 1 (and 2) never write this marker.** `write_needs_init` is called
 only from the 3a/3b branches. A missing disk is not a missing repository:
@@ -253,7 +229,7 @@ telling the operator to run `restic init` against an unmounted path is the
 exact failure `initialize = false` exists to prevent. This boundary was
 tested directly; see `EVIDENCE.md` §5.
 
-`profiles/backup.nix:251` adds `RequiresMountsFor` for the mount point to every
+`profiles/backup.nix:278` adds `RequiresMountsFor` for the mount point to every
 unit, so systemd refuses to start them when the mount is not there.
 
 Step 6 of the script is a plain `restic unlock`. Without `--remove-all` it
@@ -267,7 +243,7 @@ Waiting for the preflight check to run means the operator learns about a
 missing repository only when the timer fires — up to a day late. A second,
 independent check runs at every `nixos-rebuild switch`, via
 `system.activationScripts.resticBackupNeedsInitWarning`
-(`profiles/backup.nix:583`). It re-checks the same directory/`config`
+(`profiles/backup.nix:597`). It re-checks the same directory/`config`
 condition and prints the same operator command, but to stderr during
 activation rather than to a marker file.
 
@@ -279,15 +255,16 @@ makes *every* secret on the host undecryptable. A missing restic repository
 blocks only this one backup profile. Refusing to activate the whole system
 over a backup disk that is not ready yet would hold unrelated work hostage,
 and this profile is not important enough to justify that trade. The script is
-gated by the same `active` condition (`cfg.enable && hasPassword`) that gates
-every unit in this profile — it does not exist in `config.system.activationScripts`
-at all when the profile is inactive.
+gated by the same `active` condition (`cfg.enable`, since §2's change removed
+the secret half of that condition) that gates every unit in this profile —
+it does not exist in `config.system.activationScripts` at all when the
+profile is inactive.
 
 ---
 
 ## 5. Never initialize automatically
 
-**Decision.** `initialize = false` at `profiles/backup.nix:415`, permanently.
+**Decision.** `initialize = false` at `profiles/backup.nix:429`, permanently.
 
 The NixOS restic module's `initialize = true` path runs
 `restic cat config || restic init` in `preStart`
@@ -308,17 +285,19 @@ The module hardcodes `RESTIC_CACHE_DIR = "/var/cache/restic-backups-<name>"`
 has 26 GB free of 444 GB.
 
 **Decision.** Override it per unit with `lib.mkForce`
-(`profiles/backup.nix:451` and `:688`), pointing at
-`<mountPoint>/restic-cache`. `profiles/backup.nix:629` asserts the cache is
+(`profiles/backup.nix:465` and `:703`), pointing at
+`<mountPoint>/restic-cache`. `profiles/backup.nix:643` asserts the cache is
 under the mount point.
 
 The module's `CacheDirectory=` still creates an empty
 `/var/cache/restic-backups-system`. It stays empty and costs nothing.
 
 The generated `restic-system` wrapper reads the backup unit's environment, so a
-manual operator command picks up the same repository, password file, and cache.
-That is why no separate global `restic` package is added: a bare `restic` with
-no `RESTIC_*` set is how an operator reaches the wrong repository.
+manual operator command picks up the same repository and cache, and it is
+built from the same wrapped, flag-injecting restic package as the service, so
+it cannot prompt for a password either. That is why no separate global
+`restic` package is added: a bare `restic` with no `RESTIC_*` set is how an
+operator reaches the wrong repository.
 
 ---
 
@@ -336,7 +315,7 @@ Three exact files, chosen because each one proves a different thing:
 
 Each restored file must exist, be non-empty, and match the live file with
 `cmp --silent`. A directory listing does not pass. The command block is
-`IMPLEMENTATION.md` step C5.
+`IMPLEMENTATION.md` step C8.
 
 The gate proves **file restoration**. It does not prove application
 consistency. See §9.
@@ -347,7 +326,7 @@ consistency. See §9.
 
 There is no proven remote notification channel on this host, and none was
 claimed. The signal is local and persistent
-(`profiles/backup.nix:171`, `:210`, `:225`):
+(`profiles/backup.nix:198`, `:237`, `:252`):
 
 | Mechanism | Where |
 |---|---|
@@ -356,11 +335,11 @@ claimed. The signal is local and persistent
 | a journal excerpt of the failed unit | `…/last-failure.log`, mode 0600, because it names paths under `/home` |
 | a journal error | `logger -t restic-backup -p daemon.err`, folding in the needs-init guidance when that marker is present |
 | live terminal sessions | `wall`, likewise folding in the needs-init guidance |
-| the next interactive login | `environment.interactiveShellInit`, `profiles/backup.nix:553`, prints both markers when present |
-| `nixos-rebuild switch` activation | `system.activationScripts.resticBackupNeedsInitWarning`, `profiles/backup.nix:583` — see §4 |
+| the next interactive login | `environment.interactiveShellInit`, `profiles/backup.nix:567`, prints both markers when present |
+| `nixos-rebuild switch` activation | `system.activationScripts.resticBackupNeedsInitWarning`, `profiles/backup.nix:597` — see §4 |
 | a stalled schedule | `restic-backup-health`, daily, fails past 36 hours |
 
-The marker is cleared only by a success (`profiles/backup.nix:210`), which
+The marker is cleared only by a success (`profiles/backup.nix:237`), which
 also clears `needs-init`. The failure recorder is a templated unit reached by
 `OnFailure=restic-backup-failure@%n.service`; it carries no `OnFailure` of its
 own, so it cannot recurse.
@@ -369,10 +348,10 @@ own, so it cannot recurse.
 
 A missing or invalid repository (preflight conditions 3a/3b, §4) is no longer
 indistinguishable from any other failure. `write_needs_init`
-(`profiles/backup.nix:87`) records the repository path, the mount point, the
+(`profiles/backup.nix:113`) records the repository path, the mount point, the
 timestamp, the sub-case (`directory-missing` or `config-missing`), and the
 exact `restic init` command to run — quoted for zsh — before the unit fails.
-`restic-backup-failure` (`profiles/backup.nix:171`) then folds that guidance
+`restic-backup-failure` (`profiles/backup.nix:198`) then folds that guidance
 into both the journal error and the `wall` message, and the login hook
 (above) prints the marker's contents directly. The activation-time warning in
 §4 reaches the same information through an independent path, at
@@ -380,7 +359,7 @@ into both the journal error and the `wall` message, and the login hook
 
 A per-run alert cannot see a backup that stopped running at all. The health
 timer is for that case, and it carries **no** `RequiresMountsFor`
-(`profiles/backup.nix:499`) so it still runs and still fails when the disk is
+(`profiles/backup.nix:513`) so it still runs and still fails when the disk is
 gone.
 
 ### Explicit failure behaviour
@@ -401,7 +380,7 @@ gone.
 (`machines/server.nix:320`, pinned to `postgresql_17`). Atuin uses it.
 Copying live cluster files is **not** a valid database backup.
 
-`profiles/backup.nix:652` adds a logical `pg_dumpall` stream into the same
+`profiles/backup.nix:665` adds a logical `pg_dumpall` stream into the same
 repository, behind `nix-meta.backup.postgres.enable`, default off. The owner
 question is settled: the generated `pg_hba.conf` carries
 `local all postgres peer map=postgres` and the default `identMap` maps only
@@ -426,7 +405,7 @@ running container's volume does not prove application consistency. This has no
 solution yet and must be settled before Phase E.
 
 **Docker layers.** `/var/lib/docker/overlay2` and `/var/lib/docker/buildkit`
-are excluded (`profiles/backup.nix:324`). Images are rebuildable from their
+are excluded (`profiles/backup.nix:351`). Images are rebuildable from their
 sources; the build cache alone was 36.37 GB. Named volumes stay in.
 
 ---

@@ -1,7 +1,9 @@
 # Phase 0 implementation — ordered steps
 
 Legend: **[done]** verified in `EVIDENCE.md` · **[blocked]** needs an operator
-action · **[ready]** the command exists and runs once its blocker clears.
+action · **[ready]** the command exists and runs once its blocker clears ·
+**[superseded]** the step was written for the password-based design and is
+no longer needed; kept, struck through, as history.
 
 Run every version-control action through Gitman, from Gitman's own environment:
 
@@ -51,10 +53,10 @@ pass with the profile in the composition; see `EVIDENCE.md` §6.
 
 ## B. Blockers — operator actions
 
-Two blockers remain: B2 (interactive `sudo`) and B3 (the off-host SOPS
-recipient). B1 is resolved by decision, not by hardware. B4 was resolved
-earlier by a hand-made tag. Numbering stays as originally assigned; no
-blocker number is reused or dropped.
+One blocker remains: B2 (interactive `sudo`). B1 is resolved by decision,
+not by hardware. B3 is resolved by the passwordless design, not by an
+off-host recipient. B4 was resolved earlier by a hand-made tag. Numbering
+stays as originally assigned; no blocker number is reused or dropped.
 
 ### B1. Target disk **[resolved: decision]**
 
@@ -109,33 +111,15 @@ sudo: a password is required
 The journal shows a session at `Oct 01 21:50:29` hitting the same refusal, so
 this is not new. Run the privileged steps from an interactive terminal.
 
-### B3. An off-host SOPS recipient **[blocked: decision]**
+### B3. An off-host SOPS recipient **[resolved: passwordless design]**
 
-Both current recipients live on this host. See `DESIGN.md` §3. Nothing was
-invented and no recipient was added.
-
-Decide one of these and report which:
-
-**Option 1 — a laptop or other host.** Run on that machine:
-
-```bash
-cd ~/Documents/Projects/nix-secrets
-devenv shell -- ./scripts/bootstrap-age-key    # prints one age1… line
-```
-
-Send the `age1…` line. It is a public key; it is safe to paste.
-
-**Option 2 — a hand-held age key kept off this box.** On any machine:
-
-```bash
-age-keygen -o restic-recovery.key     # keep the file OFF this host
-age-keygen -y restic-recovery.key     # the age1… line to send
-```
-
-**Option 3 — password-manager escrow only, no third recipient.** State this
-explicitly. The password is then readable once with
-`sops -d --extract '["restic-password"]'` and must be stored off-host by hand.
-Option 3 alone leaves no way to decrypt the rest of the store after host loss.
+Superseded, not merely deferred. This blocker existed because both SOPS
+recipients for `restic-password` lived on the host the backup protects
+(`DESIGN.md` §3, prior text, kept there as history). The user chose the
+passwordless design instead: there is no `restic-password` secret, so there
+is nothing for an off-host recipient to protect. No recipient was added,
+and none needs to be. See `DESIGN.md` §2 and §3 for the resolution and its
+trade-off.
 
 ### B4. A version source for `nix-secrets`, so it can be tagged **[resolved: hand tag]**
 
@@ -195,200 +179,94 @@ sudo "$restic_bin" --repo /mnt/wd_green1/restic --insecure-no-password \
   --no-lock --no-cache stats latest --mode restore-size
 ```
 
-- **All three succeed** → keep the repository as the secondary copy and secure
-  it in C2. Do not create a second repository beside it.
+- **All three succeed** → keep the repository as-is, on its original
+  `--insecure-no-password` key (`DESIGN.md` §2). There is no key swap to run.
+  Do not create a second repository beside it.
 - **The check fails** → leave it exactly as it is, unchanged, and use a clean
   repository on the selected WD Re disk.
 - **Unexpected snapshots or paths appear** → stop and report before anything
   else.
 
-### C1b. Add a human recovery key, while the repository still has no password **[ready, needs B2]**
+### C1b. Add a human recovery key, while the repository still has no password **[superseded]**
 
-This step must run before C4, while the repository's only key is still the
+Superseded: the passwordless design (`DESIGN.md` §2, §3) removed the need.
+There is no restic password and no restic key at all, so there is nothing
+for a human-held recovery key to be an alternative to. Kept here, struck
+through, so the prior design is visible in history rather than silently
+gone.
+
+~~This step must run before C4, while the repository's only key is still the
 empty `--insecure-no-password` key from C1. It adds a second restic key whose
 passphrase a human holds — the supplementary path from `DESIGN.md` §3, not
 the primary recovery path. Run it before C2 removes the empty key, because
-this step authenticates against that same empty key.
+this step authenticates against that same empty key.~~
 
-```bash
-restic_bin="$(nix build --no-link --print-out-paths 'nixpkgs#restic')/bin/restic"
-repo=/mnt/wd_green1/restic
-
-sudo "$restic_bin" --repo "$repo" --insecure-no-password \
-  key add --user RECOVERY_USER --host RECOVERY_HOST
-```
-
-Replace `RECOVERY_USER` and `RECOVERY_HOST` with values that will still be
+~~Replace `RECOVERY_USER` and `RECOVERY_HOST` with values that will still be
 readable in five years. `key list` shows only `ID / User / Host / Created`,
 with the current key marked `*` — there is no label or purpose field, so
-`--user` and `--host` are the only way to tell keys apart later.
+`--user` and `--host` are the only way to tell keys apart later.~~
 
-**Run this at a genuine interactive terminal.** A console or a normal SSH
-session is fine; a script that pipes stdin is not. Omitting
-`--new-password-file` makes restic prompt twice with echo disabled, through
-`golang.org/x/term.ReadPassword` — a pty transcript confirmed the typed
-phrase appears nowhere in the output. But with stdin redirected from a
-non-TTY, restic silently falls back to reading one **unmasked** line from
-stdin. The passphrase itself must be 7 words from the EFF long wordlist,
-never fewer than 6, generated by dice or a tool — never invented by hand
-(`DESIGN.md` §3).
+~~Run this at a genuine interactive terminal. A console or a normal SSH
+session is fine; a script that pipes stdin is not. The passphrase itself
+must be 7 words from the EFF long wordlist, never fewer than 6, generated by
+dice or a tool — never invented by hand.~~
 
-**Timing and locking, both verified.** `key add` takes a non-exclusive
-append lock (`openWithAppendLock` in `cmd/restic/cmd_key_add.go`), so it is
-safe to run while a backup is in progress. `key add` is also O(1) in
-repository size: it only rewraps the master key and writes one small file,
-and never touches data, index, or pack files. Measured 3.5 s on a 372 MiB
-repository and 3.6 s on an empty one — the time is entirely the one-time
-scrypt calibration. Adding this key to the 59 GB repository will take
-seconds, not hours. A wrong password on any later login attempt exits
-**12**, confirmed.
+### C2. Give the WD Green repository a real password **[superseded]**
 
-### C2. Give the WD Green repository a real password **[ready, needs B2 and C4]**
+Superseded: the passwordless design (`DESIGN.md` §2) removed the need. The
+repository stays on its original `--insecure-no-password` key; there is no
+add/verify/remove key swap to perform.
 
-Add, verify, then remove. Never a blind replacement, and never remove the old
-key before the new one is proved. If C1b already ran, `key list` in step 1
-shows the empty key and the recovery key together — remove only the empty
-one; the recovery key is untouched by this sequence.
+~~Add, verify, then remove. Never a blind replacement, and never remove the
+old key before the new one is proved.~~
 
-```bash
-restic_bin="$(nix build --no-link --print-out-paths 'nixpkgs#restic')/bin/restic"
-repo=/mnt/wd_green1/restic
+### C3. Add the off-host recipient **[superseded]**
 
-# 1. Record the current key ID (or IDs, if C1b already added the recovery
-#    key). Keep this output.
-sudo "$restic_bin" --repo "$repo" --insecure-no-password key list
+Superseded: the passwordless design (`DESIGN.md` §3) removed the need. There
+is no `restic-password` secret left for an off-host recipient to protect, so
+blocker B3 is resolved by this same change, not merely deferred — see §B3
+above.
 
-# 2. Add a key from the decrypted password file.
-sudo "$restic_bin" --repo "$repo" --insecure-no-password \
-  key add --new-password-file /run/secrets/restic-password
+~~Add the off-host recipient from B3 to `secrets/.sops.yaml`, then re-encrypt
+the whole store to the new recipient set, and prove the off-host identity
+can open it.~~
 
-# 3. Prove the password-file form opens the repository.
-sudo "$restic_bin" --repo "$repo" \
-  --password-file /run/secrets/restic-password snapshots
+### C4. Provision `restic-password` **[superseded]**
 
-# 4. Remove the old empty-password key only. Replace OLD_ID with its exact
-#    ID from step 1. Angle brackets are shell redirections, so the
-#    placeholder here must stay unbracketed. Nothing else touches the
-#    repository during this step: key remove takes an exclusive lock
-#    (openWithExclusiveLock in cmd/restic/cmd_key_remove.go).
-sudo "$restic_bin" --repo "$repo" \
-  --password-file /run/secrets/restic-password key remove OLD_ID
+Superseded: the passwordless design (`DESIGN.md` §2) removed the need. No
+value was ever generated for this secret, and none needs to be.
 
-# 5. Prove the empty password no longer works. Expect exit code 12.
-sudo "$restic_bin" --repo "$repo" --insecure-no-password snapshots
-echo "exit=$?"   # 12 means the repository refused the empty password
-```
+~~Generate the secret straight into the `nix-secrets` store, verify, land, and
+push; then tag the release and re-pin `nix-meta` to it.~~
 
-Removing the empty key does not disturb the recovery key or the passphrase
-key, verified: restic refuses to remove the key you are currently
-authenticated as, and `internal/repository/key.go`'s `RemoveKey()` has no
-last-key counter. The protection is structural — the final key in a
-repository can never be removed by any path.
+The one piece of this step that did happen for an unrelated reason —
+`nix-secrets` is tagged `v0.1.1` (annotated tag, tag object `3ecc2a60`,
+commit `f1aba8e2`) and `nix-meta` is pinned to it — stays true and is
+unaffected by this change: both tags declare the same `restic-password`
+name in `nix-secrets`'s canonical inventory, and that declaration is simply
+unused now (`DESIGN.md` §2). See `EVIDENCE.md` §8 for the historical
+before/after record of that re-pin.
 
-Record both key IDs in `EVIDENCE.md`. Record neither password.
+### C5. Activate the secret on `server` **[superseded]**
 
-### C3. Add the off-host recipient **[ready, needs B3]**
+Superseded: the passwordless design (`DESIGN.md` §2) removed the need.
+There is no secret to activate. `nix-meta.backup.enable = true`
+(`machines/server.nix`) already creates real backup units on its own, with
+no `nix-secrets.secrets.activeNames` entry and no `sops.secrets` entry
+required.
 
-Lane `phase-0-restic-password` has since landed and pushed as part of step
-C4; see `EVIDENCE.md` §8. Only B3's decision and this re-encryption step
-remain open.
+~~Add `"restic-password"` to `nix-secrets.secrets.activeNames`, verify, land
+and push, then prove the secret arrived at `/run/secrets/restic-password`.~~
+Steps 1 and 2 of the original step (the `v0.1.1` re-pin) happened for an
+unrelated reason and are unaffected; see C4 above.
 
-```bash
-# 1. Add the off-host recipient from B3 to secrets/.sops.yaml, then re-encrypt
-#    the whole store to the new recipient set.
-cd ~/Documents/Projects/nix-secrets
-devenv shell -- ./scripts/secret-rotate --updatekeys
-
-# 2. Prove the off-host identity can open the store. The value is discarded.
-#    Replace /path/to/off-host-identity with the real path to the off-host
-#    age private-key file.
-SOPS_AGE_KEY_FILE=/path/to/off-host-identity \
-  devenv shell -- sops -d secrets/secrets.yaml > /dev/null && echo OFF_HOST_OK
-```
-
-### C4. Provision `restic-password` **[landed, pushed, released, re-pinned]**
-
-The secret was generated straight into the store. Nobody read it, and it
-never reached a terminal, a log, or a shell history:
-
-```bash
-cd ~/Documents/Projects/nix-secrets
-head -c 32 /dev/urandom | base64 -w0 \
-  | devenv shell -- ./scripts/secret-add restic-password
-
-devenv shell -- ./scripts/secret-ls | grep restic-password   # STORE must read "yes"
-```
-
-Verified, landed and pushed:
-
-```bash
-cd ~/Documents/Projects/nix-secrets && nix flake check --no-build
-
-cd ~/Documents/Projects/gitman && devenv shell -- bash -c '
-  cd ~/Documents/Projects/nix-secrets &&
-  gitman land && gitman push'
-```
-
-`nix-secrets` has no `publish.verify`, so the verification above is manual and
-is recorded in `EVIDENCE.md` §8. Trunk moved `b1983547` → `f1aba8e2`.
-
-**The release has happened.** `gitman release` still cannot tag
-`nix-secrets` — `uv version --short` still fails, blocker B4 (see §B4 above
-and `DESIGN.md` §12). The user tagged by hand instead: `v0.1.1` is an
-annotated tag, tag object `3ecc2a60`, pointing at commit `f1aba8e2`, which is
-`nix-secrets` trunk tip. The tag is pushed to origin. `v0.1.0` is unchanged,
-still at `58ae4ab1`, still not on trunk (`DESIGN.md` §10).
-
-**`nix-meta` now pins it.** `flake.nix:77` reads
-`?ref=refs/tags/v0.1.1`, and `flake.lock`'s `nix-secrets` node locks `ref
-refs/tags/v0.1.1` / `rev f1aba8e2`. Only the `nix-secrets` node moved in the
-lock. This is correctness hygiene, not a functional change: both `v0.1.0`
-and `v0.1.1` carry the same `restic-password` declaration, and the backup
-profile stays inert (`restic-password` still has no encrypted material, so
-no `restic.*` systemd timer exists). See `EVIDENCE.md` §8 for the full
-before/after record.
-
-### C5. Activate the secret on `server` **[ready, needs C4]**
-
-A separate, secret-only `nix-meta` lane, in its own workspace:
-
-```bash
-cd ~/Documents/Projects/gitman && devenv shell -- bash -c '
-  cd ~/Documents/Projects/nix-meta &&
-  gitman start phase-0-activate-restic-secret --workspace'
-```
-
-Steps 1 and 2 below are **already done**, landed on trunk by a separate
-re-pin lane (see C4 and `EVIDENCE.md` §8). Steps 3 through 5 remain.
-
-In that workspace:
-
-1. ~~Point `flake.nix:77` at `?ref=refs/tags/v0.1.1`.~~ **Done.**
-2. ~~`nix flake lock --update-input nix-secrets`.~~ **Done.**
-3. Add `"restic-password"` to `nix-secrets.secrets.activeNames` at
-   `profiles/secrets.nix:27`.
-4. Verify, then land and push:
-
-```bash
-nix flake check --no-build
-nix eval --raw '.#nixosConfigurations.server.config.system.build.toplevel.drvPath' > /dev/null
-sudo nixos-rebuild switch --flake '.#server'
-```
-
-5. Prove the secret arrived. This is the gate for step C6:
-
-```bash
-sudo stat -c '%n %U:%G %a' /run/secrets/restic-password
-# must print: /run/secrets/restic-password root:root 400
-```
-
-### C6. Confirm the repository, do not initialize one **[ready, needs B2, C2, C5]**
+### C6. Confirm the repository, do not initialize one **[ready, needs B2]**
 
 There is nothing to initialize. The repository at `/mnt/wd_green1/restic`
-already exists (C1), and C2 already replaced its empty password with a real
-one. This step is a confirmation, not a write: prove the mount is real, prove
-it is not the root filesystem, and prove the repository responds through the
-password file now that `restic-password` has material (C5).
+already exists (C1), with its original `--insecure-no-password` key. This
+step is a confirmation, not a write: prove the mount is real, prove it is
+not the root filesystem, and prove the repository responds — with no
+password file, since the design is passwordless (`DESIGN.md` §2).
 
 ```bash
 mount=/mnt/wd_green1
@@ -401,21 +279,20 @@ mountpoint -q "$mount" || { echo "ABORT: $mount is not a mount point"; exit 1; }
   || { echo "ABORT: $mount is the root filesystem"; exit 1; }
 echo "target: $repo"; findmnt "$mount"
 
-# Confirm the repository answers through the password file sops-nix wrote.
-sudo "$restic_bin" --repo "$repo" \
-  --password-file /run/secrets/restic-password cat config
+# Confirm the repository answers, passwordless.
+sudo "$restic_bin" --repo "$repo" --insecure-no-password cat config
 ```
 
 **Until this step's repository confirmation holds**, every `nixos-rebuild
 switch` on this host prints the activation-time warning added at
-`profiles/backup.nix:583` (`system.activationScripts.resticBackupNeedsInitWarning`):
+`profiles/backup.nix:597` (`system.activationScripts.resticBackupNeedsInitWarning`):
 a multi-line note to stderr naming the repository path and the exact command
 to create one, then `exit 0`. That is expected, not a fault — it is the same
 loud-but-harmless signal the preflight check gives at run time, just earlier.
 It stops appearing once the repository this step confirms actually exists and
 has a `config` file.
 
-### C7. Activate and inspect **[ready, needs C5, C6]**
+### C7. Activate and inspect **[ready, needs C6]**
 
 The option block itself is already landed on trunk (`machines/server.nix`,
 `nix-meta.backup.enable = true`, `mountPoint = "/mnt/wd_green1"`). This step
@@ -433,20 +310,14 @@ systemctl show restic-backups-system.service \
   -p RequiresMountsFor -p OnFailure -p ExecStart -p ExecStartPost
 ```
 
-Do not dump the unit's full environment: it names the password file path among
-values that can include secrets elsewhere. `systemctl cat` is enough.
-
-**Before `restic-password` has encrypted material**, this rebuild prints the
-profile's own warning and creates no `restic.*` unit at all. That is
-expected — it is the loud-but-inert state the profile is designed to produce,
-not a failure. Units appear only after C4 and C5 give the secret real
-material.
+`systemctl cat` is enough; there is no password file path to avoid dumping.
 
 **Before the repository at `/mnt/wd_green1/restic` is confirmed (C6)**, this
-same rebuild also prints the activation-time missing-repository warning (see
-the note under C6). Once C6's repository exists and C4/C5 have given the
-secret real material, both warnings stop and `systemctl cat` shows the real
-units below.
+same rebuild prints the activation-time missing-repository warning (see the
+note under C6). Once C6's repository confirmation holds, the warning stops
+and `systemctl cat` shows the real units below — which this design creates
+unconditionally once `nix-meta.backup.enable = true`, with no secret-arrival
+gate.
 
 ### C8. The restore gate **[ready, needs C7]**
 
@@ -484,8 +355,9 @@ sudo rm -rf -- "$restore_dir"
 ```
 
 `restic-system` is the wrapper the NixOS module generates. It carries the
-repository, the password file and the cache directory, so the command cannot
-reach a different repository than the service does.
+repository and the cache directory, and it runs the same wrapped,
+flag-injecting restic package as the service, so it cannot reach a
+different repository and cannot prompt for a password.
 
 ### C9. The weekly check **[ready, needs C7]**
 

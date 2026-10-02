@@ -1,5 +1,20 @@
 # Review: Phase 0 restic backups — audit and report only
 
+**Superseded assumption, read this first.** This prompt was written against
+trunk commit `558c3941`, when the backup used a sops-delivered
+`restic-password` secret and was "enabled but inert" pending that secret's
+arrival. A later lane converted the design to passwordless
+(`--insecure-no-password`, `DESIGN.md` §2 and §3; verification in
+`EVIDENCE.md` §14). The commit inventory, the gate assertions, and the
+"two remaining blockers" and "researched recovery design" sections below
+describe the password-based state as it stood that day. They are useful
+history, not current fact: `restic-password` no longer has a reader in
+`nix-meta`, the profile now creates real units unconditionally once
+enabled, and only one blocker (B2, interactive `sudo`) remains. A reviewer
+picking this prompt up fresh should treat every assertion below as
+"true as of `558c3941`" and check `DESIGN.md`/`EVIDENCE.md` §14 for what
+changed since.
+
 Your job is to review the Phase 0 restic-backup work and report where it
 stands. Verify claims against the code, the commits, and the gate. Do not
 implement anything and do not fix anything you find. Produce a report.
@@ -22,11 +37,13 @@ implement anything and do not fix anything you find. Produce a report.
 
 `nix-meta/.scratch/projects/01-phase-0-restic-backups/NEXT-SESSION-KICKOFF.md`
 is a separate, already-written prompt for a different session. That session
-investigates and plans the *remaining* work: the two blockers, the untested
+investigates and plans the *remaining* work: the blocker(s), the untested
 preflight/failure/check/restore/postgres units, the umbrella-guide open
-decisions, and Phase B–F sequencing. Read it so you understand what it
-covers, but do not redo its job. Where your review touches the same ground
-— the two blockers, the untested units — state the fact briefly and point at
+decisions, and Phase B–F sequencing. (It originally named two blockers; the
+passwordless conversion resolved one of them — see the note at the top of
+this document.) Read it so you understand what it covers, but do not redo
+its job. Where your review touches the same ground — the blocker(s), the
+untested units — state the fact briefly and point at
 `NEXT-SESSION-KICKOFF.md` for the planning. Your value is verification, not
 planning: did the prior session's claims hold up, and what did it get wrong.
 
@@ -90,12 +107,16 @@ The expected derivation is
 Run both. Quote the flake reference — the shell is zsh. Then additionally
 assert:
 
-- `systemd.timers` filtered for `restic.*` is empty.
-- `systemd.services` filtered for `restic.*` is empty.
-- Exactly one `restic-password` warning fires on evaluation.
-
-The claim under test is "enabled but inert." Prove that combination rather
-than trust the documents.
+- As of `558c3941`: `systemd.timers` filtered for `restic.*` is empty,
+  `systemd.services` filtered for `restic.*` is empty, and exactly one
+  `restic-password` warning fires on evaluation. The claim under test at
+  that commit is "enabled but inert." Prove that combination rather than
+  trust the documents.
+- **If reviewing a later commit** (after the passwordless conversion,
+  `DESIGN.md` §2): the claim under test is the opposite — `restic.*`
+  timers and services are non-empty, and no `restic-password` warning
+  fires at all. Check `EVIDENCE.md` §14 for what that later verification
+  already found, and confirm it rather than assuming it still holds.
 
 ### 3. Audit `profiles/backup.nix` as code
 
@@ -187,7 +208,9 @@ The user chose this disk over waiting for a WD Re drive, accepting its age,
 because a backup on an old disk beats none. A NAS will later hold a second
 copy.
 
-### The two remaining blockers (gating items — call these out explicitly)
+### The two remaining blockers, as of `558c3941` — now one (historical)
+
+As this prompt was originally written:
 
 1. `sudo` needs an interactive password. `sudo -n true` refuses in any
    agent session, so no agent session can do privileged work.
@@ -196,7 +219,21 @@ copy.
    host locks the backup. A NAS second copy does not fix this — both copies
    answer to the same key.
 
-### The researched recovery design (`DESIGN.md` §3, `IMPLEMENTATION.md` C1b)
+**Superseded.** Item 2 is resolved, not merely deferred: the passwordless
+conversion (`DESIGN.md` §2 and §3, `EVIDENCE.md` §14) removed the
+`restic-password` secret entirely, so there is no repository password left
+for an off-host recovery path to protect. Item 1 (`sudo`) is the only
+blocker that still gates anything.
+
+### The researched recovery design — superseded (`DESIGN.md` §3 history, `IMPLEMENTATION.md` C1b)
+
+**This whole subsection describes a design the user later replaced.** The
+passwordless conversion removed the restic password and the restic key
+along with it, so there is no key to recover and this analysis no longer
+applies to anything live. Kept here as the record a later reader should be
+able to find; see `DESIGN.md` §3 for the fuller history and
+`IMPLEMENTATION.md` steps C1b/C2/C3/C4 for how each superseded step was
+marked.
 
 - A restic repository has one master key. Every entry under `keys/` wraps
   that same master key, so any key grants identical access, and a
@@ -263,8 +300,10 @@ Produce a review report with:
 2. **Defects found, ranked by severity.**
 3. **A plain statement of current state** — what exists, what does not,
    what is proven, what is not.
-4. **An ordered list of what to do next**, with the two blockers (`sudo`
-   interactive access, off-host recovery) called out as the gating items.
+4. **An ordered list of what to do next**, with the current blocker(s)
+   called out as the gating item(s) — `sudo` interactive access, and, only
+   if reviewing a commit before the passwordless conversion, off-host
+   recovery.
 5. For anything you could not verify, say so explicitly and say why. An
    honest "unverified" is worth more than a guess.
 6. **End with the single highest-value next action**, stated plainly, with

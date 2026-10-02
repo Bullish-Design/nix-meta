@@ -28,44 +28,37 @@ Also read, before acting: the `gitman`, `writing`, and `my-ai` skills (or the
 equivalent personal-layer skill files in this environment), and each
 repository's own `AGENTS.md`.
 
-## The two decisions that block everything
+## The one decision that blocks everything
 
 Phase 0 — restic backups for host `server` — is written and verified in the
 repository, and the target disk is no longer an open question: the user
 chose `/mnt/wd_green1/restic`, the repository that already exists there,
 instead of waiting for a WD Re disk. `IMPLEMENTATION.md` step B1 is
-**resolved by decision**, not by hardware; see `DESIGN.md` §1. Two operator
-decisions remain. Work out, for each, what the user must decide and what
-evidence would settle it. Do not decide for them; prepare the choice.
+**resolved by decision**, not by hardware; see `DESIGN.md` §1. A second
+decision — repository confidentiality — is also now resolved: the user
+chose a passwordless repository (`--insecure-no-password`, injected by a
+wrapped restic package) instead of a sops-delivered password. See
+`DESIGN.md` §2 and §3. One operator action remains, and it needs no
+decision, only an interactive session:
 
-A NAS is planned as a **second copy location**, once one exists. Do not
-treat it as solving the decision below — see the note after item 2.
+A NAS is planned as a **second copy location**, once one exists. It does
+not change the confidentiality trade-off: a passwordless repository is
+equally readable by anyone who obtains either copy's files. Protection for
+a second copy rests on storage-side access control, not on repository
+encryption. See `DESIGN.md` §3.
 
 1. **`sudo` needs an interactive password.** Every privileged step —
-   mounting, `sops`, `nixos-rebuild` — needs root, and the current session
-   cannot authenticate (`sudo -n true` refuses). This just needs a session
-   where the user can type a password. Note it, do not try to work around
-   it.
+   mounting, `nixos-rebuild` — needs root, and the current session cannot
+   authenticate (`sudo -n true` refuses). This just needs a session where
+   the user can type a password. Note it, do not try to work around it.
 
-2. **No off-host SOPS recipient exists — the important one.** Both current
-   recipients of the encrypted secrets store live on this one host:
-   `&tower` from `/etc/ssh/ssh_host_ed25519_key`
-   (`nix-secrets/secrets/.sops.yaml:30`) and `&author` from
-   `~/.ssh/id_ed25519` (`:35`). The `restic-password` secret that protects
-   the backup is encrypted to these two keys only. Lose the host and the
-   backup cannot be opened — the recovery mechanism depends entirely on the
-   thing it is meant to recover from. `DESIGN.md` §3 and `IMPLEMENTATION.md`
-   step B3 lay out three options: an off-host age recipient on another
-   machine, a hand-held age key kept off this box, or password-manager
-   escrow with no third recipient (which `IMPLEMENTATION.md` warns leaves no
-   way to decrypt the rest of the store after host loss). Lay out the
-   trade-offs of each and recommend one, but let the user choose.
-
-**The planned NAS does not resolve item 2.** A second copy on a NAS removes
-single-disk risk, nothing more. Both copies would still be encrypted to
-`restic-password`, and that secret is still encrypted only to the two
-on-host keys above. Losing the host locks both copies, NAS copy included.
-See `DESIGN.md` §1.
+**Resolved, not open any more: the former off-host-recipient decision.**
+Earlier drafts of this document asked the next session to lay out
+trade-offs for an off-host SOPS recipient protecting `restic-password`.
+That secret no longer exists — the repository is passwordless — so there
+is nothing left for an off-host recipient to protect. `IMPLEMENTATION.md`
+blocker B3 is marked resolved for the same reason. Do not reopen this
+decision; `DESIGN.md` §2 and §3 record why it closed.
 
 ## Group 2 — steps that are written and unit-tested, but never run on the host
 
@@ -82,7 +75,7 @@ interaction, real lock contention).
 Call out two things specifically in your plan:
 
 - The PostgreSQL dump (`nix-meta.backup.postgres.enable`, default off,
-  `profiles/backup.nix:308-330` and `:549-607`) is shipped disabled and
+  `profiles/backup.nix:391-413` and `:665-723`) is shipped disabled and
   unproven. `/var/lib/postgresql` deliberately stays inside the plain file
   backup (`DESIGN.md` §9) until an operator runs
   `systemctl start restic-backups-postgres.service` and confirms a
@@ -198,7 +191,10 @@ must run as the `postgres` OS user (`runuser -u postgres`), never as root.
 ### SOPS and nix-secrets
 
 - Exactly two recipients, both on this host: `&tower` (host SSH key) and
-  `&author` (user SSH key). See item 2 above.
+  `&author` (user SSH key). This was true for `restic-password` before the
+  passwordless conversion; `restic-password` now has no material and is not
+  encrypted to anything (`DESIGN.md` §2). The other nine canonical secrets
+  are unaffected and still follow this fact.
 - `sops` is 3.13.3. `sops set --value-stdin` requires **JSON** on stdin, not
   raw plaintext — this was measured, not assumed.
 - `nix-secrets` tag `v0.1.0` is lightweight and local-only, and names commit

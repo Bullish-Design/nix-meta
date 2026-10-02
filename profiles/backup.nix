@@ -3,13 +3,22 @@
 # A profile, not a machine file: a backup policy is not machine specific. The
 # machine supplies one thing, the target disk, through `nix-meta.backup`.
 #
+# The repository is passwordless. Every restic invocation carries
+# `--insecure-no-password`, injected by a wrapped restic package, below. The
+# repository format stays encrypted; there is simply no password to create,
+# distribute, or lose. See
+# `.scratch/projects/01-phase-0-restic-backups/DESIGN.md` §2 for the
+# trade-off this accepts, and why.
+#
 # WHAT THIS PROFILE REFUSES TO DO
 #
-# It never creates a repository. `initialize = false` is deliberate. An
-# automatic `restic init` against an absent mount writes a fresh, empty
-# repository onto the root filesystem and reports success, which is worse than
-# any failure. Initialization is an operator step, run once, against a mount
-# that has been proved.
+# It never creates a repository. `initialize = false` is deliberate, and it
+# stays permanent — this is the one place this profile diverges from the
+# passwordless design's own source concept, which uses `initialize = true`.
+# An automatic `restic init` against an absent mount writes a fresh, empty
+# repository onto the root filesystem and reports success, which is worse
+# than any failure. Initialization is an operator step, run once, against a
+# mount that has been proved.
 #
 # It never starts a backup it cannot trust. Every run begins with a preflight
 # check that fails the unit before restic opens the repository. See `preflight`
@@ -34,32 +43,50 @@ inputs:
 let
   cfg = config.nix-meta.backup;
 
-  secretName = "restic-password";
+  # Every restic invocation carries `--insecure-no-password`. Per-argument
+  # flags are insufficient: the module runs restic for `init`, `backup`,
+  # `unlock`, `forget`, `prune` and `check`, and it also generates an
+  # operator wrapper (`restic-system` below) from this same package.
+  # Wrapping the binary itself is the only way every one of those
+  # invocations gets the flag.
+  #
+  # The restic module resolves a package to a runnable program with
+  # `lib.getExe`, for both the backup unit's own command and the operator
+  # wrapper. `getExe` falls back to the package's own name when
+  # `meta.mainProgram` is unset, and `symlinkJoin`'s name here is
+  # "restic-no-password" — not a binary under `$out/bin`. `meta.mainProgram`
+  # must name the real one explicitly, or `getExe` resolves to a path that
+  # does not exist.
+  resticPackage = pkgs.symlinkJoin {
+    name = "restic-no-password";
+    paths = [ cfg.package ];
+    nativeBuildInputs = [ pkgs.makeWrapper ];
+    postBuild = ''
+      wrapProgram $out/bin/restic --add-flags "--insecure-no-password"
+    '';
+    meta.mainProgram = "restic";
+  };
 
-  # `profiles/secrets.nix` lists which canonical names this host activates, and
-  # nix-secrets drops an active name that has no encrypted material yet. So the
-  # secret may be absent at eval time. Reading
-  # `config.sops.secrets."restic-password".path` unconditionally would then be
-  # an evaluation ERROR, not a warning — the same trap `hasDeepSeekKey` avoids
-  # in profiles/secrets.nix. Gate on presence and keep the rebuild working.
-  hasPassword = config.sops.secrets ? ${secretName};
-  passwordFile = config.sops.secrets.${secretName}.path or "/run/secrets/${secretName}";
+  # The restic module asserts `passwordFile != null || environmentFile !=
+  # null`. There is no password file in this design, so this empty file
+  # satisfies the assertion while carrying no secret material.
+  emptyEnvironment = pkgs.writeText "restic-empty-environment" "";
 
-  # Both switches must be on. `enable` is the operator's decision that a proved
-  # disk is in the machine; `hasPassword` is the fact that sops will deliver the
-  # key. Either one missing means no units at all.
-  active = cfg.enable && hasPassword;
+  # The profile's own decision to run is now the only switch: there is no
+  # secret to wait for. `enable` is the operator's decision that a proved
+  # disk is in the machine.
+  active = cfg.enable;
 
   statusDir = "/var/lib/restic-backup-status";
   jobName = "system";
 
-  resticBin = "${cfg.package}/bin/restic";
+  resticBin = "${resticPackage}/bin/restic";
 
   # ── Preflight ──────────────────────────────────────────────────────────────
   #
   # Runs before restic touches the repository, in both the backup unit and the
-  # check unit. It reads RESTIC_* from the unit environment, so the two units
-  # cannot drift apart on repository, password file, or cache location.
+  # check unit. The repository, mount point and cache location are baked in at
+  # build time from `cfg`, so the two units cannot drift apart on them.
   #
   # The last step is a plain `restic unlock`. Without `--remove-all` it removes
   # only STALE locks — a lock whose owning process is gone. An active lock held
@@ -76,7 +103,6 @@ let
     mount=${lib.escapeShellArg cfg.mountPoint}
     repo=${lib.escapeShellArg cfg.repository}
     cache=${lib.escapeShellArg cfg.cacheDir}
-    pwfile=${lib.escapeShellArg passwordFile}
 
     # Writes the needs-init marker. Only the two repository sub-cases of
     # condition 3, below, call this — never condition 1 (the mount is
@@ -107,7 +133,7 @@ let
         echo "as a one-time operator step, now that $mount is proved mounted and is"
         echo "not the root filesystem:"
         echo ""
-        echo "  sudo \"\$(nix build --no-link --print-out-paths 'nixpkgs#restic')/bin/restic\" --repo '$repo' --password-file '$pwfile' init"
+        echo "  sudo \"\$(nix build --no-link --print-out-paths 'nixpkgs#restic')/bin/restic\" --repo '$repo' --insecure-no-password init"
       } > ${statusDir}/needs-init
       ${pkgs.coreutils}/bin/chmod 0644 ${statusDir}/needs-init
     }
@@ -140,13 +166,14 @@ let
       fail "$repo exists but holds no restic config file — something created a plain directory here, not a repository. See ${statusDir}/needs-init."
     fi
 
-    # 4. The password file must be present and tight. sops-nix writes it to
-    #    /run/secrets at activation; a wrong owner or mode means something else
-    #    produced it.
-    [ -f "$pwfile" ] || fail "$pwfile is absent. sops did not decrypt ${secretName}."
-    pwmeta="$(${pkgs.coreutils}/bin/stat -c '%U:%G %a' "$pwfile")"
-    [ "$pwmeta" = "root:root 400" ] \
-      || fail "$pwfile is $pwmeta; expected root:root 400."
+    # 4. The repository must actually open. There is no password file to
+    #    check in this design — the repository is passwordless — so this is
+    #    a positive check rather than a file-presence check: it proves the
+    #    repository is readable with the wrapped, flag-injecting restic
+    #    binary, not merely that a path exists. RESTIC_REPOSITORY is already
+    #    set in this unit's environment, by the restic module itself.
+    ${resticBin} cat config > /dev/null \
+      || fail "$repo exists but restic could not open it. See the unit's journal for the restic error."
 
     # 5. The cache must live on the backup disk. The NixOS restic module points
     #    RESTIC_CACHE_DIR at /var/cache, which is on the nearly full root
@@ -257,12 +284,12 @@ in
     enable = lib.mkEnableOption ''
       scheduled restic system backups.
 
-      Turn this on only when all of the following hold, because the units it
+      Turn this on only when both of the following hold, because the units it
       creates assume them: a healthy disk is connected and mounted at
-      `mountPoint`, a restic repository already exists at `repository`, and
-      `restic-password` has encrypted material in nix-secrets AND is listed in
-      `nix-secrets.secrets.activeNames`. Missing material alone does not break
-      the rebuild — the profile warns and creates nothing
+      `mountPoint`, and a restic repository already exists at `repository`.
+      The repository is passwordless — every restic invocation carries
+      `--insecure-no-password` — so there is no secret to provision before
+      this profile creates real units
     '';
 
     package = lib.mkPackageOption pkgs "restic" { };
@@ -387,29 +414,16 @@ in
   };
 
   config = lib.mkMerge [
-    # ── The profile is on but the key has not arrived ───────────────────────
-    #
-    # Say so loudly. A backup profile that is silently inert is the failure
-    # this whole phase exists to prevent.
-    (lib.mkIf (cfg.enable && !hasPassword) {
-      warnings = [
-        ''
-          nix-meta.backup is enabled but the secret '${secretName}' has no
-          entry in config.sops.secrets, so NO backup units were created. Add
-          encrypted material for '${secretName}' in nix-secrets, then list the
-          name in nix-secrets.secrets.activeNames (profiles/secrets.nix).
-        ''
-      ];
-    })
-
     (lib.mkIf active {
       # ── The backup job ────────────────────────────────────────────────────
       services.restic.backups.${jobName} = {
-        inherit (cfg) package paths exclude repository;
+        package = resticPackage;
+        inherit (cfg) paths exclude repository;
 
-        # The decrypted path only. The value never reaches the Nix store or a
-        # unit file, and never appears in an argument or an environment value.
-        passwordFile = passwordFile;
+        # No password file: the repository is passwordless, by design. This
+        # empty file only satisfies the restic module's assertion that one
+        # of passwordFile/environmentFile is set.
+        environmentFile = "${emptyEnvironment}";
 
         # This profile never creates a repository. See the header.
         initialize = false;
@@ -463,8 +477,8 @@ in
 
         # ── The weekly repository check ─────────────────────────────────────
         #
-        # It copies the backup unit's RESTIC_* variables, so repository,
-        # password file and cache can never drift between the two.
+        # It copies the backup unit's RESTIC_* variables, so repository and
+        # cache can never drift between the two.
         #
         # RESTIC_* only. The whole attrset also carries PATH, which
         # system/boot/systemd.nix defines for every unit — copying it across
@@ -584,7 +598,6 @@ in
         text = ''
           repo=${lib.escapeShellArg cfg.repository}
           mount=${lib.escapeShellArg cfg.mountPoint}
-          pwfile=${lib.escapeShellArg passwordFile}
 
           if ${pkgs.util-linux}/bin/mountpoint -q "$mount" 2>/dev/null \
               && { [ ! -d "$repo" ] || [ ! -f "$repo/config" ]; }; then
@@ -594,7 +607,7 @@ in
               echo "This profile never creates a repository (initialize = false,"
               echo "profiles/backup.nix). Create one as a one-time operator step:"
               echo ""
-              echo "  sudo \"\$(nix build --no-link --print-out-paths 'nixpkgs#restic')/bin/restic\" --repo '$repo' --password-file '$pwfile' init"
+              echo "  sudo \"\$(nix build --no-link --print-out-paths 'nixpkgs#restic')/bin/restic\" --repo '$repo' --insecure-no-password init"
               echo ""
               echo "Until then, restic-backups-${jobName}.service fails its preflight check."
             } >&2
@@ -604,8 +617,9 @@ in
       };
 
       # The operator wrapper the restic module generates is `restic-system`. It
-      # carries the repository, the password file and the cache directory, so a
-      # manual command cannot contradict the service.
+      # carries the repository and the cache directory, and uses the same
+      # wrapped, flag-injecting restic package as the service, so a manual
+      # command cannot prompt for a password or contradict the service.
       #
       # No separate global restic package: a bare `restic` with no RESTIC_*
       # set is how an operator reaches the wrong repository.
@@ -650,8 +664,9 @@ in
     # dump while restic keeps running as root to write the repository.
     (lib.mkIf (active && cfg.postgres.enable) {
       services.restic.backups.postgres = {
-        inherit (cfg) package repository;
-        passwordFile = passwordFile;
+        package = resticPackage;
+        inherit (cfg) repository;
+        environmentFile = "${emptyEnvironment}";
         initialize = false;
         runCheck = false;
 

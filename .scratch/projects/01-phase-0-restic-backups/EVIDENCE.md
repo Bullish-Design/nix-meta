@@ -21,8 +21,9 @@ restic 0.19.0
 | `EVIDENCE.md` records the result | partial — this document records the work done |
 | the repository changes have landed and been pushed | **MET** — both lanes landed and pushed to origin; the `nix-secrets` tag `v0.1.1` and the `nix-meta` re-pin are both complete (see §8) |
 
-**Phase 0 is not complete.** Two operator actions block it; see
-`IMPLEMENTATION.md` §B.
+**Phase 0 is not complete.** One operator action blocks it (interactive
+`sudo`, B2); see `IMPLEMENTATION.md` §B. B3, the off-host SOPS recipient,
+is resolved by the passwordless conversion in §14, not by a recipient.
 
 ---
 
@@ -191,9 +192,17 @@ really is encrypted to exactly these two. Both live on this host.
 **There is no off-host recipient, and none was created.** Off-host recovery is
 therefore **unproven** and cannot be proven from this session. Blocker B3.
 
+**Historical, as of 2026-10-01.** This paragraph, and blocker B3 it
+describes, were measurements of the password-based design. §14
+(2026-10-02) records the user's later decision to make the repository
+passwordless instead, which resolves B3 by removing the secret an
+off-host recipient would have protected, rather than by adding one. The
+measurement above stays accurate as a historical record of the store's
+actual recipients that day; it is no longer a live blocker.
+
 The store currently holds three keys: `tailscale-auth-key`,
 `subconscious-api-key`, `deepseek-api-key`. `restic-password` has **no
-material**.
+material**, and under the design in §14 never will.
 
 ---
 
@@ -323,19 +332,21 @@ evaluation failed with a conflicting definition. The fix restricts the copy to
 `RESTIC_*` keys.
 
 Generated values, after the fix. **Measured 2026-10-02, before the backup
-target moved to the WD Caviar Green.** The `/mnt/wd_re1` paths below are what
-the probe produced at the time, with the option default that then applied.
-They are a record of the measurement, not a description of the current units.
-The live values now read `/mnt/wd_green1/restic`,
-`/mnt/wd_green1/restic-cache`, and `RequiresMountsFor=/mnt/wd_green1` — see
-§8 and `machines/server.nix`. Everything else in the table is unchanged by
-the retarget.
+target moved to the WD Caviar Green, and before the passwordless
+conversion in §14.** The `/mnt/wd_re1` paths below are what the probe
+produced at the time, with the option default that then applied. They are
+a record of the measurement, not a description of the current units. The
+live values now read `/mnt/wd_green1/restic`, `/mnt/wd_green1/restic-cache`,
+and `RequiresMountsFor=/mnt/wd_green1` — see §8 and `machines/server.nix`.
+The `RESTIC_PASSWORD_FILE` row is **historical only**: §14's passwordless
+conversion removed `passwordFile` entirely, so no unit sets this variable
+any more. Everything else in the table is unchanged by the retarget.
 
 
 | Attribute | Value |
 |---|---|
 | `restic-backups-system` `RESTIC_REPOSITORY` | `/mnt/wd_re1/restic` |
-| `restic-backups-system` `RESTIC_PASSWORD_FILE` | `/run/secrets/restic-password` |
+| `restic-backups-system` `RESTIC_PASSWORD_FILE` (historical, see above) | `/run/secrets/restic-password` |
 | `restic-backups-system` `RESTIC_CACHE_DIR` | `/mnt/wd_re1/restic-cache` |
 | `restic-check-system` `RESTIC_CACHE_DIR` | `/mnt/wd_re1/restic-cache` (same, by construction) |
 | `RequiresMountsFor` | `/mnt/wd_re1` |
@@ -757,6 +768,17 @@ Record no secret contents, no password value, and no private-key content.
 classification in the preflight script, the `needs-init` marker, the
 activation-time warning, and the updated failure/login signals.
 
+**Historical as a whole, superseded by §14.** Every measurement below
+describes the password-based design: `active = cfg.enable && hasPassword`,
+the `restic-password` warning, and a stand-in `sops.secrets."restic-password"`
+used to force the active path. §14 (2026-10-02, later the same day) replaces
+`hasPassword` with the passwordless design, so `active` is now just
+`cfg.enable`, and none of this section's secret-gating logic exists in the
+current file. The measurements themselves stay accurate as a record of what
+was true that day, and the general method — redirect baked-in paths,
+stub `mountpoint`/`stat`, drive each preflight condition to failure — is the
+same method §14 reuses for the new condition 4.
+
 ### 13.1 `nix flake check`
 
 ```
@@ -928,3 +950,303 @@ last-success-backup
 
 All three markers were removed by one success run; only the new
 `last-success-backup` marker remains.
+
+---
+
+## 14. The passwordless conversion (lane `phase-0-passwordless`)
+
+**Session:** 2026-10-02, in the lane's own workspace
+(`.worktrees/phase-0-passwordless`). Converts the profile from the
+sops-delivered `restic-password` design to the passwordless design the user
+chose: every restic invocation carries `--insecure-no-password`, injected by
+a wrapped restic package. See `DESIGN.md` §2 and §3 for the decision and the
+trade-off; this section is the verification record.
+
+### 14.1 What changed
+
+- `profiles/backup.nix`: added `resticPackage` (`pkgs.symlinkJoin` plus
+  `makeWrapper`, with `meta.mainProgram = "restic"`, see 14.3) and
+  `emptyEnvironment` (`pkgs.writeText "restic-empty-environment" ""`);
+  removed `secretName`, `hasPassword`, `passwordFile`, and the
+  `cfg.enable && !hasPassword` warning branch; `active` is now plain
+  `cfg.enable`; both `services.restic.backups.system` and
+  `services.restic.backups.postgres` now set `package = resticPackage` and
+  `environmentFile = "${emptyEnvironment}"` instead of `passwordFile`;
+  preflight condition 4 changed from a password-file presence/mode check to
+  `${resticBin} cat config > /dev/null`, a positive check that the
+  repository actually opens; the `needs-init` marker's suggested operator
+  command changed from `--password-file '$pwfile'` to
+  `--insecure-no-password`; the activation-warning script dropped its
+  `pwfile` variable for the same reason.
+- `machines/server.nix`: the `nix-meta.backup` comment no longer describes
+  an inert-until-secret-arrives state; it now says the repository is
+  passwordless and the profile creates real units as soon as it is enabled.
+- `profiles/secrets.nix` and `nix-secrets`: untouched, as directed.
+  `restic-password` stays declared in `nix-secrets`'s canonical name
+  inventory, unused; see `DESIGN.md` §2.
+
+### 14.2 `nix flake check` and the derivation, before and after
+
+```
+$ nix flake check --no-build "path:$PWD"
+evaluation warning: stdenv.isLinux is deprecated, use stdenv.hostPlatform.isLinux instead
+evaluation warning: 'system' has been renamed to/replaced by 'stdenv.hostPlatform.system'
+evaluation warning: stdenv.isDarwin is deprecated, use stdenv.hostPlatform.isDarwin instead
+evaluation warning: nix-paseo: password auth is disabled for network-reachable tailnet access.
+all checks passed!
+```
+
+No `restic-password` warning fires — confirmed separately in 14.4.
+
+Trunk (`main`, password-based design, "enabled but inert") and the lane
+(passwordless, active), both measured 2026-10-02:
+
+| Commit | Server `toplevel.drvPath` |
+|---|---|
+| trunk `main` (before this lane) | `/nix/store/kcc9npihf9rp5vj0madpfi1zch95skaj-nixos-system-server-26.11.20260705.d407951.drv` |
+| lane `phase-0-passwordless` (after) | `/nix/store/7cp9d2xmqbdk15sr617hn5z2my34h4j3-nixos-system-server-26.11.20260705.d407951.drv` |
+
+The derivation **moved**, as expected and as the task anticipated: the
+profile is no longer "enabled but inert" — it is simply enabled, and it now
+creates real units. This is the first Phase 0 commit series where the
+backup profile's own change is the reason the derivation moves, rather than
+an unrelated commit (contrast §6 and §8, where the Mnemonix bump and the
+`v0.1.1` re-pin were each confirmed derivation-neutral or neutral-for-an-
+unrelated-reason).
+
+### 14.3 Live-state assertions
+
+All four, run against the lane:
+
+```
+$ nix eval --json "path:$PWD#nixosConfigurations.server.config.systemd.timers" \
+    --apply 'ts: builtins.filter (n: builtins.match "restic.*" n != null) (builtins.attrNames ts)'
+["restic-backup-health","restic-backups-system","restic-check-system"]
+
+$ nix eval --json "path:$PWD#nixosConfigurations.server.config.systemd.services" \
+    --apply 'ss: builtins.filter (n: builtins.match "restic.*" n != null) (builtins.attrNames ss)'
+["restic-backup-failure@","restic-backup-health","restic-backups-system","restic-check-system"]
+
+$ nix eval --json "path:$PWD#nixosConfigurations.server.config.warnings" \
+    --apply 'ws: builtins.filter (w: builtins.match ".*restic-password.*" w != null) ws'
+[]
+
+$ nix eval --json "path:$PWD#nixosConfigurations.server.config.nix-meta.backup" \
+    --apply 'c: { inherit (c) enable mountPoint repository cacheDir; }'
+{"cacheDir":"/mnt/wd_green1/restic-cache","enable":true,"mountPoint":"/mnt/wd_green1","repository":"/mnt/wd_green1/restic"}
+```
+
+Timers and services are both non-empty (contrast §13.3, where they were
+`[]` under the password design) — `restic-backup-health`,
+`restic-backups-system`, `restic-check-system`, and
+`restic-backup-failure@`. No `restic-password` warning fires. `nix-meta.backup`
+still resolves to `/mnt/wd_green1` and its derived paths, unchanged by this
+conversion.
+
+**`ExecStart` of the backup unit references the wrapped restic, not the
+unwrapped one:**
+
+```
+$ nix eval --json "path:$PWD#nixosConfigurations.server.config.systemd.services.restic-backups-system.serviceConfig.ExecStart"
+["/nix/store/fz0v6dfn1yl3z28k0kckpasn98k1pgxj-restic-no-password/bin/restic backup --exclude-file=/nix/store/yqz0932znw7v26n44j2pfr95kxzmrsh1-exclude-patterns --files-from=/run/restic-backups-system/includes",
+ "/nix/store/fz0v6dfn1yl3z28k0kckpasn98k1pgxj-restic-no-password/bin/restic unlock",
+ "/nix/store/fz0v6dfn1yl3z28k0kckpasn98k1pgxj-restic-no-password/bin/restic forget --prune --keep-daily 7 --keep-weekly 4 --keep-monthly 6"]
+
+$ nix eval --raw "path:$PWD#nixosConfigurations.server.config.services.restic.backups.system.package"
+/nix/store/fz0v6dfn1yl3z28k0kckpasn98k1pgxj-restic-no-password
+```
+
+Every `ExecStart` line resolves to `restic-no-password`, confirming
+`lib.getExe` (used by the NixOS restic module for the backup command)
+resolved through `meta.mainProgram = "restic"` rather than failing or
+falling back to an unwrapped binary. **This is the `lib.getExe`/
+`meta.mainProgram` concern the task flagged, verified directly, not just
+argued:** a bare `pkgs.symlinkJoin` carries no `meta.mainProgram`, and
+`getExe` would otherwise look for a binary literally named
+`restic-no-password` under `$out/bin`, which does not exist. Setting
+`meta.mainProgram = "restic";` on the join was both necessary and
+sufficient — no other approach was needed.
+
+**The generated operator wrapper also uses the wrapped package:**
+
+```
+$ nix eval --json "path:$PWD#nixosConfigurations.server.config.environment.systemPackages" \
+    --apply 'pkgs: map (p: p.name or "?") (builtins.filter (p: builtins.match ".*restic.*" (p.name or "") != null) pkgs)'
+["restic-system"]
+```
+
+`restic-system` is generated from the same `backup.package` the service
+uses (`lib.getExe backup.package` again, in the module's wrapper-generation
+code), so it is the same `restic-no-password` join, confirmed by building
+it directly (14.4) and reading the unit files it draws its environment
+from (14.6) — neither carries `RESTIC_PASSWORD_FILE`. A manual invocation
+through `restic-system` cannot prompt for a password.
+
+### 14.4 Building the wrapped package, and proving the flag is really there
+
+```
+$ nix build --no-link --print-out-paths "path:$PWD#nixosConfigurations.server.config.services.restic.backups.system.package"
+/nix/store/fz0v6dfn1yl3z28k0kckpasn98k1pgxj-restic-no-password
+
+$ cat /nix/store/fz0v6dfn1yl3z28k0kckpasn98k1pgxj-restic-no-password/bin/restic
+#! /nix/store/zh1ijdhb6gng1509b1zrilb6xlzx60j6-bash-5.3p9/bin/bash -e
+exec -a "$0" "/nix/store/fz0v6dfn1yl3z28k0kckpasn98k1pgxj-restic-no-password/bin/.restic-wrapped_"  --insecure-no-password "$@"
+
+$ /nix/store/fz0v6dfn1yl3z28k0kckpasn98k1pgxj-restic-no-password/bin/restic version
+restic 0.19.0 compiled with go1.26.4 on linux/amd64
+```
+
+The wrapper script literally contains `--insecure-no-password`, injected
+ahead of `"$@"` so no caller argument can remove it. Run against a
+nonexistent path with no flags of its own, the wrapper still behaves as a
+passwordless client (it fails on the missing repository, not on a missing
+password):
+
+```
+$ /nix/store/fz0v6dfn1yl3z28k0kckpasn98k1pgxj-restic-no-password/bin/restic --repo /tmp/doesnotexist123 snapshots
+Fatal: repository does not exist: unable to open config file: stat /tmp/doesnotexist123/config: no such file or directory
+Is there a repository at the following location?
+/tmp/doesnotexist123
+```
+
+### 14.5 End-to-end proof in `/tmp`: init, backup, restore, `cmp`
+
+A throwaway repository, created and destroyed entirely under `/tmp`, using
+only the wrapped binary and no password:
+
+```
+$ RESTIC=/nix/store/fz0v6dfn1yl3z28k0kckpasn98k1pgxj-restic-no-password/bin/restic
+$ WORK=/tmp/restic-e2e.qyCskD
+$ export RESTIC_REPOSITORY="$WORK/repo"
+$ echo "hello passwordless world <timestamp>" > "$WORK/src/testfile.txt"
+
+$ "$RESTIC" init
+created restic repository c2e6f9d75a at /tmp/restic-e2e.qyCskD/repo
+
+$ "$RESTIC" backup "$WORK/src"
+no parent snapshot found, will read all files
+Files:           1 new,     0 changed,     0 unmodified
+Added to the repository: 1.515 KiB (1.307 KiB stored)
+processed 1 files, 51 B in 0:00
+snapshot 5ca988fa saved
+
+$ "$RESTIC" snapshots --json   # 1 snapshot, id 5ca988fa79238...
+
+$ "$RESTIC" restore 5ca988fa --target "$WORK/restore"
+restoring snapshot 5ca988fa ... to /tmp/restic-e2e.qyCskD/restore
+Summary: Restored 4 files/dirs (51 B) in 0:00
+
+$ cmp "$WORK/src/testfile.txt" "$WORK/restore$WORK/src/testfile.txt"
+CMP OK: files match
+
+$ rm -rf "$WORK"
+removed /tmp/restic-e2e.qyCskD
+```
+
+No password prompt occurred at any step. `init` printed restic's standard
+password-policy notice text but never asked for, or accepted, a password —
+consistent with `--insecure-no-password`. The throwaway repository was
+deleted immediately after the comparison.
+
+### 14.6 Unit files, read directly — `EnvironmentFile`, no `RESTIC_PASSWORD_FILE`
+
+Building the backup, check, health and failure-template units directly
+(`nix build "path:$PWD#nixosConfigurations.server.config.systemd.units.\"<name>\".unit"`)
+and reading the generated unit files confirms the environment NixOS writes:
+
+```
+[Service]
+Environment="RESTIC_CACHE_DIR=/mnt/wd_green1/restic-cache"
+Environment="RESTIC_REPOSITORY=/mnt/wd_green1/restic"
+EnvironmentFile=/nix/store/5jvarml1wl6s277bjfl1xivnbvjn3jls-restic-empty-environment
+ExecStart=/nix/store/fz0v6dfn1yl3z28k0kckpasn98k1pgxj-restic-no-password/bin/restic backup ...
+```
+
+No `RESTIC_PASSWORD_FILE` line appears in either the backup unit or the
+check unit (which copies only the backup unit's `RESTIC_*` variables).
+`EnvironmentFile` points at the empty store file, confirming the restic
+module's `passwordFile != null || environmentFile != null` assertion is
+satisfied by the empty file and not by a password.
+
+### 14.7 `bash -n` on every generated and inline script
+
+```
+OK: restic-preflight-system
+OK: restic-backup-success
+OK: restic-backup-health
+OK: restic-backup-failure
+OK: backupPrepareCommand
+OK: unit-script-restic-backups-system-pre-start/bin/restic-backups-system-pre-start
+OK: environment.interactiveShellInit (written to a temp file)
+OK: system.activationScripts.resticBackupNeedsInitWarning.text (written to a temp file)
+```
+
+All built from the lane's own `extendModules`-forced active configuration
+(`nix-meta.backup.enable = true;`), realized through
+`nix build "path:$PWD#nixosConfigurations.server.config.systemd.units.\"<unit>\".unit"`
+— the same "build the owning unit to pull in its script dependencies"
+method used because an already-interpolated store-path string (as appears
+in `config`) cannot be rebuilt directly; the owning derivation can.
+
+### 14.8 Functional test of the new preflight condition 4
+
+Following the method of §13.6: the preflight script was copied out,
+`mount=`/`repo=`/`cache=` and the `statusDir` literal redirected with `sed`
+to a throwaway tree, and the absolute `mountpoint`/`stat` tool paths
+redirected to stub scripts (`mountpoint` always reports "mounted"; `stat -c
+%d PATH` returns a distinct device for `/` than for everything else, so
+conditions 2 and 5 pass). Condition 4 itself — `restic cat config` — was
+run for real, against the real wrapped binary, with `RESTIC_REPOSITORY`
+exported to match what the systemd environment would provide.
+
+| Case | Setup | Result |
+|---|---|---|
+| repository present and openable | a real repository created with `restic init` (wrapped, no password) at the redirected path | preflight exits **0**; no marker written |
+| repository present but not openable | directory and a `config` file exist (so 3a/3b pass), but the `config` file is garbage text, not a real restic config | restic fails with `wrong password or no key found` (restic's own diagnosis of an unreadable config); preflight **fails condition 4** with `"... exists but restic could not open it. See the unit's journal for the restic error."`; exit 1; **no** `needs-init` marker written |
+| repository directory missing (3a, regression check) | no directory at all | fails condition 3a as before; `needs-init` written with `status=directory-missing` and the updated command, ending in `--insecure-no-password init` (not `--password-file`) |
+| directory present, no `config` (3b, regression check) | empty directory | fails condition 3b as before; `needs-init` written with `status=config-missing` and the same updated command |
+
+Condition 4's failure does **not** write `needs-init` — consistent with
+`DESIGN.md` §4's rule that `write_needs_init` is called only from the 3a/3b
+branches, now verified to still hold for the new condition 4 as well as
+for conditions 1 and 2.
+
+### 14.9 Anchor remeasurement
+
+Every `profiles/backup.nix:<line>` anchor in `DESIGN.md` was remeasured
+against the rewritten file and corrected. Spot-checked directly against
+the file content (not assumed from a diff):
+
+| Anchor | Line content |
+|---|---|
+| `:60` | `resticPackage = pkgs.symlinkJoin {` |
+| `:73` | `emptyEnvironment = pkgs.writeText "restic-empty-environment" "";` |
+| `:95` | `preflight = pkgs.writeShellScript "restic-preflight-${jobName}" ''` |
+| `:113` | `write_needs_init() {` |
+| `:198` | `failureScript = pkgs.writeShellScript "restic-backup-failure" ''` |
+| `:237` | `successScript = pkgs.writeShellScript "restic-backup-success" ''` |
+| `:246` | the `rm -f last-failure last-failure.log needs-init` line |
+| `:252` | `healthScript = pkgs.writeShellScript "restic-backup-health" ''` |
+| `:278` | `unitConfig.RequiresMountsFor = [ cfg.mountPoint ];` |
+| `:351` | `"/var/lib/docker/overlay2"` |
+| `:429` | `initialize = false;` (backup job) |
+| `:465` | `environment.RESTIC_CACHE_DIR = lib.mkForce cfg.cacheDir;` (backup unit) |
+| `:513` | `"restic-backup-health" = {` (service) |
+| `:567` | `environment.interactiveShellInit = ''` |
+| `:597` | `system.activationScripts.resticBackupNeedsInitWarning = {` |
+| `:628` | the `/mnt/shared` assertion |
+| `:643` | the cache-under-mountPoint assertion |
+| `:665` | `(lib.mkIf (active && cfg.postgres.enable) {` |
+| `:703` | `environment.RESTIC_CACHE_DIR = lib.mkForce cfg.cacheDir;` (postgres unit) |
+
+`IMPLEMENTATION.md`'s one stray anchor, `DESIGN.md` §7's reference to "step
+C5" for the restore gate (the restore gate is actually C8; C5 was always
+"Activate the secret", a pre-existing drift unrelated to this conversion),
+was corrected to C8 while in the area.
+
+### 14.10 Cleanup
+
+The `/tmp` throwaway restic repository (14.5) and the `/tmp` preflight
+functional-test trees (14.8) were both removed after use. No change was
+made outside this repository's working tree; `/mnt/wd_green1/restic`, the
+real host repository, was never touched.

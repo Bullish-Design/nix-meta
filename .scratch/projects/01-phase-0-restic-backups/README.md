@@ -1,8 +1,8 @@
 # Phase 0 — restic system backups
 
-**Status:** BLOCKED on two operator actions. The target disk is decided, the
-repository exists, the profile is enabled, and the `nix-meta` and
-`nix-secrets` changes are landed and verified.
+**Status:** BLOCKED on one operator action. The target disk is decided, the
+repository exists, the design is passwordless, the profile is enabled, and
+the `nix-meta` changes are landed and verified.
 **Opened:** 2026-10-01
 **Host:** `server` (Dell Precision 5820, Xeon W-2125, 128 GB RAM)
 **Parent project:** `vendomat/.scratch/projects/07-local-depot-release-bus/IMPLEMENTATION.md`, Phase 0
@@ -50,28 +50,28 @@ blocks this" below.
 - `RUNBOOK.md` §3a states the recipient-coverage problem.
 - `profiles/backup.nix` exists, is exported, and is in the `server`
   composition. Both halves of nix-meta's verify gate pass.
-- The profile creates **no units** until an operator turns it on. Nothing on
-  the host changed.
-- The `profiles/backup.nix` profile, the Phase 0 documents, and the
-  `nix-secrets` tooling fixes have all landed on trunk and reached origin,
-  in both `nix-meta` and `nix-secrets`. See `EVIDENCE.md` §8.
+- The repository is passwordless: every restic invocation carries
+  `--insecure-no-password`, injected by a wrapped restic package. There is
+  no secret to provision and no secret-arrival gate. See `DESIGN.md` §2.
+  The profile creates real backup, check and health units as soon as it is
+  enabled and activated — nothing waits on a secret any more.
+- The `profiles/backup.nix` profile and the Phase 0 documents have landed on
+  `nix-meta` trunk and reached origin. See `EVIDENCE.md` §8.
 - The target is decided: `/mnt/wd_green1/restic`, the repository that already
   exists there. The user's decision, recorded in `DESIGN.md` §1. The WD
   Green's age and load-cycle count are an accepted risk; a NAS is planned as
   a second copy location later.
-- `machines/server.nix` now sets `nix-meta.backup.enable = true` with
-  `mountPoint = "/mnt/wd_green1"`. The profile is enabled but creates no
-  unit yet: `restic-password` has no encrypted material, so the profile
-  warns and stays inert, by design.
+- `machines/server.nix` sets `nix-meta.backup.enable = true` with
+  `mountPoint = "/mnt/wd_green1"`. The host's **live** generation predates
+  this lane and has not yet rebuilt with it; once it does, the units exist
+  immediately, gated only by the preflight check, not by a secret.
 
 ## What blocks this
 
 | Blocker | Needs | Document |
 |---|---|---|
 | `sudo` requires a password | an interactive session | `IMPLEMENTATION.md` step B2 |
-| No off-host SOPS recipient exists | a decision and a key | step B3 |
 
-The second is the one that matters most. Both current recipients of the
-encrypted store live on this one host. A `restic-password` that only this host
-can decrypt cannot recover this host. A planned NAS, as a second copy
-location, does not change this: see `DESIGN.md` §1.
+B2 is the only remaining blocker. B3 (an off-host SOPS recipient) is
+resolved, not merely deferred: the passwordless design removed the secret
+that recipient would have protected. See `DESIGN.md` §2 and §3.

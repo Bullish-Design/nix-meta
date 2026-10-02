@@ -662,9 +662,9 @@ in
   # Phase 0 restic target: the repository that already exists on the WD
   # Caviar Green above. The disk's age and load-cycle count are an accepted
   # risk, recorded in the Phase 0 DESIGN.md §1. A NAS will later hold a
-  # second copy. No backup unit exists yet: the profile warns and creates
-  # nothing until `restic-password` has encrypted material, at which point
-  # this warning stops firing on its own.
+  # second copy. The repository is passwordless (DESIGN.md §2): there is no
+  # secret to wait for, so enabling this creates real backup units
+  # immediately, gated only by the preflight check in profiles/backup.nix.
   nix-meta.backup = {
     enable = true;
     mountPoint = "/mnt/wd_green1";
