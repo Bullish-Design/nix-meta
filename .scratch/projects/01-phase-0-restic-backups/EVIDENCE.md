@@ -253,6 +253,13 @@ The repository's declared gate is `gitman.toml:4`:
 verify = ["bash", "-c", "nix flake check --no-build && nix eval --raw .#nixosConfigurations.server.config.system.build.toplevel.drvPath > /dev/null"]
 ```
 
+(Quoted verbatim from `gitman.toml:4`. The `.#nixosConfigurations...` flake
+reference above is unquoted there too, and that is correct: gitman passes
+the string straight to `bash -c` as one argv element, with no shell reading
+the surrounding command line first, so the zsh quoting rules that apply to a
+pasted interactive command do not apply here. This is why this flake
+reference differs from the quoted forms used in `IMPLEMENTATION.md`.)
+
 Both halves pass. Run from the Gitman workspace, so the flake reference is
 `path:$PWD` rather than `.` — a jj workspace under `.worktrees/` is untracked
 in the outer git tree, and Nix's git fetcher refuses it:
@@ -278,6 +285,26 @@ $ nix eval --raw "git+file:///home/andrew/Documents/Projects/nix-meta?ref=refs/h
 $ nix eval --raw "path:$PWD#nixosConfigurations.server.config.system.build.toplevel.drvPath"
 /nix/store/jgk76qyb7fvlbm0fnjiv5d65h7js1mjs-nixos-system-server-…drv
 ```
+
+This measurement is dated: trunk at the time was `1914dae`, and the lane
+being compared was `dddd4b1`, the commit that adds and composes
+`profiles/backup.nix`. The derivation later moved to `wbjk6lr9jz371…` (see
+§8, "The hand-made tag and the re-pin lane", which records this hash) at
+`d633a35`, a Mnemonix bump from another session, unrelated to the backup
+profile. The two hashes do not contradict each other: each records a true
+fact about a different pair of commits.
+
+| Commit | Server `toplevel.drvPath` |
+|---|---|
+| `1914dae` (before any Phase 0 work) | `jgk76qyb7fvlbm0fnjiv5d65h7js1mjs-nixos-system-server-26.11.20260705.d407951.drv` |
+| `dddd4b1` (adds `profiles/backup.nix` and composes it) | `jgk76qyb…` — identical to its parent |
+| `d633a35` (Mnemonix bump, another session's work, not Phase 0) | `wbjk6lr9jz371zq56ai8q2wjd6ab9nmn-…` |
+| current trunk | `wbjk6lr9…` |
+
+Every Phase 0 commit before and after `d633a35` is individually
+derivation-neutral; `d633a35` itself is the only commit in the series that
+changed the derivation, and it did so for a reason unrelated to backups —
+the only package-level difference is `mnemonix-import.drv`.
 
 ### The enabled path was evaluated too
 

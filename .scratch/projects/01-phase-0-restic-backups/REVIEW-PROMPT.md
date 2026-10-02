@@ -156,9 +156,22 @@ claim. Look for:
 enables it with `mountPoint = "/mnt/wd_green1"`. `repository` resolves to
 `/mnt/wd_green1/restic` and `cacheDir` to `/mnt/wd_green1/restic-cache`. The
 profile creates no systemd unit and warns on every evaluation, because
-`restic-password` has no encrypted material yet. The derivation is
-byte-identical to pre-change trunk — nothing on the host has changed. No
-backup, snapshot, check, or restore has ever run.
+`restic-password` has no encrypted material yet. The backup profile added
+no change to the system derivation: `dddd4b1`, the commit that adds and
+composes `profiles/backup.nix`, produces the same `toplevel.drvPath` as its
+parent `1914dae`. Current trunk carries a different derivation, but for an
+unrelated reason — the Mnemonix bump at `d633a35`, another session's work,
+not Phase 0. Every Phase 0 commit after `d633a35` is individually
+derivation-neutral.
+
+| Commit | Server `toplevel.drvPath` |
+|---|---|
+| `1914dae` (before any Phase 0 work) | `jgk76qyb7fvlbm0fnjiv5d65h7js1mjs-nixos-system-server-26.11.20260705.d407951.drv` |
+| `dddd4b1` (adds `profiles/backup.nix` and composes it) | `jgk76qyb…` — identical to its parent |
+| `d633a35` (Mnemonix bump, another session's work, not Phase 0) | `wbjk6lr9jz371zq56ai8q2wjd6ab9nmn-…` |
+| current trunk | `wbjk6lr9…` |
+
+No backup, snapshot, check, or restore has ever run.
 
 ### The target disk
 

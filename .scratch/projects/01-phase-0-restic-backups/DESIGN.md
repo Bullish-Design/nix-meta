@@ -342,10 +342,13 @@ repository, behind `nix-meta.backup.postgres.enable`, default off. The owner
 question is settled: the generated `pg_hba.conf` carries
 `local all postgres peer map=postgres` and the default `identMap` maps only
 `postgres postgres postgres`
-(`nixpkgs/nixos/modules/services/databases/postgresql.nix:692` and `:701`).
+(`nixpkgs/nixos/modules/services/databases/postgresql.nix:688` and `:699`).
 root is **not** mapped, so root cannot connect as the `postgres` role.
 `runuser -u postgres` drops to that user for the dump while restic keeps
-running as root to write the repository.
+running as root to write the repository. These two anchors point into
+nixpkgs, an external pinned dependency, so they move whenever the nixpkgs
+pin moves — unlike the in-repo anchors in this document, which move only
+when this repository's own files change.
 
 The job is **unproven**: it has never been run, because running it needs root.
 Until an operator runs it and confirms the snapshot, `/var/lib/postgresql`
@@ -367,10 +370,12 @@ sources; the build cache alone was 36.37 GB. Named volumes stay in.
 ## 10. The nix-secrets release that was rewound
 
 Found during this work, and it changes how `nix-secrets` must be released.
+**This section describes the state as found, before the re-pin.** Line 77
+now reads `v0.1.1`, not `v0.1.0` — the resolution is recorded in §12 below.
 
-`nix-meta/flake.nix:77` pins
+At the time this was found, `nix-meta/flake.nix:77` pinned
 `git+file:///home/andrew/Documents/Projects/nix-secrets?ref=refs/tags/v0.1.0`,
-locked to `58ae4ab1`. That commit is **not on `nix-secrets` trunk**:
+locked to `58ae4ab1`. That commit was **not on `nix-secrets` trunk**:
 
 | Ref | Commit |
 |---|---|
