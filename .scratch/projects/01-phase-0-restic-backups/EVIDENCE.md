@@ -295,7 +295,15 @@ unit's whole `environment` attrset, which carries `PATH`.
 evaluation failed with a conflicting definition. The fix restricts the copy to
 `RESTIC_*` keys.
 
-Generated values, after the fix:
+Generated values, after the fix. **Measured 2026-10-02, before the backup
+target moved to the WD Caviar Green.** The `/mnt/wd_re1` paths below are what
+the probe produced at the time, with the option default that then applied.
+They are a record of the measurement, not a description of the current units.
+The live values now read `/mnt/wd_green1/restic`,
+`/mnt/wd_green1/restic-cache`, and `RequiresMountsFor=/mnt/wd_green1` — see
+§8 and `machines/server.nix`. Everything else in the table is unchanged by
+the retarget.
+
 
 | Attribute | Value |
 |---|---|
