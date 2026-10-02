@@ -575,12 +575,33 @@ has now happened.
 `toplevel.drvPath`, evaluated both before (trunk `b8508a94`) and after (this
 lane), is the **same** derivation:
 `/nix/store/wbjk6lr9jz371zq56ai8q2wjd6ab9nmn-nixos-system-server-26.11.20260705.d407951.drv`.
-The lock moved, but the server derivation did not: `profiles/secrets.nix`
-does not yet list `restic-password` in `activeNames` (that step is C5, not
-done here), so the part of `nix-secrets` this re-pin touches is not yet
-wired into the server build. The restic-timers check,
-`config.systemd.timers` filtered for `restic.*`, returned `[]`: the backup
-profile stays inert.
+The lock moved and the server derivation did not. The reason is that nothing
+the NixOS module evaluates changed between the two tags. The whole diff from
+`58ae4ab1` (`v0.1.0`) to `f1aba8e2` (`v0.1.1`) is:
+
+| File | Change |
+|---|---|
+| `RUNBOOK.md` | +43 −1 — prose only |
+| `scripts/secret-add` | +44 −15 — operator plane; the module never reads it |
+| `scripts/secret-ls` | +4 −1 — operator plane |
+| `modules/secrets.nix` | +3 −3 — **comment text only**, two stale "eight" counts |
+
+`modules/secrets.nix` carries no change outside comments, so the module's own
+evaluation is byte-identical. The `secrets/` tree is byte-identical too — the
+same git tree object at both tags — so `secretsDir` and `sopsFile` resolve to
+the same store path, and `availableKeys` reads the same file.
+
+This correction matters because `activeNames` is **not** the reason. An
+earlier draft of this section said the derivation held still because
+`profiles/secrets.nix` does not yet list `restic-password`. That is wrong, and
+it implies the hash will move once step C5 activates the secret *because of
+this pin*. It will not. This re-pin is inert at any `activeNames` setting,
+because the two tags carry identical module code and an identical secrets
+tree. Step C5 will move the hash on its own merit — it adds a
+`sops.secrets` entry — not as a delayed effect of the pin.
+
+The restic-timers check, `config.systemd.timers` filtered for `restic.*`,
+returned `[]`: the backup profile stays inert.
 
 ---
 
