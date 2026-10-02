@@ -23,7 +23,8 @@ umbrella guide.
 | `DESIGN.md` | the decisions, with `file:line` anchors |
 | `IMPLEMENTATION.md` | the ordered steps, and which are done |
 | `EVIDENCE.md` | measured facts, verification output, and the gate |
-| `NEXT-SESSION-KICKOFF.md` | the kickoff prompt for the next working session |
+| `NEXT-SESSION-KICKOFF.md` | the kickoff prompt for the next working session — investigate and plan the remaining work |
+| `REVIEW-PROMPT.md` | the kickoff prompt for a review session — audit what landed, then report state and next steps |
 
 ## The gate
 
