@@ -280,7 +280,7 @@
         # profiles.terminal restored: nix-terminal now consumes nix-nvim (the
         # loci-rich config promoted from ~/.dotfiles/nvim) instead of the retired,
         # broken nixvim input.
-        server = mkMachine "server" [ profiles.minimal profiles.terminal profiles.developer profiles.gpu-compute profiles.agent profiles.secrets profiles.devman profiles.mnemonix ];
+        server = mkMachine "server" [ profiles.minimal profiles.terminal profiles.developer profiles.gpu-compute profiles.agent profiles.secrets profiles.backup profiles.devman profiles.mnemonix ];
       };
     };
 }

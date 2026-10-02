@@ -28,6 +28,12 @@ inputs:
   # Stacked on `agent`, which installs the three CLIs this configures.
   mnemonix = import ./mnemonix.nix inputs;
 
+  # System backups (restic). Phase 0 of the local depot and release bus: the
+  # policy is host independent, the target disk is not — the machine sets
+  # `nix-meta.backup`. Stacked AFTER `secrets`, which delivers the repository
+  # password to /run/secrets.
+  backup = import ./backup.nix inputs;
+
   # The devman automation plane: one Dagu user service that runs each repo's own
   # devenv tasks. Stacked on `developer`, which installs the devenv launcher the
   # plane's workflow steps call.
