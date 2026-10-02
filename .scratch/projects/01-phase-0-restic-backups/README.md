@@ -1,6 +1,8 @@
 # Phase 0 — restic system backups
 
-**Status:** BLOCKED on three operator actions. The repository work is done and verified.
+**Status:** BLOCKED on two operator actions. The target disk is decided, the
+repository exists, the profile is enabled, and the repository work is done
+and verified.
 **Opened:** 2026-10-01
 **Host:** `server` (Dell Precision 5820, Xeon W-2125, 128 GB RAM)
 **Parent project:** `vendomat/.scratch/projects/07-local-depot-release-bus/IMPLEMENTATION.md`, Phase 0
@@ -52,15 +54,23 @@ blocks this" below.
 - The `profiles/backup.nix` profile, the Phase 0 documents, and the
   `nix-secrets` tooling fixes have all landed on trunk and reached origin,
   in both `nix-meta` and `nix-secrets`. See `EVIDENCE.md` §8.
+- The target is decided: `/mnt/wd_green1/restic`, the repository that already
+  exists there. The user's decision, recorded in `DESIGN.md` §1. The WD
+  Green's age and load-cycle count are an accepted risk; a NAS is planned as
+  a second copy location later.
+- `machines/server.nix` now sets `nix-meta.backup.enable = true` with
+  `mountPoint = "/mnt/wd_green1"`. The profile is enabled but creates no
+  unit yet: `restic-password` has no encrypted material, so the profile
+  warns and stays inert, by design.
 
 ## What blocks this
 
 | Blocker | Needs | Document |
 |---|---|---|
-| No WD Re disk is connected | a physical action | `IMPLEMENTATION.md` step B1 |
-| `sudo` requires a password | an interactive session | step B2 |
+| `sudo` requires a password | an interactive session | `IMPLEMENTATION.md` step B2 |
 | No off-host SOPS recipient exists | a decision and a key | step B3 |
 
-The third is the one that matters most. Both current recipients of the
+The second is the one that matters most. Both current recipients of the
 encrypted store live on this one host. A `restic-password` that only this host
-can decrypt cannot recover this host.
+can decrypt cannot recover this host. A planned NAS, as a second copy
+location, does not change this: see `DESIGN.md` §1.

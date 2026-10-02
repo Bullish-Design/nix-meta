@@ -51,14 +51,24 @@ pass with the profile in the composition; see `EVIDENCE.md` §6.
 
 ## B. Blockers — operator actions
 
-### B1. Connect a WD Re disk and prove it **[blocked: physical]**
+Two blockers remain: B2 (interactive `sudo`) and B3 (the off-host SOPS
+recipient). B1 is resolved by decision, not by hardware. B4 was resolved
+earlier by a hand-made tag. Numbering stays as originally assigned; no
+blocker number is reused or dropped.
+
+### B1. Target disk **[resolved: decision]**
+
+The user chose `/mnt/wd_green1` as the Phase 0 target, now, instead of
+waiting for a WD Re disk. See `DESIGN.md` §1. This is no longer a blocker.
 
 `lsblk` shows no WD Re device. Only `sda` (WD Green), `sdb` (Team SATA),
 `nvme0n1` (empty 4 TB) and `nvme1n1` (system) are present. Both WD Re UUIDs
 are declared with `nofail`, so the host boots without them and leaves empty
-directories at `/mnt/wd_re1` and `/mnt/wd_re2`.
+directories at `/mnt/wd_re1` and `/mnt/wd_re2`. Both stay declared and both
+stay the preferred upgrade path.
 
-Seat a WD Re `WD2000FYYZ` in a flexbay, then:
+**The WD Re upgrade path, when a disk is seated.** Seat a WD Re
+`WD2000FYYZ` in a flexbay, then:
 
 ```bash
 # 1. Find it. Expect a WD2000FYYZ.
@@ -85,7 +95,8 @@ df -h /mnt/wd_re1
 ```
 
 If the UUID changed, `machines/server.nix:637` needs the new one before
-anything else.
+anything else. Moving the profile's `mountPoint` back to a WD Re disk, once
+one is proved, is a one-line change in `machines/server.nix`.
 
 ### B2. A session where `sudo` can authenticate **[blocked: password]**
 
@@ -315,15 +326,16 @@ sudo stat -c '%n %U:%G %a' /run/secrets/restic-password
 # must print: /run/secrets/restic-password root:root 400
 ```
 
-### C6. Initialize the repository **[ready, needs B1, B2, C5]**
+### C6. Confirm the repository, do not initialize one **[ready, needs B2, C2, C5]**
 
-Only after **all** of these hold: a WD Re disk is connected, its long SMART
-test passed, its filesystem is mounted, the mount is proved not to be the root
-filesystem, the exact path is confirmed, and
-`/run/secrets/restic-password` exists as `root:root 400`.
+There is nothing to initialize. The repository at `/mnt/wd_green1/restic`
+already exists (C1), and C2 already replaced its empty password with a real
+one. This step is a confirmation, not a write: prove the mount is real, prove
+it is not the root filesystem, and prove the repository responds through the
+password file now that `restic-password` has material (C5).
 
 ```bash
-mount=/mnt/wd_re1
+mount=/mnt/wd_green1
 repo="$mount/restic"
 restic_bin="$(nix build --no-link --print-out-paths nixpkgs#restic)/bin/restic"
 
@@ -333,27 +345,16 @@ mountpoint -q "$mount" || { echo "ABORT: $mount is not a mount point"; exit 1; }
   || { echo "ABORT: $mount is the root filesystem"; exit 1; }
 echo "target: $repo"; findmnt "$mount"
 
-# One-time, explicit, with the password file.
-sudo "$restic_bin" --repo "$repo" \
-  --password-file /run/secrets/restic-password init
-
+# Confirm the repository answers through the password file sops-nix wrote.
 sudo "$restic_bin" --repo "$repo" \
   --password-file /run/secrets/restic-password cat config
 ```
 
-### C7. Turn the profile on **[ready, needs C6]**
+### C7. Activate and inspect **[ready, needs C5, C6]**
 
-A third `nix-meta` lane, in its own workspace. One option block in
-`machines/server.nix`:
-
-```nix
-nix-meta.backup = {
-  enable = true;
-  mountPoint = "/mnt/wd_re1";   # or /mnt/wd_re2 if WD Re 1 failed B1
-};
-```
-
-Then verify, activate, and inspect what was generated:
+The option block itself is already landed on trunk (`machines/server.nix`,
+`nix-meta.backup.enable = true`, `mountPoint = "/mnt/wd_green1"`). This step
+no longer adds it. It activates the rebuild and inspects what was generated.
 
 ```bash
 nix flake check --no-build
@@ -369,6 +370,12 @@ systemctl show restic-backups-system.service \
 
 Do not dump the unit's full environment: it names the password file path among
 values that can include secrets elsewhere. `systemctl cat` is enough.
+
+**Before `restic-password` has encrypted material**, this rebuild prints the
+profile's own warning and creates no `restic.*` unit at all. That is
+expected — it is the loud-but-inert state the profile is designed to produce,
+not a failure. Units appear only after C4 and C5 give the secret real
+material.
 
 ### C8. The restore gate **[ready, needs C7]**
 
@@ -419,11 +426,14 @@ cat /var/lib/restic-backup-status/last-success-check
 
 ### C10. Prove the failure path **[ready, needs C7]**
 
-The failure signal is worth as much as the backup. Prove it on purpose:
+The failure signal is worth as much as the backup. Prove it on purpose.
+
+**Caution.** Unmounting `/mnt/wd_green1` takes the live repository offline.
+Run this proof only when no backup or check is running.
 
 ```bash
 # Unmount the backup disk, then run the backup. It must fail at preflight.
-sudo umount /mnt/wd_re1
+sudo umount /mnt/wd_green1
 sudo systemctl start restic-backups-system.service   # expect a failure
 cat /var/lib/restic-backup-status/last-failure
 journalctl -u restic-backups-system.service -n 20 --no-pager
@@ -432,7 +442,7 @@ journalctl -u restic-backups-system.service -n 20 --no-pager
 bash -ic true
 
 # Remount, run a real backup, and confirm the marker clears.
-sudo mount /mnt/wd_re1
+sudo mount /mnt/wd_green1
 sudo systemctl start restic-backups-system.service
 ls /var/lib/restic-backup-status/      # last-failure must be gone
 ```

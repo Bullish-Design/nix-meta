@@ -217,11 +217,15 @@ in
 
     mountPoint = lib.mkOption {
       type = lib.types.str;
-      default = "/mnt/wd_re1";
+      default = "/mnt/wd_green1";
       description = ''
-        The mount point of the backup disk. The units take a hard systemd
-        dependency on it and the preflight check proves it is mounted and is
-        not the root filesystem.
+        The mount point of the backup disk. The machine sets this option
+        explicitly; the default here only names the current target.
+        `/mnt/wd_green1` (the WD Caviar Green) is the current target, chosen
+        because its restic repository already exists. A WD Re disk, or the
+        planned NAS, is the upgrade path once one is connected. The units
+        take a hard systemd dependency on this mount, and the preflight
+        check proves it is mounted and is not the root filesystem.
       '';
     };
 

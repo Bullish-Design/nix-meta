@@ -7,14 +7,20 @@ are relative to the repository named in the heading.
 
 ## 1. Where the repository goes
 
-**Decision.** The primary repository is `/mnt/wd_re1/restic`. The WD Caviar
-Green keeps its existing repository as a secondary copy.
+**Decision.** The primary repository is `/mnt/wd_green1/restic`. It already
+exists: created 2026-09-28 by restic 0.19.0, root-owned, mode 0700. This is
+the user's decision. Their reasoning: a backup on an aged disk beats the
+nothing that exists today. A NAS will come later and give a second location
+to save to.
 
 The WD Green is a 2009 `WDC WD20EADS-00R6B0`. Its last SMART reading showed
 57,588 power-on hours and 2,175,705 load cycles with zero reallocated,
 pending, or offline-uncorrectable sectors. The sector counts are clean, so the
-disk is not failing. The hours and the load-cycle count say it is a poor sole
-target for the only copy of this host.
+disk is not failing. The hours and the load-cycle count are the cost of this
+decision, not an open objection. They are an **accepted risk**: the user
+chose to start backing up now, on the disk that is actually connected and
+already holds a repository, rather than wait for a WD Re disk to be fitted
+and proved.
 
 Two WD Re `WD2000FYYZ` drives are already declared:
 
@@ -23,19 +29,46 @@ Two WD Re `WD2000FYYZ` drives are already declared:
 - `machines/server.nix:646` — `/mnt/wd_re2`, UUID
   `221736bc-2a75-4949-823a-364c8c772dad`, ext4, `defaults nofail`
 
-Neither device is connected (see `EVIDENCE.md` §2). `nofail` means an absent
-drive leaves a plain empty directory on the root filesystem. That is exactly
-the failure the preflight check in §4 exists to catch.
+Neither device is connected (see `EVIDENCE.md` §2). Both stay declared and
+both stay the **preferred upgrade path**: a WD Re disk, once connected and
+passing a long SMART test, should replace the WD Green as the primary
+target. `nofail` means an absent drive leaves a plain empty directory on the
+root filesystem. That is exactly the failure the preflight check in §4 exists
+to catch.
 
-**Order of preference.** WD Re 1 if it passes a long SMART test. WD Re 2 if
-WD Re 1 fails and WD Re 2 passes. The WD Green is not acceptable as the sole
-target.
+**The planned NAS.** A NAS is planned as the **second copy location** — not
+as a replacement for the primary disk. It solves single-disk risk: with a
+second copy, no single drive failure loses the only backup.
+
+**The point the NAS does not solve, stated plainly.** A second copy removes
+single-disk risk. It does not remove the key-recovery circularity described
+in §3. Both copies would still be encrypted to `restic-password`, and that
+secret is encrypted only to two keys that live on the host the backup
+protects. Losing the host locks both copies — the NAS copy included. Off-host
+escrow or a third SOPS recipient (§3) is still required before the backup can
+be relied on for host loss. Adding a NAS does not change this; only §3's
+decision does.
 
 `/mnt/shared` stays out of Phase 0. It is declared at
 `machines/server.nix:620` as an `ntfs3` automount and holds 129 GiB of
 unadjudicated data. Phase F stays blocked until that data has its own verified
 policy. `profiles/backup.nix:510` asserts that the repository is not under
 `/mnt/shared`.
+
+### No repository initialization is needed
+
+The repository at `/mnt/wd_green1/restic` already exists. There is nothing to
+initialize. `profiles/backup.nix:359` sets `initialize = false`, and that
+setting stays permanent — it was never conditional on which disk is primary.
+
+The path to a working backup from here is three steps, in order:
+
+1. Adjudicate the existing repository **read-only** — confirm it opens and
+   list its snapshots, without writing to it.
+2. Replace the repository's current empty password (`--insecure-no-password`)
+   with a real one, using restic's add/verify/remove key sequence.
+3. Activate the profile by giving `restic-password` encrypted material in
+   `nix-secrets` (§2).
 
 ---
 

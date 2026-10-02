@@ -28,30 +28,26 @@ Also read, before acting: the `gitman`, `writing`, and `my-ai` skills (or the
 equivalent personal-layer skill files in this environment), and each
 repository's own `AGENTS.md`.
 
-## The three decisions that block everything
+## The two decisions that block everything
 
 Phase 0 — restic backups for host `server` — is written and verified in the
-repository, but blocked on three operator decisions. Work out, for each, what
-the user must decide and what evidence would settle it. Do not decide for
-them; prepare the choice.
+repository, and the target disk is no longer an open question: the user
+chose `/mnt/wd_green1/restic`, the repository that already exists there,
+instead of waiting for a WD Re disk. `IMPLEMENTATION.md` step B1 is
+**resolved by decision**, not by hardware; see `DESIGN.md` §1. Two operator
+decisions remain. Work out, for each, what the user must decide and what
+evidence would settle it. Do not decide for them; prepare the choice.
 
-1. **No WD Re disk is connected.** `lsblk` shows no `WD2000FYYZ` device.
-   `machines/server.nix:637` and `:646` declare `/mnt/wd_re1` and
-   `/mnt/wd_re2` with `nofail`, so the host boots fine without them, but the
-   repository has nowhere durable to live. This needs a physical action
-   (seat a drive, run a long SMART test) that only the user can do. State
-   what a passing SMART result looks like (`Completed without error`,
-   zero `Reallocated_Sector_Ct` / `Current_Pending_Sector` /
-   `Offline_Uncorrectable`) and what to do if WD Re 1 fails and WD Re 2 must
-   be used instead.
+A NAS is planned as a **second copy location**, once one exists. Do not
+treat it as solving the decision below — see the note after item 2.
 
-2. **`sudo` needs an interactive password.** Every privileged step —
-   mounting, `restic init`, `sops`, `nixos-rebuild` — needs root, and the
-   current session cannot authenticate (`sudo -n true` refuses). This just
-   needs a session where the user can type a password. Note it, do not try
-   to work around it.
+1. **`sudo` needs an interactive password.** Every privileged step —
+   mounting, `sops`, `nixos-rebuild` — needs root, and the current session
+   cannot authenticate (`sudo -n true` refuses). This just needs a session
+   where the user can type a password. Note it, do not try to work around
+   it.
 
-3. **No off-host SOPS recipient exists — the important one.** Both current
+2. **No off-host SOPS recipient exists — the important one.** Both current
    recipients of the encrypted secrets store live on this one host:
    `&tower` from `/etc/ssh/ssh_host_ed25519_key`
    (`nix-secrets/secrets/.sops.yaml:30`) and `&author` from
@@ -64,6 +60,12 @@ them; prepare the choice.
    escrow with no third recipient (which `IMPLEMENTATION.md` warns leaves no
    way to decrypt the rest of the store after host loss). Lay out the
    trade-offs of each and recommend one, but let the user choose.
+
+**The planned NAS does not resolve item 2.** A second copy on a NAS removes
+single-disk risk, nothing more. Both copies would still be encrypted to
+`restic-password`, and that secret is still encrypted only to the two
+on-host keys above. Losing the host locks both copies, NAS copy included.
+See `DESIGN.md` §1.
 
 ## Group 2 — steps that are written and unit-tested, but never run on the host
 
@@ -112,9 +114,10 @@ decide; the user decides.
    written by `nix copy` is unsigned by default. The umbrella guide prefers
    a local signing key over disabling signature checks, but this is unsettled.
 4. **`/mnt/flex` and the two WD Re bays are unconnected.** They are declared
-   in `machines/server.nix` but nothing is seated. The WD Re pair is the
-   Phase 0 backup target under discussion above; this question has been
-   asked three times in prior sessions and not yet answered.
+   in `machines/server.nix` but nothing is seated. The WD Re pair is no
+   longer the open question it was: the user decided the Phase 0 backup
+   target is `/mnt/wd_green1` (see above), and the WD Re pair stays the
+   preferred upgrade path once a disk is connected and proved.
 5. **Is Flora's training data still wanted?** About 119 GiB sits on
    `/mnt/shared` (`sdb2`) with no backup and no decision on whether to keep
    it, move it, or discard it. Nothing there has been touched.
