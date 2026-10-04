@@ -24,8 +24,7 @@ The Phase 0 lane has already landed into `nix-meta` trunk; use the fallback
 path if the primary path is missing. Do not run any `git` or `gitman`
 command that mutates state while you check this.
 
-Also read, before acting: the `gitman`, `writing`, and `my-ai` skills (or the
-equivalent personal-layer skill files in this environment), and each
+Before you act, read the `gitman` and `writing` skills, if present, and each
 repository's own `AGENTS.md`.
 
 ## The one decision that blocks everything
