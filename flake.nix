@@ -31,14 +31,14 @@
     # its bin on the login shell's PATH, replacing the mutable venv used by the
     # retired machine bootstrap path.
     #
-    # Pinned to a published tag: this lock decides the toolchain revision, so a
-    # floating ref would make "which repoman is on my PATH" unanswerable.
+    # Pinned to an exact source revision so "which repoman is on my PATH" stays
+    # answerable while the shared toolchain release is prepared.
     # NO `inputs.nixpkgs.follows`. Vendomat pins the same nixpkgs the devenv stack uses,
     # and that pin is what makes the closure shared: a devenv consumer and this login
     # shell must resolve the SAME store paths for the same commands. Making vendomat
     # follow the system nixpkgs forks the closure in two — same source, same version,
     # different build — which is the duplication this whole design removes.
-    vendomat.url = "git+https://github.com/Bullish-Design/vendomat?ref=refs/tags/v0.4.4";
+    vendomat.url = "git+https://github.com/Bullish-Design/vendomat?rev=bd26fea8a2124bb4b1bbd8721418d831b4c2bf13";
 
     # Project 039 (repoman half): the repoman devenv meta-module, machine-installed.
     # This ONE pin replaces the twenty-three per-repository `devenv.yaml` pins the

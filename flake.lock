@@ -3,18 +3,35 @@
     "agentman": {
       "flake": false,
       "locked": {
-        "lastModified": 1789928595,
-        "narHash": "sha256-YsCtWqZFFJLLEXbANi8oUx4JDKYIkRVg0dNqKNxEQ7A=",
-        "ref": "refs/tags/v0.0.2",
-        "rev": "4870686dbddf26653d9e9db13bc1babcf73271a6",
-        "revCount": 54,
+        "lastModified": 1791072864,
+        "narHash": "sha256-D5nQliq5gYt07VHo/KZPx+5YyzgmTpLwH5beXK6s0lE=",
+        "ref": "refs/tags/v0.0.3",
+        "rev": "601e10f84aa6b098f91228e9bbcf1398fa13ec84",
+        "revCount": 62,
         "type": "git",
         "url": "ssh://git@github.com/Bullish-Design/agentman.git"
       },
       "original": {
-        "ref": "refs/tags/v0.0.2",
+        "ref": "refs/tags/v0.0.3",
         "type": "git",
         "url": "ssh://git@github.com/Bullish-Design/agentman.git"
+      }
+    },
+    "agentman-inferference": {
+      "flake": false,
+      "locked": {
+        "lastModified": 1789836946,
+        "narHash": "sha256-dqJQKE3ANRFMJGeX7WSxWZ6h2Y/A2zFKivgbOU7moS0=",
+        "ref": "refs/tags/v0.3.0",
+        "rev": "3816077a4896135465c566ec6d36a74fefcd3776",
+        "revCount": 105,
+        "type": "git",
+        "url": "ssh://git@github.com/Bullish-Design/inferference.git"
+      },
+      "original": {
+        "ref": "refs/tags/v0.3.0",
+        "type": "git",
+        "url": "ssh://git@github.com/Bullish-Design/inferference.git"
       }
     },
     "argentic": {
@@ -1544,6 +1561,7 @@
     "vendomat": {
       "inputs": {
         "agentman": "agentman",
+        "agentman-inferference": "agentman-inferference",
         "copyroom": "copyroom",
         "devman": "devman_3",
         "docman": "docman",
@@ -1557,16 +1575,16 @@
         "uv2nix": "uv2nix_2"
       },
       "locked": {
-        "lastModified": 1790624223,
-        "narHash": "sha256-gQRVWeVkSbcltP7wfpQDrkV2aSBNrSt8wLr59RFRgBo=",
-        "ref": "refs/tags/v0.4.4",
-        "rev": "2a46a3bcfdf4fa355ca454ccbed264bc20223c01",
-        "revCount": 108,
+        "lastModified": 1791073650,
+        "narHash": "sha256-pHvbUn+CIZEAkYMKFd63hwuVAWJ5XG5ow7M0E2oF2SE=",
+        "ref": "refs/heads/main",
+        "rev": "bd26fea8a2124bb4b1bbd8721418d831b4c2bf13",
+        "revCount": 117,
         "type": "git",
         "url": "https://github.com/Bullish-Design/vendomat"
       },
       "original": {
-        "ref": "refs/tags/v0.4.4",
+        "rev": "bd26fea8a2124bb4b1bbd8721418d831b4c2bf13",
         "type": "git",
         "url": "https://github.com/Bullish-Design/vendomat"
       }
