@@ -52,7 +52,7 @@ longer applies.
 `/mnt/shared` stays out of Phase 0. It is declared at
 `machines/server.nix:620` as an `ntfs3` automount and holds 129 GiB of
 unadjudicated data. Phase F stays blocked until that data has its own verified
-policy. `profiles/backup.nix:628` asserts that the repository is not under
+policy. `profiles/backup.nix:638` asserts that the repository is not under
 `/mnt/shared`.
 
 The profile is enabled on the host: `machines/server.nix:668` sets
@@ -247,8 +247,8 @@ independent check runs at every `nixos-rebuild switch`, via
 condition and prints the same operator command, but to stderr during
 activation rather than to a marker file.
 
-**It warns; it never fails.** The script ends with an unconditional `exit 0`,
-regardless of what it found. This is a deliberate departure from
+**It warns; it never fails.** The script ends with a plain `true`, regardless
+of what it found. This is a deliberate departure from
 `nix-secrets/modules/secrets.nix`'s `nixSecretsValidateAgeKey`, which exits 1
 when the age identity is absent — correct there, because an absent age key
 makes *every* secret on the host undecryptable. A missing restic repository
@@ -259,6 +259,14 @@ gated by the same `active` condition (`cfg.enable`, since §2's change removed
 the secret half of that condition) that gates every unit in this profile —
 it does not exist in `config.system.activationScripts` at all when the
 profile is inactive.
+
+**An activation snippet must never call `exit`.** NixOS concatenates every
+`system.activationScripts` snippet into one shared bash script, so an `exit`
+anywhere in it terminates the *whole* script, not just the snippet that
+called it, and silently skips every snippet that runs after. An earlier
+revision of this script ended with `exit 0` instead of `true`; see
+`EVIDENCE.md` §"Activation exit bug" for the host failure that caused and the
+fix.
 
 ---
 
@@ -285,8 +293,8 @@ The module hardcodes `RESTIC_CACHE_DIR = "/var/cache/restic-backups-<name>"`
 has 26 GB free of 444 GB.
 
 **Decision.** Override it per unit with `lib.mkForce`
-(`profiles/backup.nix:465` and `:703`), pointing at
-`<mountPoint>/restic-cache`. `profiles/backup.nix:643` asserts the cache is
+(`profiles/backup.nix:465` and `:713`), pointing at
+`<mountPoint>/restic-cache`. `profiles/backup.nix:653` asserts the cache is
 under the mount point.
 
 The module's `CacheDirectory=` still creates an empty
@@ -380,7 +388,7 @@ gone.
 (`machines/server.nix:320`, pinned to `postgresql_17`). Atuin uses it.
 Copying live cluster files is **not** a valid database backup.
 
-`profiles/backup.nix:665` adds a logical `pg_dumpall` stream into the same
+`profiles/backup.nix:675` adds a logical `pg_dumpall` stream into the same
 repository, behind `nix-meta.backup.postgres.enable`, default off. The owner
 question is settled: the generated `pg_hba.conf` carries
 `local all postgres peer map=postgres` and the default `identMap` maps only

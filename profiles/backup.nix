@@ -612,7 +612,17 @@ in
               echo "Until then, restic-backups-${jobName}.service fails its preflight check."
             } >&2
           fi
-          exit 0
+
+          # Never `exit` here. NixOS concatenates every activation snippet
+          # into ONE shared bash script; an `exit` in this snippet would
+          # terminate that whole script, not just this snippet, and skip
+          # every snippet that runs after it — including `setupSecrets` and
+          # `silverbulletSpaceTraverse`. This snippet cannot fail on its own:
+          # NixOS sets `_localstatus=0` before each snippet runs, and the
+          # body above only runs `mountpoint` and `echo`, so there is
+          # nothing here to propagate a failure. End on a plain command
+          # instead of `exit 0`.
+          true
         '';
       };
 

@@ -1250,3 +1250,265 @@ The `/tmp` throwaway restic repository (14.5) and the `/tmp` preflight
 functional-test trees (14.8) were both removed after use. No change was
 made outside this repository's working tree; `/mnt/wd_green1/restic`, the
 real host repository, was never touched.
+
+---
+
+## 15. The activation exit bug (lane `phase-0-fix-activation-exit`)
+
+**Session:** 2026-10-03, in the lane's own workspace
+(`.worktrees/phase-0-fix-activation-exit`). Fixes a defect in §14's
+`system.activationScripts.resticBackupNeedsInitWarning`: the snippet ended
+with `exit 0`.
+
+### 15.1 The defect
+
+NixOS does not run each `system.activationScripts` entry as its own
+process. It concatenates every snippet's `text` into **one** shared bash
+script (`$out/activate`), separated only by comments and a per-snippet
+`_localstatus=0` reset. An `exit` anywhere in that script terminates the
+**whole** script, not the one snippet that called it, and every snippet
+after it in file order never runs.
+
+`resticBackupNeedsInitWarning` ended with an unconditional `exit 0`. That
+line is correct syntax, builds cleanly, and passes `bash -n` in isolation
+— the defect is invisible unless the concatenated script, not the
+snippet alone, is inspected.
+
+### 15.2 Why it happened
+
+`exit N` is the right way to end a script that systemd (or anything else)
+runs as its own process. Three other scripts in `profiles/backup.nix` —
+`preflight`, `failureScript`, and `healthScript` — are each built with
+`pkgs.writeShellScript` and run as a standalone executable by a systemd
+unit; `exit 1` inside any of them is correct and was not touched by this
+fix. `system.activationScripts.*.text` looks like the same kind of
+script — it is a `''...''` string of bash, run with `set -e` semantics by
+convention — but it is spliced into a shared file with every other
+machine's and profile's activation snippet. The author carried the
+"standalone script" idiom (end on `exit 0` to state "this snippet
+succeeded") across that boundary into a context where `exit` is never
+safe. The comment directly above the bug (`profiles/backup.nix:584`,
+"It only WARNS; it never fails the activation") correctly states the
+*intent* — never fail activation — but the implementation chose the one
+primitive that does exactly the opposite of that intent in a concatenated
+script.
+
+### 15.3 The observed symptom on the host
+
+The user ran `nixos-rebuild switch` after the change that added this
+snippet (§14) landed. The service failed:
+
+```
+switching to system configuration ... failed (status 4)
+nixos-rebuild-switch-to-configuration.service: Main process exited, code=exited, status=4/NOPERMISSION
+```
+
+The system profile advanced to generation 133
+(`/nix/var/nix/profiles/system-133-link`), but `/run/current-system` stayed
+at generation 132: **no new systemd unit was installed**, because
+`setupSecrets` and every snippet after `resticBackupNeedsInitWarning` in
+file order never ran. This is why the restic timers the §14 change was
+meant to create were absent from the running system — not because the
+units were never built, but because the activation script that installs
+them was cut short before it reached that point.
+
+### 15.4 Proof, before the fix
+
+Trunk's own `activate` script, built and inspected directly (not assumed
+from source), shows the exact mechanism:
+
+```
+$ OUT_BEFORE=$(nix build --no-link --print-out-paths "path:$PWD#nixosConfigurations.server.config.system.build.toplevel")
+$ grep -n 'exit' "$OUT_BEFORE/activate"
+99:  exit 1
+124:exit 0
+191:exit $_status
+```
+
+Line 124 is the bug. The surrounding section (`sed -n '95,145p'`) shows
+the sequence this task's bug report predicted, confirmed against the real
+built script:
+
+```
+#### Activation script snippet resticBackupNeedsInitWarning:
+_localstatus=0
+...
+fi
+exit 0
+
+if (( _localstatus > 0 )); then
+  printf "Activation script snippet '%s' failed (%s)\n" "resticBackupNeedsInitWarning" "$_localstatus"
+fi
+
+#### Activation script snippet setupSecrets:
+_localstatus=0
+[ -e /run/current-system ] || echo setting up secrets...
+(
+  ...
+  /nix/store/.../sops-install-secrets /nix/store/...-manifest.json
+)
+...
+
+#### Activation script snippet silverbulletSpaceTraverse:
+...
+```
+
+`setupSecrets` and `silverbulletSpaceTraverse` are both present in the
+file, after the bug — and both are unreachable at runtime, because `exit
+0` on the line before them ends the process first.
+
+### 15.5 The fix
+
+`profiles/backup.nix`'s `resticBackupNeedsInitWarning.text` now ends on a
+plain `true`, preceded by a comment explaining why `exit` must never
+appear here (naming the concatenation as the reason), instead of `exit 0`.
+No other line in the snippet changed. The snippet still cannot fail on its
+own: NixOS sets `_localstatus=0` before the snippet runs, and the body
+only runs `mountpoint` and `echo`, so there was never anything to
+propagate — `exit 0` was asserting a fact that was already true by
+construction, at the cost of ending the whole script.
+
+### 15.6 Proof, after the fix
+
+```
+$ nix flake check --no-build "path:$PWD"
+all checks passed!
+
+$ nix eval --raw "path:$PWD#nixosConfigurations.server.config.system.build.toplevel.drvPath"
+/nix/store/06l3h0sfizgrzn576651ai3hafynla84-nixos-system-server-26.11.20260705.d407951.drv
+
+$ OUT=$(nix build --no-link --print-out-paths "path:$PWD#nixosConfigurations.server.config.system.build.toplevel")
+$ grep -n 'exit' "$OUT/activate"
+99:  exit 1
+125:# Never `exit` here. NixOS concatenates every activation snippet
+126:# into ONE shared bash script; an `exit` in this snippet would
+133:# instead of `exit 0`.
+201:exit $_status
+```
+
+No `exit` command remains inside the snippet — only comment text matches
+the word, and the two real `exit` lines (99, 201) belong to unrelated,
+pre-existing snippets (`nixSecretsValidateAgeKey`'s own `exit 1`, and the
+script's own closing `exit $_status`).
+
+`setupSecrets` and `silverbulletSpaceTraverse` now run, with nothing
+short-circuiting them:
+
+```
+#### Activation script snippet resticBackupNeedsInitWarning:
+_localstatus=0
+...
+fi
+
+# Never `exit` here. NixOS concatenates every activation snippet
+# into ONE shared bash script; an `exit` in this snippet would
+# terminate that whole script, not just this snippet, and skip
+# every snippet that runs after it — including `setupSecrets` and
+# `silverbulletSpaceTraverse`. This snippet cannot fail on its own:
+# NixOS sets `_localstatus=0` before each snippet runs, and the
+# body above only runs `mountpoint` and `echo`, so there is
+# nothing here to propagate a failure. End on a plain command
+# instead of `exit 0`.
+true
+
+if (( _localstatus > 0 )); then
+  printf "Activation script snippet '%s' failed (%s)\n" "resticBackupNeedsInitWarning" "$_localstatus"
+fi
+
+#### Activation script snippet setupSecrets:
+_localstatus=0
+[ -e /run/current-system ] || echo setting up secrets...
+(
+  ...
+  /nix/store/.../sops-install-secrets /nix/store/...-manifest.json
+)
+
+if (( _localstatus > 0 )); then
+  printf "Activation script snippet '%s' failed (%s)\n" "setupSecrets" "$_localstatus"
+fi
+
+#### Activation script snippet silverbulletSpaceTraverse:
+_localstatus=0
+d=/home/andrew/Notes
+...
+```
+
+The whole concatenated script still parses:
+
+```
+$ bash -n "$OUT/activate" && echo PARSE_OK
+PARSE_OK
+```
+
+The restic units are present in the built system:
+
+```
+$ ls "$OUT/etc/systemd/system/" | grep -i restic
+restic-backup-failure@.service
+restic-backup-health.service
+restic-backup-health.timer
+restic-backups-system.service
+restic-backups-system.timer
+restic-check-system.service
+restic-check-system.timer
+```
+
+Backup, check and health services and timers, plus the templated failure
+unit — the full set this profile creates with `postgres.enable` left at
+its default (off).
+
+Live-config assertions, re-run against the fixed lane:
+
+```
+$ nix eval --json "path:$PWD#nixosConfigurations.server.config.systemd.timers" \
+    --apply 'ts: builtins.filter (n: builtins.match "restic.*" n != null) (builtins.attrNames ts)'
+["restic-backup-health","restic-backups-system","restic-check-system"]
+
+$ nix eval --json "path:$PWD#nixosConfigurations.server.config.systemd.services" \
+    --apply 'ss: builtins.filter (n: builtins.match "restic.*" n != null) (builtins.attrNames ss)'
+["restic-backup-failure@","restic-backup-health","restic-backups-system","restic-check-system"]
+
+$ nix eval --json "path:$PWD#nixosConfigurations.server.config.warnings" \
+    --apply 'ws: builtins.filter (w: builtins.match ".*restic-password.*" w != null) ws'
+[]
+```
+
+Timers and services are both non-empty, and no `restic-password` warning
+fires.
+
+### 15.7 Anchor remeasurement
+
+The fix inserts 9 lines before the former `exit 0` line. Every
+`profiles/backup.nix:<line>` anchor in `DESIGN.md` that falls after the
+snippet was remeasured against the rewritten file and corrected:
+
+| Anchor (old → new) | Line content |
+|---|---|
+| `:628` → `:638` | the `/mnt/shared` assertion |
+| `:643` → `:653` | the cache-under-mountPoint assertion |
+| `:665` → `:675` | `(lib.mkIf (active && cfg.postgres.enable) {` |
+| `:703` → `:713` | `environment.RESTIC_CACHE_DIR = lib.mkForce cfg.cacheDir;` (postgres unit) |
+
+Every anchor at or before the snippet itself (`:597`, the attribute
+itself; `:567`, `:513`, `:465`, and earlier) is unchanged, because the
+fix only touched lines inside the snippet's own `text`, after its last
+pre-existing line.
+
+### 15.8 What this fix did not touch
+
+`exit 1` in `preflight`, `failureScript`, and `healthScript`
+(`profiles/backup.nix:100`, `:259`, `:264`, `:270`) are each inside a
+`pkgs.writeShellScript` — a standalone executable run by its own systemd
+unit, in its own process. `exit` there ends only that process, correctly.
+None of those three scripts were changed.
+
+`nix-secrets/modules/secrets.nix`'s `nixSecretsValidateAgeKey` activation
+snippet (confirmed in the built `activate` script, line 99: `exit 1`) is
+untouched. It is a different activation snippet with a deliberately
+different contract — it is meant to abort the whole activation when the
+host's age identity is absent, because that absence makes every secret
+undecryptable. Its `exit 1` is not a bug; it is the one case in this
+host's activation scripts where ending the whole concatenated script is
+the intended behavior. `profiles/backup.nix`'s own comment (line 584 area)
+already says not to copy that pattern here, and this fix does not change
+that script or that comment's reasoning.
