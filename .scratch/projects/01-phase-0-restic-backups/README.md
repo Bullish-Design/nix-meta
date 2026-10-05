@@ -1,9 +1,10 @@
 # Phase 0 — restic system backups
 
-**Status:** BLOCKED on one operator action. The target disk is decided, the
-repository exists, the design is passwordless, the profile is enabled, and
-the `nix-meta` changes are landed and verified.
+**Status:** PASSED. All five gate conditions hold: a successful snapshot,
+a repository check, the exact restore gate, `EVIDENCE.md` recording it,
+and the changes landed and pushed.
 **Opened:** 2026-10-01
+**Closed:** 2026-10-04
 **Host:** `server` (Dell Precision 5820, Xeon W-2125, 128 GB RAM)
 **Parent project:** `vendomat/.scratch/projects/07-local-depot-release-bus/IMPLEMENTATION.md`, Phase 0
 
@@ -28,18 +29,17 @@ umbrella guide.
 
 ## The gate
 
-Phase 0 is complete only when all five hold:
+Phase 0 is complete. All five conditions hold:
 
-1. `restic snapshots` lists a successful snapshot.
-2. A repository check succeeds.
+1. `restic snapshots` lists a successful snapshot. **MET** — two
+   snapshots, `3dd34831` and `26236227`. See `EVIDENCE.md` §16.
+2. A repository check succeeds. **MET** — `restic-check-system.service`
+   succeeded 2026-10-04 04:10:47 EDT. See `EVIDENCE.md` §16.
 3. The restore gate restores three exact files and `cmp` matches each.
-4. `EVIDENCE.md` records the result.
+   **MET** — see `EVIDENCE.md` §16.
+4. `EVIDENCE.md` records the result. **MET** — `EVIDENCE.md` §16.
 5. The repository changes have landed and been pushed. **MET** — see
-   `EVIDENCE.md` §8. The tag and the re-pin are also done.
-
-Items 1 through 4 (`restic snapshots`, the repository check, the restore
-gate, `EVIDENCE.md`) are **NOT MET**. Nothing has run on the host. See "What
-blocks this" below.
+   `EVIDENCE.md` §8 and §16. The tag and the re-pin are also done.
 
 ## What is done
 
@@ -62,16 +62,16 @@ blocks this" below.
   Green's age and load-cycle count are an accepted risk; a NAS is planned as
   a second copy location later.
 - `machines/server.nix` sets `nix-meta.backup.enable = true` with
-  `mountPoint = "/mnt/wd_green1"`. The host's **live** generation predates
-  this lane and has not yet rebuilt with it; once it does, the units exist
-  immediately, gated only by the preflight check, not by a secret.
+  `mountPoint = "/mnt/wd_green1"`. The host's live generation is now 134,
+  store path
+  `rgzc6m0z55iygpjzbs6g87xh66k87c8b-nixos-system-server-26.11.20260705.d407951`.
+  The units exist and have run: two snapshots, a successful check, and a
+  passed restore gate. See `EVIDENCE.md` §16.
 
-## What blocks this
+## No blocker remains
 
-| Blocker | Needs | Document |
-|---|---|---|
-| `sudo` requires a password | an interactive session | `IMPLEMENTATION.md` step B2 |
-
-B2 is the only remaining blocker. B3 (an off-host SOPS recipient) is
-resolved, not merely deferred: the passwordless design removed the secret
-that recipient would have protected. See `DESIGN.md` §2 and §3.
+B2 (interactive `sudo`) is resolved: the operator ran the privileged steps
+directly, on 2026-10-04. See `IMPLEMENTATION.md` step B2 and `EVIDENCE.md`
+§16. B3 (an off-host SOPS recipient) is resolved, not merely deferred: the
+passwordless design removed the secret that recipient would have
+protected. See `DESIGN.md` §2 and §3.

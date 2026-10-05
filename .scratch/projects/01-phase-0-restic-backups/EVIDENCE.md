@@ -15,15 +15,16 @@ restic 0.19.0
 
 | Gate condition | State |
 |---|---|
-| `restic snapshots` lists a successful snapshot | **NOT MET** — no repository on a healthy disk |
-| a repository check succeeds | **NOT MET** |
-| the restore gate restores three exact files and `cmp` matches | **NOT MET** |
-| `EVIDENCE.md` records the result | partial — this document records the work done |
-| the repository changes have landed and been pushed | **MET** — both lanes landed and pushed to origin; the `nix-secrets` tag `v0.1.1` and the `nix-meta` re-pin are both complete (see §8) |
+| `restic snapshots` lists a successful snapshot | **MET** — two snapshots, `3dd34831` and `26236227` (see §16) |
+| a repository check succeeds | **MET** — `restic-check-system.service` succeeded 2026-10-04 04:10:47 EDT (see §16) |
+| the restore gate restores three exact files and `cmp` matches | **MET** — all three files restored, non-empty, `cmp` OK (see §16) |
+| `EVIDENCE.md` records the result | **MET** — §16 records the full measured result |
+| the repository changes have landed and been pushed | **MET** — see §8 and §16 |
 
-**Phase 0 is not complete.** One operator action blocks it (interactive
-`sudo`, B2); see `IMPLEMENTATION.md` §B. B3, the off-host SOPS recipient,
-is resolved by the passwordless conversion in §14, not by a recipient.
+**Phase 0 is complete.** All five gate conditions hold; see §16 for the
+measured result. B2 (interactive `sudo`) is resolved: the operator ran the
+privileged steps directly. B3, the off-host SOPS recipient, is resolved by
+the passwordless conversion in §14, not by a recipient.
 
 ---
 
@@ -113,6 +114,13 @@ Three facts follow.
    invocation, not restic's own output, which went to a terminal. Completion
    remains **unproven**. `IMPLEMENTATION.md` step C1 is the read-only
    adjudication.
+
+   **Forward note, superseded by §16.** This section recorded completion as
+   unproven at the time it was written (2026-10-01/02). §16 (2026-10-04)
+   settles the question: snapshot `3dd34831`, taken 2026-09-28 22:51:16, is
+   present in the repository, so the 2026-09-28 backup did complete. The
+   reasoning above stays as the record of what was known at the time, not
+   deleted.
 3. The 2026-09-28 attempt to add `restic-password` **failed**. It used
    `SOPS_AGE_SSH_PRIVATE_KEY_FILE`, which offers the SSH key as an
    `ssh-ed25519` age identity. Both recipients in `.sops.yaml` are native
@@ -1512,3 +1520,141 @@ host's activation scripts where ending the whole concatenated script is
 the intended behavior. `profiles/backup.nix`'s own comment (line 584 area)
 already says not to copy that pattern here, and this fix does not change
 that script or that comment's reasoning.
+
+---
+
+## 16. The Phase 0 gate — PASSED (lane `phase-0-gate-passed`)
+
+**Session:** 2026-10-04, operator-run on `server` with an interactive
+`sudo` session. Recorded from the lane's own workspace
+(`.worktrees/phase-0-gate-passed`). This section settles every condition
+`IMPLEMENTATION.md` §B2 left blocked, and it is the fifth gate condition in
+its own right: this record.
+
+### 16.1 Repository
+
+**Host** `server`. **Repository** `/mnt/wd_green1/restic`. **Repository
+ID** `9b7b6fc1`, format version 2, compression `auto`.
+
+### 16.2 System generation
+
+**Generation 134**, store path
+`rgzc6m0z55iygpjzbs6g87xh66k87c8b-nixos-system-server-26.11.20260705.d407951`.
+`/run/current-system` and the system profile now agree. This resolves the
+split state described in §15.3, where the system profile advanced to
+generation 133 but `/run/current-system` stayed at 132 because the
+activation-exit bug cut the script short before it reached `setupSecrets`.
+
+### 16.3 Snapshots
+
+Two snapshots in the repository:
+
+| Snapshot | Taken | Source size |
+|---|---|---|
+| `3dd34831` | 2026-09-28 22:51:16 | 137.748 GiB |
+| `26236227` | 2026-10-04 02:49:33 | 141.014 GiB |
+
+This settles the question §3 (point 2) left open: **the 2026-09-28 backup
+did complete.** Its completion could not be proven from the journal alone,
+because the journal recorded only the `sudo` invocation. It is now proven
+by the snapshot's presence in the repository.
+
+**Runtime.** Today's backup took 2 minutes 14 seconds (02:49:33 to
+02:51:47) for 141 GiB, because almost everything deduplicated against the
+2026-09-28 snapshot.
+
+### 16.4 Backup run
+
+`restic-backups-system.service`: `Result=success`, `ExecMainStatus=0`,
+finished 2026-10-04 02:51:47 EDT.
+
+Retention ran: `forget --prune --keep-daily 7 --keep-weekly 4
+--keep-monthly 6`, and tagged both snapshots as daily/weekly/monthly
+correctly.
+
+### 16.5 Check run
+
+`restic-check-system.service`, `--read-data-subset=10%`, started
+2026-10-04 04:09:16, succeeded 04:10:47.
+
+### 16.6 Health timer
+
+Ran 2026-10-04 09:04:26 and passed. This proves the 36-hour freshness
+check works against a real recent success, not only in isolation.
+
+### 16.7 Stored size
+
+`/mnt/wd_green1` went from 59 G to 61 G used, 1.7 T available, 4%.
+
+### 16.8 Status markers
+
+Present:
+
+- `/var/lib/restic-backup-status/last-success-backup`
+  (`epoch=1791096707`, `time=2026-10-04T02:51:47-04:00`)
+- `/var/lib/restic-backup-status/last-success-check`
+  (`epoch=1791101447`, `time=2026-10-04T04:10:47-04:00`)
+
+Absent: `last-failure`, `last-failure.log`, `needs-init`.
+
+### 16.9 Live binary and repository environment
+
+The units use
+`/nix/store/fz0v6dfn1yl3z28k0kckpasn98k1pgxj-restic-no-password/bin/restic`,
+with `RESTIC_REPOSITORY=/mnt/wd_green1/restic` and no
+`RESTIC_PASSWORD_FILE` anywhere. The passwordless design (`DESIGN.md` §2)
+is confirmed live, not just in evaluation.
+
+### 16.10 Timer schedule, as installed
+
+| Timer | Last | Next |
+|---|---|---|
+| `restic-backups-system` | 2026-10-04 02:49:32 | 2026-10-05 02:48:42 |
+| `restic-check-system` | 2026-10-04 04:09:16 | 2026-10-11 04:13:50 |
+| `restic-backup-health` | 2026-10-04 09:04:26 | 2026-10-05 09:07:44 |
+
+### 16.11 The restore gate — PASSED
+
+Run from snapshot `26236227` into `/tmp/restic-restore.MelxhTWB`. Restic
+output:
+
+```
+repository 9b7b6fc1 opened (version 2, compression level auto)
+[0:00] 100.00%  17 / 17 index files loaded
+restoring snapshot 26236227 of [/home/andrew /etc /var/lib] at 2026-10-04 02:49:33.784261492 -0400 EDT by root@server to /tmp/restic-restore.MelxhTWB
+Summary: Restored 13 / 3 files/dirs (5.375 KiB / 5.375 KiB) in 0:00
+```
+
+| Restored file | Size | Owner/mode | `cmp` vs live |
+|---|---|---|---|
+| `/home/andrew/Documents/Projects/nix-meta/AGENTS.md` | 4628 B | `andrew:users 644` | **OK** |
+| `/etc/ssh/ssh_host_ed25519_key` | 411 B | **`root:root 600`** | **OK** |
+| `/var/lib/nixos/declarative-users` | 465 B | `root:root 644` | **OK** |
+
+All three exist, all three are non-empty, all three are byte-identical to
+the live files. The SSH host key came back as `root:root 0600`, which is
+the `DESIGN.md` §7 requirement and proves restic preserves ownership and
+mode, not only content.
+
+**What this proves, stated plainly.** This gate proves **file
+restoration**. It does **not** prove Mnemonix Hindsight application
+consistency, which remains unsolved and must be settled before Phase E
+(`DESIGN.md` §9). It also does not prove PostgreSQL recoverability — the
+`pg_dumpall` job (`IMPLEMENTATION.md` step C11) is still disabled and
+unproven, and `/var/lib/postgresql` remains inside the file backup for
+that reason.
+
+**The temporary restore directory.** `/tmp/restic-restore.MelxhTWB` held a
+private SSH host key. The operator was given the exact resolved-path
+removal command. Its creation is recorded here; removal was instructed,
+not verified. Do not assume it was removed, and do not remove it from a
+later session without first confirming its path still matches exactly.
+
+### 16.12 Phase 0, complete
+
+All five gate conditions (`DESIGN.md`/`README.md` "The gate") now hold:
+a successful snapshot (§16.3), a repository check (§16.5), the exact
+restore gate (§16.11), this record (§16, the whole section), and the
+`nix-meta` documentation changes landed and pushed (this lane,
+`phase-0-gate-passed`; see `gitman status`/`gitman push` output recorded
+at land time). No blocker remains.

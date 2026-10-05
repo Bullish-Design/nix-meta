@@ -328,6 +328,11 @@ Each restored file must exist, be non-empty, and match the live file with
 The gate proves **file restoration**. It does not prove application
 consistency. See §9.
 
+**Passed, 2026-10-04.** All three files restored from snapshot
+`26236227`, each non-empty and `cmp`-identical to the live file; the SSH
+host key came back `root:root 0600`. This completes Phase 0. See
+`EVIDENCE.md` §16 for the full measured result.
+
 ---
 
 ## 8. Failure is never silent

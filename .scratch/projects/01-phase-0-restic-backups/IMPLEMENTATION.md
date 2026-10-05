@@ -53,10 +53,12 @@ pass with the profile in the composition; see `EVIDENCE.md` §6.
 
 ## B. Blockers — operator actions
 
-One blocker remains: B2 (interactive `sudo`). B1 is resolved by decision,
-not by hardware. B3 is resolved by the passwordless design, not by an
-off-host recipient. B4 was resolved earlier by a hand-made tag. Numbering
-stays as originally assigned; no blocker number is reused or dropped.
+No blocker remains. B2 (interactive `sudo`) is resolved: the operator ran
+the privileged steps directly, on 2026-10-04 (see `EVIDENCE.md` §16). B1
+is resolved by decision, not by hardware. B3 is resolved by the
+passwordless design, not by an off-host recipient. B4 was resolved earlier
+by a hand-made tag. Numbering stays as originally assigned; no blocker
+number is reused or dropped.
 
 ### B1. Target disk **[resolved: decision]**
 
@@ -100,16 +102,19 @@ If the UUID changed, `machines/server.nix:637` needs the new one before
 anything else. Moving the profile's `mountPoint` back to a WD Re disk, once
 one is proved, is a one-line change in `machines/server.nix`.
 
-### B2. A session where `sudo` can authenticate **[blocked: password]**
+### B2. A session where `sudo` can authenticate **[resolved: operator ran it]**
 
-Every privileged step needs it. `sudo` currently refuses:
+Every privileged step needs it. `sudo` refused in every earlier automated
+session:
 
 ```
 sudo: a password is required
 ```
 
-The journal shows a session at `Oct 01 21:50:29` hitting the same refusal, so
-this is not new. Run the privileged steps from an interactive terminal.
+The journal showed a session at `Oct 01 21:50:29` hitting the same
+refusal, so that was not new. The operator ran the privileged steps
+directly, from an interactive terminal, on 2026-10-04. See `EVIDENCE.md`
+§16 for the measured result. No blocker remains.
 
 ### B3. An off-host SOPS recipient **[resolved: passwordless design]**
 
@@ -157,12 +162,17 @@ by the user at every `nix-secrets` release.
 
 ## C. Steps that run once B clears
 
-### C1. Adjudicate the existing WD Green repository **[ready, needs B2]**
+### C1. Adjudicate the existing WD Green repository **[done]**
 
 `/mnt/wd_green1/restic` exists, `root:root 0700`, created 2026-09-28 22:51 by
 restic 0.19.0 with `--insecure-no-password`. The filesystem holds 59 GB, which
 is almost certainly that repository, but the journal records only the `sudo`
 invocation, so **completion is unproven**.
+
+**Done, 2026-10-04.** All three commands below were run. `snapshots`
+listed two snapshots (`3dd34831` and `26236227`), `check` succeeded, and
+`stats` reported source sizes matching `EVIDENCE.md` §16's table.
+Completion is proven, not merely likely.
 
 Read-only first. Nothing here writes to the repository.
 
@@ -260,7 +270,7 @@ and push, then prove the secret arrived at `/run/secrets/restic-password`.~~
 Steps 1 and 2 of the original step (the `v0.1.1` re-pin) happened for an
 unrelated reason and are unaffected; see C4 above.
 
-### C6. Confirm the repository, do not initialize one **[ready, needs B2]**
+### C6. Confirm the repository, do not initialize one **[done]**
 
 There is nothing to initialize. The repository at `/mnt/wd_green1/restic`
 already exists (C1), with its original `--insecure-no-password` key. This
@@ -292,16 +302,28 @@ loud-but-harmless signal the preflight check gives at run time, just earlier.
 It stops appearing once the repository this step confirms actually exists and
 has a `config` file.
 
-### C7. Activate and inspect **[ready, needs C6]**
+**Done, 2026-10-04.** `restic cat config` succeeded. The repository is
+confirmed, so the activation-time warning described above no longer
+appears. See `EVIDENCE.md` §16.
+
+### C7. Activate and inspect **[done]**
 
 The option block itself is already landed on trunk (`machines/server.nix`,
 `nix-meta.backup.enable = true`, `mountPoint = "/mnt/wd_green1"`). This step
 no longer adds it. It activates the rebuild and inspects what was generated.
 
+**Activate by the exact pinned commit, not by the short flake reference.**
+The shared working copy of `nix-meta` on this host sits on an Atuin lane,
+behind trunk. The short form, `--flake '.#server'`, resolves against
+whatever is checked out in that working copy, so it silently builds the
+lane instead of trunk, with no warning that it did so. That form has
+already cost two rebuilds and produced an activation with no restic units
+at all. Pin the flake reference to trunk explicitly instead:
+
 ```bash
 nix flake check --no-build
 nix eval --raw '.#nixosConfigurations.server.config.system.build.toplevel.drvPath' > /dev/null
-sudo nixos-rebuild switch --flake '.#server'
+sudo nixos-rebuild switch --flake 'git+file:///home/andrew/Documents/Projects/nix-meta?ref=refs/heads/main#server'
 
 systemctl cat restic-backups-system.service
 systemctl cat restic-check-system.service
@@ -319,7 +341,13 @@ and `systemctl cat` shows the real units below — which this design creates
 unconditionally once `nix-meta.backup.enable = true`, with no secret-arrival
 gate.
 
-### C8. The restore gate **[ready, needs C7]**
+**Done, 2026-10-04.** System generation 134, store path
+`rgzc6m0z55iygpjzbs6g87xh66k87c8b-nixos-system-server-26.11.20260705.d407951`.
+`/run/current-system` and the system profile now agree, so the split state
+left by the `EVIDENCE.md` §15.3 activation failure is resolved. See
+`EVIDENCE.md` §16.
+
+### C8. The restore gate **[done — PASSED]**
 
 ```bash
 sudo systemctl start restic-backups-system.service
@@ -359,13 +387,24 @@ repository and the cache directory, and it runs the same wrapped,
 flag-injecting restic package as the service, so it cannot reach a
 different repository and cannot prompt for a password.
 
-### C9. The weekly check **[ready, needs C7]**
+**Done, 2026-10-04 — PASSED.** Run from snapshot `26236227` into
+`/tmp/restic-restore.MelxhTWB`. All three files restored, non-empty, and
+`cmp` OK against the live files; the SSH host key came back `root:root
+0600`. The restore directory held a private SSH host key; the operator
+was given the exact resolved-path removal command shown above. Removal is
+not verified here — do not assume it ran. See `EVIDENCE.md` §16 for the
+full record.
+
+### C9. The weekly check **[done]**
 
 ```bash
 sudo systemctl start restic-check-system.service
 systemctl status restic-check-system.service
 cat /var/lib/restic-backup-status/last-success-check
 ```
+
+**Done, 2026-10-04.** `restic-check-system.service` succeeded, started
+04:09:16, finished 04:10:47 EDT. See `EVIDENCE.md` §16.
 
 ### C10. Prove the failure path **[ready, needs C7]**
 
