@@ -7,7 +7,11 @@
     # Pi changes rapidly and is used by Paseo as an external CLI. Keep its
     # package evaluation on an independently locked nixpkgs commit, so routine
     # system nixpkgs bumps cannot change the Pi binary unexpectedly.
-    pi-nixpkgs.url = "github:NixOS/nixpkgs/6774f7bc253789b113a4f39285dc0fa100abeacc";
+    #
+    # Pinned to a nixpkgs master commit that carries pi-coding-agent 1.0.2.
+    # nixos-unstable still ships 1.0.0 as of 2026-10-05; upstream pi is at
+    # v1.0.3, not yet packaged in nixpkgs.
+    pi-nixpkgs.url = "github:NixOS/nixpkgs/24d907a895dce36d9e65748237ba8c8bac3e1de8";
 
     # Keep the developer-environment toolchain independent from the system
     # package set. This lets us adopt a new devenv release when it needs a newer
@@ -21,7 +25,7 @@
     # here and ignored, while `pkgs.devenv` from the system nixpkgs supplied the
     # actual binary — three declarations for one name (023-toolchain P4).
     devenv = {
-      url = "github:cachix/devenv/v2.2.2";
+      url = "github:cachix/devenv/v2.4.0";
       inputs.nixpkgs.follows = "devenv-nixpkgs";
     };
 
