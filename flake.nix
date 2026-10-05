@@ -78,7 +78,7 @@
     # into a rebuild. Bump the tag to adopt a new secret, exactly like the
     # vendomat/repoman/devman pins above.
     nix-secrets = {
-      url = "git+file:///home/andrew/Documents/Projects/nix-secrets?ref=refs/tags/v0.1.1";
+      url = "git+file:///home/andrew/Documents/Projects/nix-secrets?ref=refs/tags/v0.1.3";
       inputs.nixpkgs.follows = "nixpkgs";
     };
 
@@ -123,7 +123,7 @@
     # Shared Hindsight service and declarative Claude/Codex/Pi wiring. This is
     # a direct composer input: nix-paseo does not depend on Mnemonix.
     mnemonix = {
-      url = "git+file:///home/andrew/Documents/Projects/mnemonix?ref=refs/tags/v0.1.3";
+      url = "git+file:///home/andrew/Documents/Projects/mnemonix?ref=refs/tags/v0.2.0";
       inputs.nixpkgs.follows = "nixpkgs";
     };
 
