@@ -8,7 +8,8 @@ case "$arm" in
   low) target_level=low; target_profile=0 ;;
   manual-default) target_level=manual; target_profile=0 ;;
   power-saving) target_level=manual; target_profile=2 ;;
-  *) echo "usage: sudo bash $0 {low|manual-default|power-saving}" >&2; exit 3 ;;
+  power-saving-soak) target_level=manual; target_profile=2 ;;
+  *) echo "usage: sudo bash $0 {low|manual-default|power-saving|power-saving-soak}" >&2; exit 3 ;;
 esac
 
 if [[ $EUID -ne 0 ]]; then

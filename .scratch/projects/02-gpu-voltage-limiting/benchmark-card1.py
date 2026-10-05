@@ -26,6 +26,11 @@ EXPECTED_SHA256 = 'bee238bbeb3dc0a34bde4d0dedbaee1f98c009e8bb4226f03070054c12fb1
 PORT = 18170
 MIB = 1048576
 EXPERIMENT_STOP_C = 72
+SOAK_SECONDS = 15 * 60
+SOAK_MIN_PROMPT_TOKENS = 8192
+SOAK_MIN_COMPLETION_TOKENS = 1536
+SOAK_MIN_REASONING_TOKENS = 1024
+SOAK_MIN_REASONING_CHARACTERS = 4000
 
 
 def utc():
@@ -160,13 +165,81 @@ def validate(case, result):
             'reason': None if ok else 'content did not meet the case check'}
 
 
+def soak_request(cycle):
+    rows = []
+    for index in range(600):
+        junction = 42 + (index * 7 + cycle * 3) % 27
+        power = 142 + (index * 11 + cycle * 5) % 91
+        queue = (index * 13 + cycle * 17) % 38
+        errors = 1 if (index + cycle * 19) % 47 == 0 else 0
+        rows.append(f'SAMPLE-{index:04d} minute={index // 4:03d} card=1 '
+                    f'junction_c={junction} edge_c={junction - 8} power_w={power} '
+                    f'fan_rpm={2260 + (index * 17) % 790} queue={queue} errors={errors}')
+    question = (
+        f'This is a synthetic GPU server log for analysis cycle {cycle}. '
+        'Review the full log. Identify the hottest samples, the largest queues, '
+        'and the error samples. Compare the first and last quarters. '
+        'Explain how temperature, power, fan speed, and queue depth relate in this log. '
+        'Give at least twelve numbered findings, cite sample IDs and values, '
+        'show the calculations behind at least three comparisons, and finish with '
+        'a practical monitoring plan. Check your evidence before you answer.\n\n'
+        + '\n'.join(rows)
+    )
+    return {'model': 'qwen38-27b', 'temperature': 0, 'seed': 42 + cycle,
+            'stream': False, 'max_tokens': 6144,
+            'reasoning_effort': 'xhigh',
+            'chat_template_kwargs': {'enable_thinking': True, 'preserve_thinking': True},
+            'messages': [
+                {'role': 'system', 'content': 'Analyze the evidence carefully before writing a detailed final report.'},
+                {'role': 'user', 'content': question},
+            ]}
+
+
+def validate_soak(result):
+    if result['status'] != 200:
+        return {'ok': False, 'reason': f'HTTP {result["status"]}'}
+    try:
+        data = json.loads(result['body'])
+        choice = data['choices'][0]
+        message = choice['message']
+        content = message.get('content') or ''
+        usage = data['usage']
+        prompt_tokens = int(usage['prompt_tokens'])
+        completion_tokens = int(usage['completion_tokens'])
+    except (ValueError, KeyError, IndexError, TypeError) as exc:
+        return {'ok': False, 'reason': f'bad response: {exc}'}
+    reasoning = message.get('reasoning_content') or ''
+    if not reasoning:
+        match = re.search(r'<think>(.*?)</think>', content, re.DOTALL)
+        reasoning = match.group(1) if match else ''
+    details = usage.get('completion_tokens_details') or {}
+    reported_reasoning_tokens = int(details.get('reasoning_tokens') or 0)
+    checks = {
+        'prompt_tokens': SOAK_MIN_PROMPT_TOKENS <= prompt_tokens <= 32000,
+        'completion_tokens': completion_tokens >= SOAK_MIN_COMPLETION_TOKENS,
+        'reasoning': (reported_reasoning_tokens >= SOAK_MIN_REASONING_TOKENS
+                      or len(reasoning) >= SOAK_MIN_REASONING_CHARACTERS),
+        'final_answer': len(content) >= 1200,
+        'completed': choice.get('finish_reason') == 'stop',
+    }
+    return {'ok': all(checks.values()), 'checks': checks, 'usage': usage,
+            'timings': data.get('timings'), 'elapsed_s': result['elapsed_s'],
+            'content_length': len(content), 'reasoning_length': len(reasoning),
+            'reported_reasoning_tokens': reported_reasoning_tokens,
+            'finish_reason': choice.get('finish_reason')}
+
+
 def main():
     parser = argparse.ArgumentParser()
-    parser.add_argument('label', choices=('baseline', 'low', 'manual-default', 'power-saving', 'compute', 'undervolt'))
+    parser.add_argument('label', choices=('baseline', 'low', 'manual-default', 'power-saving',
+                                          'power-saving-soak', 'compute', 'undervolt'))
     parser.add_argument('--expected-performance-level', default='auto')
     parser.add_argument('--expected-profile', type=int, default=0)
     parser.add_argument('--expected-offset-mv', type=int, default=0)
     args = parser.parse_args()
+    if args.label == 'power-saving-soak' and (args.expected_performance_level,
+                                              args.expected_profile, args.expected_offset_mv) != ('manual', 2, 0):
+        parser.error('the power-saving soak requires manual mode, profile 2, and 0 mV')
     parallel = 2
     ctx = 40960 * parallel
     port = PORT
@@ -282,14 +355,45 @@ def main():
                 raise RuntimeError('server did not become healthy within 120s or exited')
             results['models'] = api(port, '/v1/models', timeout=10)
             results['slots'] = api(port, '/slots', timeout=10)
-            for name, payload in request_cases():
-                save_json(out / f'{name}-request.json', payload)
-                response = api(port, '/v1/chat/completions', payload, timeout=300)
-                save_json(out / f'{name}-response.json', response)
-                results[name] = validate(name, response)
-                save_json(out / 'progress.json', results)
-                if not results[name]['ok']:
-                    raise RuntimeError(f'{name} request validation failed: {results[name]}')
+            if args.label == 'power-saving-soak':
+                started = time.monotonic()
+                results['soak'] = {'started_utc': utc(), 'target_seconds': SOAK_SECONDS,
+                                   'cycles': [], 'minimum_prompt_tokens': SOAK_MIN_PROMPT_TOKENS,
+                                   'minimum_completion_tokens': SOAK_MIN_COMPLETION_TOKENS,
+                                   'minimum_reasoning_tokens': SOAK_MIN_REASONING_TOKENS,
+                                   'minimum_reasoning_characters': SOAK_MIN_REASONING_CHARACTERS}
+                while time.monotonic() - started < SOAK_SECONDS:
+                    cycle = len(results['soak']['cycles']) + 1
+                    name = f'soak-{cycle:03d}'
+                    payload = soak_request(cycle)
+                    save_json(out / f'{name}-request.json', payload)
+                    cycle_started_utc = utc()
+                    response = api(port, '/v1/chat/completions', payload, timeout=600)
+                    save_json(out / f'{name}-response.json', response)
+                    checked = validate_soak(response)
+                    checked.update(cycle=cycle, started_utc=cycle_started_utc, finished_utc=utc())
+                    results['soak']['cycles'].append(checked)
+                    results['soak']['elapsed_seconds'] = time.monotonic() - started
+                    save_json(out / 'progress.json', results)
+                    print(f'{name}: {json.dumps(checked)}', flush=True)
+                    if not checked['ok']:
+                        raise RuntimeError(f'{name} did not meet the long prompt and thinking checks')
+                results['soak']['finished_utc'] = utc()
+                results['soak']['elapsed_seconds'] = time.monotonic() - started
+                results['soak']['completed_cycles'] = len(results['soak']['cycles'])
+                results['soak']['total_prompt_tokens'] = sum(
+                    x['usage']['prompt_tokens'] for x in results['soak']['cycles'])
+                results['soak']['total_completion_tokens'] = sum(
+                    x['usage']['completion_tokens'] for x in results['soak']['cycles'])
+            else:
+                for name, payload in request_cases():
+                    save_json(out / f'{name}-request.json', payload)
+                    response = api(port, '/v1/chat/completions', payload, timeout=300)
+                    save_json(out / f'{name}-response.json', response)
+                    results[name] = validate(name, response)
+                    save_json(out / 'progress.json', results)
+                    if not results[name]['ok']:
+                        raise RuntimeError(f'{name} request validation failed: {results[name]}')
         except Exception as exc:
             results['failure'] = repr(exc)
         finally:
@@ -323,17 +427,26 @@ def main():
     results['cache_log'] = [line for line in log_text.splitlines() if 'KV buffer' in line or 'cache type' in line.lower()][:20]
     results['placement_log'] = [line for line in log_text.splitlines() if 'assigned to device' in line or 'offload' in line.lower()][:80]
     results['placement_ok'] = 'offloaded 66/66 layers to GPU' in log_text and results.get('peak_card1_vram_mib', 0) > 17000
+    passed_requests = (results.get('soak', {}).get('elapsed_seconds', 0) >= SOAK_SECONDS
+                       and results.get('soak', {}).get('completed_cycles', 0) >= 2
+                       and all(x['ok'] for x in results.get('soak', {}).get('cycles', []))) \
+        if args.label == 'power-saving-soak' else all(results.get(x, {}).get('ok') for x in ('prompt', 'decode'))
+    passed = (passed_requests and results['placement_ok'] and results['vram_released']
+              and not spill.is_set() and not thermal_stop.is_set()
+              and 'failure' not in results and not (out / 'monitor-error.txt').exists())
+    results['passed'] = passed
     save_json(out / 'summary.json', results)
     print(json.dumps({'artifact': str(out), 'summary': str(out / 'summary.json'),
+                      'passed': passed,
+                      'soak_cycles': results.get('soak', {}).get('completed_cycles'),
+                      'soak_elapsed_seconds': results.get('soak', {}).get('elapsed_seconds'),
                       'prompt_tokens_per_second': results.get('prompt', {}).get('timings', {}).get('prompt_per_second'),
                       'thermal_stop': results['experiment_thermal_stop'],
                       'peak_temperature_c': results.get('peak_temperature_c'),
                       'peak_card1_power_w': results.get('peak_card1_power_w'),
                       'peak_fan_rpm': results.get('peak_fan_rpm'),
                       'vram_released': results['vram_released']}, indent=2), flush=True)
-    return 0 if (all(results.get(x, {}).get('ok') for x in ('prompt', 'decode'))
-                 and results['placement_ok'] and results['vram_released']
-                 and not spill.is_set() and not thermal_stop.is_set()) else 1
+    return 0 if passed else 1
 
 
 if __name__ == '__main__':
