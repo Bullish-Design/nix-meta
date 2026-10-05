@@ -1,7 +1,7 @@
 # V620 voltage and power investigation
 
 **Date:** 2026-10-05 UTC  
-**Status:** The owner selected a controlled card1 benchmark. The baseline and `manual` profile 0 reached the separate 72 C stop. `low` reduced heat but made decode too slow. `POWER_SAVING` profile 2 completed the fixed long response below the experiment stop.
+**Status:** The owner selected a controlled card1 benchmark. The baseline and `manual` profile 0 reached the separate 72 C stop. `low` reduced heat but made decode too slow. `POWER_SAVING` profile 2 completed the fixed long response below the experiment stop. A later long-prompt soak attempt reached 72 C during prompt processing and produced no response.
 
 ## Target and boundary
 
@@ -139,6 +139,14 @@ sudo bash /home/andrew/Documents/Projects/nix-meta/.scratch/projects/02-gpu-volt
 The exact manual-default and power-saving arms use the same command with the final argument changed. Each run writes its own timestamped SSD artifact. The operator should confirm that the script prints the restored controls after each run. Do not start another arm until card1 junction returns to 30 C or below.
 
 Only after the reversible controls are measured, probe voltage on idle card0. Confirm its original offset is 0 mV. Write a small negative pending value, such as `vo -25`, and check readback. Commit only if that first write succeeds. Check the committed readback, then reset with `r` and confirm 0 mV. Restore the prior performance mode. Expect firmware to accept the small offset or reject the commit cleanly; do not infer success from the sysfs write alone. A later loaded voltage comparison needs matched card and workload, power, temperature, throughput, and error checks.
+
+## 2026-10-05 long-prompt soak attempt
+
+The owner ran `run-power-saving-soak.sh` on card1. The artifact is `/mnt/shared/ai/models/qwen3.8-27b-gguf/artifacts/2026-10-05T210316Z/02-v620-power-saving-soak/`. The run used the same pinned model, server, lease, Q8_0 K/V cache, two slots, and 72 C experiment stop. Card1 began at 26 C junction with profile 2 and a 0 mV offset. The production router stayed inactive, and the blower watchdog stayed active.
+
+The generated request contained 27,601 prompt tokens. It enabled thinking, set `reasoning_effort` to `xhigh`, and allowed 6,144 completion tokens. Prompt processing began at 21:04:01 UTC. Card1 reached 72 C at 21:04:16 UTC, about 15 seconds later. The server log last recorded 6,199 processed prompt tokens, or 22% of the prompt. It did not begin decoding. No response or thinking output completed. Peak card1 power was 254 W, and peak fan speed was 3,088 RPM. The experiment monitor killed the isolated server at 72 C; the repository's 80 C guard did not trip. Model VRAM was released. A live read after the root script exited confirmed `auto`, profile 0, and 0 mV.
+
+This run failed the soak test. It shows that profile 2 did not keep the long prefill workload below 72 C. The earlier 2,049-token prompt and long decode remain valid for that shorter workload, but they do not establish safety for long prompts or a 15-minute soak. Do not rerun the same 27,601-token prompt under the same controls. A follow-up should measure a shorter prompt in a separate cool-start run, or first change the power or cooling conditions through a reviewed plan. Keep the 72 C experiment stop for any follow-up.
 
 ## Open questions
 

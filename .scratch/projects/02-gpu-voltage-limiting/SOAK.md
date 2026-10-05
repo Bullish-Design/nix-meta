@@ -1,6 +1,8 @@
 # Card1 power saving soak
 
-Run this from the host terminal when card1 is cool and the production router is stopped:
+**First run failed on 2026-10-05.** Card1 reached the 72 C experiment stop after 6,199 of 27,601 prompt tokens. No response completed. Do not repeat this workload with the same controls. See `RESEARCH_REPORT.md` for the result.
+
+The failed run used this host command:
 
 ```bash
 sudo bash /home/andrew/Documents/Projects/nix-meta/.scratch/projects/02-gpu-voltage-limiting/run-power-saving-soak.sh
