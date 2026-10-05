@@ -8,9 +8,6 @@ let
   # that reads its placeholder is gated on this, so a rebuild succeeds while the
   # secret is still unprovisioned.
   hasDeepSeekKey = config.sops.secrets ? "deepseek-api-key";
-
-  # Same gate for the key Hindsight presents to tower's vLLM server.
-  hasVllmKey = config.sops.secrets ? "mnemonix-vllm-api-key";
 in
 {
   imports = [
@@ -36,11 +33,6 @@ in
     # `warnOnMissingKeys` is true, so until the material lands in nix-secrets
     # this name is dropped with an eval warning instead of failing the rebuild.
     "deepseek-api-key"
-    # Hindsight's bearer token for the vLLM backend on tower. The same value
-    # is pushed to tower as VLLM_API_KEY by mnemonix's deploy script, so one
-    # secret configures both ends. Defence in depth behind the tailnet ACL:
-    # vLLM authenticates only /v1, /v2 and /inference.
-    "mnemonix-vllm-api-key"
   ];
 
   # Ownership overrides for the secrets this host consumes. One definition:
@@ -68,10 +60,6 @@ in
       mode = "0400";
       restartUnits = [ "paseo.service" ];
     };
-
-    # mnemonix-vllm-api-key needs no entry here. Nothing reads the raw secret —
-    # only the rendered mnemonix-hindsight.env below — and sops-nix already
-    # defaults to root:root 0400, which is what that template wants.
   };
 
   # Render the token into each consumer's expected shape. The value never
@@ -80,34 +68,17 @@ in
   # Gated on the key existing. `sops.placeholder` is derived from
   # `sops.secrets`, so reading a placeholder for a secret that
   # `warnOnMissingKeys` filtered out is an evaluation error, not a warning.
-  # mkMerge, not `//`: `mkIf` returns a wrapper attrset, so `//`-ing a second
-  # template onto it would merge into that wrapper and silently drop the
-  # template instead of defining it.
-  sops.templates = lib.mkMerge [
-    (lib.mkIf hasDeepSeekKey {
-      "paseo-deepseek.env" = {
-        owner = config.nixos-core.base.username;
-        group = "users";
-        mode = "0400";
-        content = ''
-          DEEPSEEK_API_KEY=${config.sops.placeholder."deepseek-api-key"}
-        '';
-      };
-    })
+  sops.templates = lib.mkIf hasDeepSeekKey {
+    "paseo-deepseek.env" = {
+      owner = config.nixos-core.base.username;
+      group = "users";
+      mode = "0400";
+      content = ''
+        DEEPSEEK_API_KEY=${config.sops.placeholder."deepseek-api-key"}
+      '';
+    };
 
-    # Hindsight's environmentFile for the tower vLLM backend. Root-only: only
-    # the Hindsight container reads it. Restart the container on rotation,
-    # otherwise it keeps presenting the previous key.
-    (lib.mkIf hasVllmKey {
-      "mnemonix-hindsight.env" = {
-        mode = "0400";
-        restartUnits = [ "docker-mnemonix-hindsight.service" ];
-        content = ''
-          HINDSIGHT_API_LLM_API_KEY=${config.sops.placeholder."mnemonix-vllm-api-key"}
-        '';
-      };
-    })
-  ];
+  };
 
   # Consume tailscale-auth-key for declarative tailnet re-auth. The provider owns
   # the secret *declaration*; nixos-core.base owns the *service* wiring — the

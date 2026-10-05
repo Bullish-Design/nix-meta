@@ -10,13 +10,6 @@ let
   memignoreFile = "${projectsRoot}/mnemonix/.memignore";
 
   hindsight = config.services.mnemonix.hindsight;
-
-  # True once mnemonix-vllm-api-key has material in the encrypted store. The
-  # tower backend cannot run without it, so the backend choice follows this
-  # flag: a rebuild still succeeds while the secret is unprovisioned, falling
-  # back to the loopback Inferference router with a warning. Same incremental
-  # activation principle as profiles/secrets.nix.
-  hasVllmKey = config.sops.secrets ? "mnemonix-vllm-api-key";
 in
 {
   imports = [ inputs.mnemonix.nixosModules.mnemonix ];
@@ -42,21 +35,13 @@ in
     #
     # There is no automatic failover: Hindsight takes a single base URL. If
     # tower is down, switch this to "inferference" and rebuild.
-    llmBackend = if hasVllmKey then "tower-vllm" else "inferference";
-
-    # The tower backend leaves this host, so Mnemonix requires a credential —
-    # a missing one is an assertion failure, not a warning. The rendered file
-    # defines HINDSIGHT_API_LLM_API_KEY; mnemonix's deploy script reads the
-    # SAME file to set tower's VLLM_API_KEY, so the two cannot drift.
-    environmentFile = lib.mkIf hasVllmKey config.sops.templates."mnemonix-hindsight.env".path;
+    #
+    # No environmentFile and no secret: tower serves a local model with no API
+    # key, so Mnemonix supplies the non-secret placeholder its
+    # OpenAI-compatible client needs. Access control is the loopback publish on
+    # tower, a Serve mapping scoped to /v1 and /health, and the tailnet ACL.
+    llmBackend = "tower-vllm";
   };
-
-  warnings = lib.optional (!hasVllmKey) ''
-    profiles/mnemonix: mnemonix-vllm-api-key has no material yet, so Hindsight
-    is using the loopback Inferference router instead of tower's vLLM. Add the
-    key in nix-secrets, rebuild, then run mnemonix's
-    scripts/deploy-tower-vllm.sh.
-  '';
 
   # ── The shared agent configuration ─────────────────────────────────────────
   #
