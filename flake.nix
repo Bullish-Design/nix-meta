@@ -13,21 +13,28 @@
     # v1.0.3, not yet packaged in nixpkgs.
     pi-nixpkgs.url = "github:NixOS/nixpkgs/24d907a895dce36d9e65748237ba8c8bac3e1de8";
 
-    # Keep the developer-environment toolchain independent from the system
-    # package set. This lets us adopt a new devenv release when it needs a newer
-    # nixpkgs, without moving the NixOS configuration at the same time.
-    devenv-nixpkgs.url = "github:NixOS/nixpkgs/nixos-unstable";
-
-    # Pin to a released devenv version. Update this tag and only its two lock
-    # inputs when the developer-environment toolchain should move forward.
+    # Pin to a released devenv version. This pin is what profiles/developer.nix
+    # installs. It used to be declared here and ignored, while `pkgs.devenv`
+    # from the system nixpkgs supplied the actual binary — three declarations
+    # for one name (023-toolchain P4).
     #
-    # This pin is what profiles/developer.nix installs. It used to be declared
-    # here and ignored, while `pkgs.devenv` from the system nixpkgs supplied the
-    # actual binary — three declarations for one name (023-toolchain P4).
-    devenv = {
-      url = "github:cachix/devenv/v2.4.0";
-      inputs.nixpkgs.follows = "devenv-nixpkgs";
-    };
+    # DELIBERATELY NOT following this flake's nixpkgs, and the one input that is
+    # allowed to carry its own. devenv pins a curated nixpkgs
+    # (cachix/devenv-nixpkgs) and publishes binaries only against it, including
+    # its own Nix fork and the nixd / nixf language servers. Overriding that
+    # nixpkgs changes every derivation hash, so no cache can serve them and Nix
+    # itself gets compiled locally — about a thousand derivations.
+    #
+    # That is not merely slow, it does not build. On nixos-unstable as of
+    # 2026-10-05, cachix/nix fails to compile: meson's unity build emits
+    # `#include <.../src/libstore/build/build/build-log.cc>` — a duplicated path
+    # segment, because src/libstore/meson.build lists 'build/build-log.cc' while
+    # the build directory is also named `build`. Nix's own meson files never
+    # enable unity, so the flag arrives with the newer nixpkgs.
+    #
+    # Left alone, devenv resolves entirely from cache: 4 paths, 85.5 MiB, zero
+    # builds. The cost is a second nixpkgs in flake.lock. Pay it here.
+    devenv.url = "github:cachix/devenv/v2.4.0";
 
     nixos-core.url = "git+https://github.com/Bullish-Design/nixos-core.git?ref=main";
 

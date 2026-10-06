@@ -111,6 +111,22 @@ in
     { nix-meta.developer.enable = lib.mkDefault true; }
 
     (lib.mkIf cfg.enable {
+      # devenv's binary cache. REQUIRED, not an optimisation: devenv is a Rust
+      # program whose crate tree is ~1000 separate derivations, and it publishes
+      # them here rather than to cache.nixos.org. Without this the host compiles
+      # all of them plus rustc and devenv's own Nix fork — measured 1058
+      # derivations, versus 10 built and 85.5 MiB fetched with the cache on.
+      #
+      # This only works because `inputs.devenv` carries its own nixpkgs; see the
+      # comment on that input in flake.nix. Overriding it changes every hash and
+      # nothing here can be served.
+      nix.settings = {
+        extra-substituters = [ "https://devenv.cachix.org" ];
+        extra-trusted-public-keys = [
+          "devenv.cachix.org-1:w1cLUi8dv3hnoSPGAuibQv+f9TZLr6cv/Hm9XgU50cw="
+        ];
+      };
+
       # This is deliberately independent of `terminal`: it can merge with that
       # profile's HM user module without re-owning shell, git, or terminal config.
       home-manager = {
