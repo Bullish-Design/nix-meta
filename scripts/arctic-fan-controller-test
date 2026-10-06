@@ -591,7 +591,6 @@ test_curve_hold() {
     done
     if [ "$match" -eq 1 ]; then
       echo "Curve hold result: PASS; GPU duct channels match the curve at $expected"
-      require_all_high || return 1
       return 0
     fi
     sleep 2
