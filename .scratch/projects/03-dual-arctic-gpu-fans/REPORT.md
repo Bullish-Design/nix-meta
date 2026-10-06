@@ -100,7 +100,25 @@ Do not assume channel 3 drives the second fan only because it is free.
 
 - `gpuFanChannels = [ 2 3 ]` in `machines/hardware/arctic-fan-controller.nix`.
   The list is also written to `/etc/nix-meta/arctic-fan/gpu-duct-channels`.
-- Curve: flat at PWM 255 (`curve_pwm`). Calibration pending.
+- Curve (`curve_pwm`), max GPU junction to PWM, both fans. Each step applies
+  from its lower bound up to the next:
+
+  | Junction | PWM |
+  |---|---|
+  | below 30 C | 25 |
+  | 30 to 40 C | 50 |
+  | 40 to 45 C | 75 |
+  | 45 to 50 C | 100 |
+  | 50 to 55 C | 125 |
+  | 55 to 60 C | 150 |
+  | 60 to 65 C | 175 |
+  | 65 to 70 C | 200 |
+  | 70 to 75 C | 225 |
+  | 75 C and above | 255 |
+
+  Measured in the sweep: 255, 200, 150, 100, 50. Not yet measured: 25, 75,
+  125, 175, 225. The sweep default now covers all ten values. The step
+  choice is the owner's. The GPU heat response is untested.
 - Channel rules: GPU channels hold a valid nonzero value. All other
   channels must read 255.
 - Failure latch: a GPU tach below 500 RPM for 3 samples latches that channel

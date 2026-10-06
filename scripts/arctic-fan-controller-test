@@ -13,7 +13,7 @@ module, disconnect USB, remove sensors, or suspend the machine. It reads the
 GPU duct channel list from /etc/nix-meta/arctic-fan/gpu-duct-channels.
 
 --sweep sets the PWM values written to each GPU duct channel, for example
-"90 80 70 60". Each value is 1 to 255. The default is "255 200 150 120 100".
+"90 80 70 60". Each value is 1 to 255. The default covers every curve value, 255 down to 25.
 EOF
 }
 
@@ -481,7 +481,7 @@ if [ -n "$sweep_override" ]; then
     fi
   done
 else
-  SWEEP_PWM_VALUES=(255 200 150 120 100)
+  SWEEP_PWM_VALUES=(255 225 200 175 150 125 100 75 50 25)
 fi
 
 test_gpu_fan_response() {
@@ -574,23 +574,46 @@ test_curve_hold() {
   done
   echo "max_gpu_junction_mC=$max_junction"
 
-  # The calibrated curve is pending. Until it exists, every GPU duct channel
-  # must stay at 255 at every temperature.
-  for i in $(seq 1 5); do
+  # The expected PWM comes from the watchdog curve. Keep this table equal to
+  # curve_pwm in machines/hardware/arctic-fan-controller.nix.
+  expected="$(expected_pwm "$max_junction")"
+  echo "expected_pwm=$expected"
+
+  # The watchdog ramps down after five cool samples. Allow about 15 s.
+  for i in $(seq 1 8); do
     for ch in "${GPU_FAN_CHANNELS[@]}"; do
       pwm="$(cat "$h/pwm$ch")" || return 1
-      echo "curve_hold_sample=$i pwm$ch=$pwm"
-      if [ "$pwm" != 255 ]; then
-        fail "GPU duct channel $ch left PWM 255 while the curve is uncalibrated: $pwm"
-        force_all_high || true
-        return 1
-      fi
+      echo "curve_sample=$i pwm$ch=$pwm expected=$expected"
     done
+    match=1
+    for ch in "${GPU_FAN_CHANNELS[@]}"; do
+      [ "$(cat "$h/pwm$ch")" = "$expected" ] || match=0
+    done
+    if [ "$match" -eq 1 ]; then
+      echo "Curve hold result: PASS; GPU duct channels match the curve at $expected"
+      require_all_high || return 1
+      return 0
+    fi
     sleep 2
   done
-  echo "Curve hold result: PASS; all GPU duct channels held at 255"
-  require_all_high || return 1
-  return 0
+  fail "GPU duct channels did not reach the expected curve value $expected"
+  force_all_high || true
+  return 1
+}
+
+expected_pwm() {
+  local junction="$1"
+  if [ "$junction" -ge 75000 ]; then echo 255
+  elif [ "$junction" -ge 70000 ]; then echo 225
+  elif [ "$junction" -ge 65000 ]; then echo 200
+  elif [ "$junction" -ge 60000 ]; then echo 175
+  elif [ "$junction" -ge 55000 ]; then echo 150
+  elif [ "$junction" -ge 50000 ]; then echo 125
+  elif [ "$junction" -ge 45000 ]; then echo 100
+  elif [ "$junction" -ge 40000 ]; then echo 75
+  elif [ "$junction" -ge 30000 ]; then echo 50
+  else echo 25
+  fi
 }
 
 restore_service_state() {
@@ -699,7 +722,8 @@ echo "=== intentionally untested cases ==="
 echo "NOT TESTED: GPU load; run only after this report passes review."
 echo "NOT TESTED: reboot persistence; ask for reboot approval first."
 echo "NOT TESTED: a stopped GPU duct fan; unplug one fan only in a supervised run."
-echo "NOT TESTED: calibrated curve below 255; calibration is pending."
+echo "NOT TESTED: GPU heat response of the curve; run the loaded test with the 72 C stop."
+echo "NOT TESTED: PWM 25, 75, 125, 175, 225 on the fans; interpolated, not swept."
 echo "NOT TESTED: synthetic GPU sensor removal; no sensor was removed."
 echo "NOT TESTED: USB disconnect/reconnect; the controller stayed connected."
 echo "NOT TESTED: suspend/resume; the workstation was not suspended."

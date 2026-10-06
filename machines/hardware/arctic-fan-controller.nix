@@ -137,11 +137,32 @@ let
       return 1
     }
 
-    # Calibration is pending. Every GPU duct fan runs at full speed until the
-    # calibration sweep measures a stable low value. Add a lower value only when
-    # every GPU fan keeps a tach reading above min_running_rpm at that value.
+    # Fan curve for both GPU duct fans. Each step applies from its lower bound
+    # up to the next bound. Values are PWM. 25, 75, 125, 175, and 225 are not
+    # measured yet. Each sits between measured sweep points.
     curve_pwm() {
-      printf '%s\n' 255
+      junction="$1"
+      if [ "$junction" -ge 75000 ]; then
+        printf '%s\n' 255
+      elif [ "$junction" -ge 70000 ]; then
+        printf '%s\n' 225
+      elif [ "$junction" -ge 65000 ]; then
+        printf '%s\n' 200
+      elif [ "$junction" -ge 60000 ]; then
+        printf '%s\n' 175
+      elif [ "$junction" -ge 55000 ]; then
+        printf '%s\n' 150
+      elif [ "$junction" -ge 50000 ]; then
+        printf '%s\n' 125
+      elif [ "$junction" -ge 45000 ]; then
+        printf '%s\n' 100
+      elif [ "$junction" -ge 40000 ]; then
+        printf '%s\n' 75
+      elif [ "$junction" -ge 30000 ]; then
+        printf '%s\n' 50
+      else
+        printf '%s\n' 25
+      fi
     }
 
     # Thresholds for the fan failure latch. A GPU fan below min_running_rpm for
