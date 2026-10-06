@@ -73,6 +73,9 @@ source "$script_dir/lib/arctic-gpu-fan-channels.sh"
 if ! load_gpu_fan_channels; then
   exit 2
 fi
+if ! load_gpu_fan_curve; then
+  exit 2
+fi
 
 required_commands=(
   awk cat date find grep journalctl kill ls lsmod modinfo readlink
@@ -574,8 +577,7 @@ test_curve_hold() {
   done
   echo "max_gpu_junction_mC=$max_junction"
 
-  # The expected PWM comes from the watchdog curve. Keep this table equal to
-  # curve_pwm in machines/hardware/arctic-fan-controller.nix.
+  # The expected PWM comes from the exported watchdog curve.
   expected="$(expected_pwm "$max_junction")"
   echo "expected_pwm=$expected"
 
@@ -600,19 +602,11 @@ test_curve_hold() {
   return 1
 }
 
+# The expected PWM comes from the curve the NixOS module exported, which is the
+# same value the watchdog's generated curve_pwm uses. Do not restate the table
+# here; a second copy drifts.
 expected_pwm() {
-  local junction="$1"
-  if [ "$junction" -ge 75000 ]; then echo 255
-  elif [ "$junction" -ge 70000 ]; then echo 225
-  elif [ "$junction" -ge 65000 ]; then echo 200
-  elif [ "$junction" -ge 60000 ]; then echo 175
-  elif [ "$junction" -ge 55000 ]; then echo 150
-  elif [ "$junction" -ge 50000 ]; then echo 125
-  elif [ "$junction" -ge 45000 ]; then echo 100
-  elif [ "$junction" -ge 40000 ]; then echo 75
-  elif [ "$junction" -ge 30000 ]; then echo 50
-  else echo 25
-  fi
+  curve_expected_pwm "$1"
 }
 
 restore_service_state() {

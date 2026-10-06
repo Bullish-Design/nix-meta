@@ -11,6 +11,82 @@ let
   gpuFanChannels = [ 2 3 ];
   gpuFanChannelsForShell = lib.concatMapStringsSep " " toString gpuFanChannels;
 
+  # Named GPU duct fan curves. Each entry maps a minimum maximum-junction
+  # temperature, in milli-degrees C, to a commanded PWM value. Order each list
+  # from the hottest step to the coolest, and end it with a 0 entry so every
+  # temperature maps to a value. PWM-to-RPM values come from the project 03
+  # calibration sweep.
+  fanCurves = {
+    # Installed production curve. This is the shipped default.
+    stepped = [
+      { minC = 75000; pwm = 255; }
+      { minC = 70000; pwm = 225; }
+      { minC = 65000; pwm = 200; }
+      { minC = 60000; pwm = 175; }
+      { minC = 55000; pwm = 150; }
+      { minC = 50000; pwm = 125; }
+      { minC = 45000; pwm = 100; }
+      { minC = 40000; pwm = 75; }
+      { minC = 30000; pwm = 50; }
+      { minC = 0; pwm = 25; }
+    ];
+
+    # Project 024 arm 1 (C-FULL). Flat maximum duty at every temperature. This
+    # is an EXPERIMENT curve: it runs both fans at about 14,600 and 15,100 RPM
+    # continuously and is loud. It exists to put an upper bound on airflow, so
+    # a long decode can be measured with no fan ramp in the result. REVERT to
+    # `stepped` when the measurement is complete.
+    full = [
+      { minC = 0; pwm = 255; }
+    ];
+
+    # Project 024 arm 2 candidate (C-STEEP). Reaches full duty at 55 C instead
+    # of 75 C, so the fans are already at maximum before the hot window. Build
+    # this only if C-FULL shows that airflow changes the junction slope.
+    steep = [
+      { minC = 55000; pwm = 255; }
+      { minC = 50000; pwm = 125; }
+      { minC = 45000; pwm = 100; }
+      { minC = 40000; pwm = 75; }
+      { minC = 30000; pwm = 50; }
+      { minC = 0; pwm = 25; }
+    ];
+  };
+
+  # The active curve. Change this one name to switch curves.
+  selectedFanCurveName = "full";
+  selectedFanCurve = fanCurves.${selectedFanCurveName};
+
+  # Fail at evaluation time rather than shipping a curve that cannot answer
+  # every temperature or that commands a stopped fan.
+  curveIsValid =
+    let
+      last = lib.last selectedFanCurve;
+      descending = lib.all (i: (lib.elemAt selectedFanCurve i).minC > (lib.elemAt selectedFanCurve (i + 1)).minC)
+        (lib.range 0 (lib.length selectedFanCurve - 2));
+      pwmInRange = lib.all (e: e.pwm >= 1 && e.pwm <= 255) selectedFanCurve;
+    in
+    selectedFanCurve != [ ] && last.minC == 0 && descending && pwmInRange;
+
+  # Render the curve as a shell function. Every entry becomes a comparison, so
+  # no branch tests a constant. The final `else` is unreachable for a valid
+  # sensor reading and fails high rather than guessing.
+  curveShellFunction = ''
+    curve_pwm() {
+      junction="$1"
+  '' + lib.concatImapStrings
+    (i: e: ''
+      ${if i == 1 then "    if" else "    elif"} [ "$junction" -ge ${toString e.minC} ]; then
+        printf '%s\n' ${toString e.pwm}
+    '')
+    selectedFanCurve
+  + ''
+      else
+        printf '%s\n' 255
+      fi
+    }
+  '';
+
   # Keep the system kernel unchanged. The driver source is taken from the
   # nixpkgs testing source where it is currently available, but compiled and
   # installed as an out-of-tree module for this host's selected kernel.
@@ -137,33 +213,11 @@ let
       return 1
     }
 
-    # Fan curve for both GPU duct fans. Each step applies from its lower bound
-    # up to the next bound. Values are PWM. 25, 75, 125, 175, and 225 are not
-    # measured yet. Each sits between measured sweep points.
-    curve_pwm() {
-      junction="$1"
-      if [ "$junction" -ge 75000 ]; then
-        printf '%s\n' 255
-      elif [ "$junction" -ge 70000 ]; then
-        printf '%s\n' 225
-      elif [ "$junction" -ge 65000 ]; then
-        printf '%s\n' 200
-      elif [ "$junction" -ge 60000 ]; then
-        printf '%s\n' 175
-      elif [ "$junction" -ge 55000 ]; then
-        printf '%s\n' 150
-      elif [ "$junction" -ge 50000 ]; then
-        printf '%s\n' 125
-      elif [ "$junction" -ge 45000 ]; then
-        printf '%s\n' 100
-      elif [ "$junction" -ge 40000 ]; then
-        printf '%s\n' 75
-      elif [ "$junction" -ge 30000 ]; then
-        printf '%s\n' 50
-      else
-        printf '%s\n' 25
-      fi
-    }
+    # Fan curve for both GPU duct fans, generated from `selectedFanCurve` in
+    # this module's `let` block. Each step applies from its lower bound up to
+    # the next bound. Values are PWM. The test scripts read the same curve from
+    # /etc/nix-meta/arctic-fan/gpu-curve, so the two cannot drift apart.
+${curveShellFunction}
 
     # Thresholds for the fan failure latch. A GPU fan below min_running_rpm for
     # stall_samples consecutive samples is failed. Startup_grace_samples skips
@@ -423,6 +477,17 @@ in
       assertion = builtins.length gpuFanChannels == 2;
       message = "The ARCTIC GPU fan watchdog requires exactly two GPU duct fan channels.";
     }
+    {
+      assertion = fanCurves ? ${selectedFanCurveName};
+      message = "Unknown ARCTIC GPU fan curve: ${selectedFanCurveName}.";
+    }
+    {
+      assertion = curveIsValid;
+      message =
+        "The selected ARCTIC GPU fan curve '${selectedFanCurveName}' is invalid. "
+        + "It must be non-empty, ordered from the hottest step to the coolest, "
+        + "end with a minC = 0 step, and command PWM 1 to 255 at every step.";
+    }
   ];
 
   boot.extraModulePackages = [ arcticFanController ];
@@ -433,6 +498,11 @@ in
   # Test scripts read the same channel list as the watchdog.
   environment.etc."nix-meta/arctic-fan/gpu-duct-channels".text =
     lib.concatMapStrings (channel: "${toString channel}\n") gpuFanChannels;
+
+  # Test scripts read the same curve as the watchdog. One line per step,
+  # "<minJunctionMilliC> <pwm>", hottest step first.
+  environment.etc."nix-meta/arctic-fan/gpu-curve".text =
+    lib.concatMapStrings (e: "${toString e.minC} ${toString e.pwm}\n") selectedFanCurve;
 
   systemd.services.arctic-fan-module-load = {
     description = "Load the kernel-matched ARCTIC Fan Controller module";

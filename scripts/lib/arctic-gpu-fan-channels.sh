@@ -33,3 +33,46 @@ is_gpu_channel() {
   done
   return 1
 }
+
+# Load the active GPU duct fan curve. The NixOS module writes this file from
+# the same Nix value that generates the watchdog's curve_pwm function, so the
+# test scripts and the watchdog cannot drift apart. Each line is
+# "<minJunctionMilliC> <pwm>", ordered from the hottest step to the coolest.
+load_gpu_fan_curve() {
+  local file="/etc/nix-meta/arctic-fan/gpu-curve" line min pwm
+  GPU_FAN_CURVE=()
+  if [ ! -r "$file" ]; then
+    echo "FAIL: GPU duct fan curve is not readable: $file" >&2
+    return 1
+  fi
+  while IFS= read -r line || [ -n "$line" ]; do
+    [ -n "$line" ] || continue
+    min="${line%% *}"
+    pwm="${line##* }"
+    if ! [[ "$min" =~ ^[0-9]+$ ]] || ! [[ "$pwm" =~ ^[0-9]+$ ]]; then
+      echo "FAIL: invalid curve step in $file: $line" >&2
+      return 1
+    fi
+    GPU_FAN_CURVE+=("$min $pwm")
+  done < "$file"
+  if [ "${#GPU_FAN_CURVE[@]}" -eq 0 ]; then
+    echo "FAIL: GPU duct fan curve in $file is empty" >&2
+    return 1
+  fi
+  echo "gpu_fan_curve_steps=${#GPU_FAN_CURVE[@]}"
+}
+
+# Expected PWM for a maximum junction reading, from the loaded curve.
+curve_expected_pwm() {
+  local junction="$1" step min pwm
+  for step in "${GPU_FAN_CURVE[@]}"; do
+    min="${step%% *}"
+    pwm="${step##* }"
+    if [ "$junction" -ge "$min" ]; then
+      echo "$pwm"
+      return 0
+    fi
+  done
+  echo "FAIL: no curve step matched junction $junction" >&2
+  return 1
+}
