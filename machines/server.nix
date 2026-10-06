@@ -115,6 +115,12 @@ in
     repoDir = "/home/andrew/Documents/Projects/inferference";
   };
 
+  # The thermal guard fails closed unless the dual-fan watchdog is healthy.
+  systemd.user.services.inferference-router.environment = {
+    GPU_THERMAL_FAN_STATUS_FILE = "/run/arctic-fan/status";
+    GPU_THERMAL_FAN_WATCHDOG_UNIT = "arctic-fan-watchdog.service";
+  };
+
   # The launcher uses /usr/bin/env bash. User units do not inherit the
   # interactive shell PATH, so include Bash in the deployed unit explicitly.
   systemd.user.services.inferference-router.environment.PATH = pkgs.lib.mkForce (pkgs.lib.makeBinPath [

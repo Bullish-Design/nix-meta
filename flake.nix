@@ -266,7 +266,7 @@
     # Native inference service module. The repository is not a flake, so keep
     # it as a source input and import its NixOS module through `inputs`.
     inferference = {
-      url = "git+ssh://git@github.com/Bullish-Design/inferference.git?ref=fix/restore-mi25-power-table";
+      url = "git+ssh://git@github.com/Bullish-Design/inferference.git?ref=main";
       flake = false;
     };
   };

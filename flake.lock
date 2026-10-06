@@ -648,16 +648,16 @@
     "inferference": {
       "flake": false,
       "locked": {
-        "lastModified": 1788737098,
-        "narHash": "sha256-lLSuSTj3dXoRz3GngMu5NGsIy0LLsVW6Zp7j98UualE=",
-        "ref": "fix/restore-mi25-power-table",
-        "rev": "926a45ae5134c8963179104ad8534c8f72ccf323",
-        "revCount": 104,
+        "lastModified": 1791312629,
+        "narHash": "sha256-puNrn3RzGJZqGvHiMcJVMwQcqPbkRzMQb6ysorhxDrM=",
+        "ref": "main",
+        "rev": "89f85be51f65f56d058a681851d5508245b0abcc",
+        "revCount": 131,
         "type": "git",
         "url": "ssh://git@github.com/Bullish-Design/inferference.git"
       },
       "original": {
-        "ref": "fix/restore-mi25-power-table",
+        "ref": "main",
         "type": "git",
         "url": "ssh://git@github.com/Bullish-Design/inferference.git"
       }
