@@ -1,0 +1,6 @@
+/tmp/arctic-sim/root/bin/arctic-fans-100: line 2: /tmp/arctic-sim/root/sys/class/hwmon/hwmon2/pwm2: Permission denied
+fake safe-high
+/tmp/arctic-sim/wd-sim.sh: line 80: /tmp/arctic-sim/root/sys/class/hwmon/hwmon2/pwm2: Permission denied
+failed to write PWM 255 to channel 2; forcing safe high
+/tmp/arctic-sim/root/bin/arctic-fans-100: line 2: /tmp/arctic-sim/root/sys/class/hwmon/hwmon2/pwm2: Permission denied
+fake safe-high

@@ -1,0 +1,15 @@
+fake safe-high
+ARCTIC watchdog: state=OK max_gpu_junction_mC=22000 target_pwm=255 cooldown_samples=0 channel2(pwm=255 rpm=14470 failed=0) channel3(pwm=255 rpm=15029 failed=0)
+ARCTIC watchdog: state=OK max_gpu_junction_mC=22000 target_pwm=255 cooldown_samples=0 channel2(pwm=255 rpm=14470 failed=0) channel3(pwm=255 rpm=15029 failed=0)
+ARCTIC watchdog: state=OK max_gpu_junction_mC=22000 target_pwm=255 cooldown_samples=0 channel2(pwm=255 rpm=14470 failed=0) channel3(pwm=255 rpm=15029 failed=0)
+ARCTIC watchdog: state=OK max_gpu_junction_mC=22000 target_pwm=255 cooldown_samples=0 channel2(pwm=255 rpm=0 failed=0) channel3(pwm=255 rpm=0 failed=0)
+ARCTIC watchdog: state=OK max_gpu_junction_mC=22000 target_pwm=255 cooldown_samples=0 channel2(pwm=255 rpm=0 failed=0) channel3(pwm=255 rpm=0 failed=0)
+CRITICAL: GPU duct channel 2 stopped at 0 RPM; latched as failed
+CRITICAL: GPU duct channel 3 stopped at 0 RPM; latched as failed
+ARCTIC watchdog: state=NO_AIRFLOW max_gpu_junction_mC=22000 target_pwm=255 cooldown_samples=0 channel2(pwm=255 rpm=0 failed=1) channel3(pwm=255 rpm=0 failed=1)
+ARCTIC watchdog: state=NO_AIRFLOW max_gpu_junction_mC=22000 target_pwm=255 cooldown_samples=0 channel2(pwm=255 rpm=0 failed=1) channel3(pwm=255 rpm=0 failed=1)
+ARCTIC watchdog: state=NO_AIRFLOW max_gpu_junction_mC=22000 target_pwm=255 cooldown_samples=0 channel2(pwm=255 rpm=0 failed=1) channel3(pwm=255 rpm=0 failed=1)
+ARCTIC watchdog: state=NO_AIRFLOW max_gpu_junction_mC=22000 target_pwm=255 cooldown_samples=0 channel2(pwm=255 rpm=0 failed=1) channel3(pwm=255 rpm=0 failed=1)
+ARCTIC watchdog: state=NO_AIRFLOW max_gpu_junction_mC=22000 target_pwm=255 cooldown_samples=0 channel2(pwm=255 rpm=0 failed=1) channel3(pwm=255 rpm=0 failed=1)
+ARCTIC watchdog: state=NO_AIRFLOW max_gpu_junction_mC=22000 target_pwm=255 cooldown_samples=0 channel2(pwm=255 rpm=0 failed=1) channel3(pwm=255 rpm=0 failed=1)
+fake safe-high

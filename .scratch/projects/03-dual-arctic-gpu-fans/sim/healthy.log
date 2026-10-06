@@ -1,0 +1,7 @@
+fake safe-high
+ARCTIC watchdog: state=OK max_gpu_junction_mC=22000 target_pwm=255 cooldown_samples=0 channel2(pwm=255 rpm=14470 failed=0) channel3(pwm=255 rpm=15029 failed=0)
+ARCTIC watchdog: state=OK max_gpu_junction_mC=22000 target_pwm=255 cooldown_samples=0 channel2(pwm=255 rpm=14470 failed=0) channel3(pwm=255 rpm=15029 failed=0)
+ARCTIC watchdog: state=OK max_gpu_junction_mC=22000 target_pwm=255 cooldown_samples=0 channel2(pwm=255 rpm=14470 failed=0) channel3(pwm=255 rpm=15029 failed=0)
+ARCTIC watchdog: state=OK max_gpu_junction_mC=22000 target_pwm=255 cooldown_samples=0 channel2(pwm=255 rpm=14470 failed=0) channel3(pwm=255 rpm=15029 failed=0)
+ARCTIC watchdog: state=OK max_gpu_junction_mC=22000 target_pwm=255 cooldown_samples=0 channel2(pwm=255 rpm=14470 failed=0) channel3(pwm=255 rpm=15029 failed=0)
+fake safe-high

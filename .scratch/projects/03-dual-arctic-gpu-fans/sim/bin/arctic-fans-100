@@ -1,0 +1,3 @@
+#!/usr/bin/env bash
+for p in "$FAKE"/sys/class/hwmon/hwmon2/pwm[0-9] "$FAKE"/sys/class/hwmon/hwmon2/pwm[0-9][0-9]; do [ -f "$p" ] && echo 255 > "$p"; done
+echo "fake safe-high"

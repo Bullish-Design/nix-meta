@@ -9,7 +9,8 @@ Usage: sudo ./scripts/arctic-fan-controller-test [--artifact-dir DIR]
 
 Runs the safe ARCTIC controller acceptance tests and writes a complete log.
 The script never writes PWM 0. It does not reboot, run GPU load, unload a
-module, disconnect USB, remove sensors, or suspend the machine.
+module, disconnect USB, remove sensors, or suspend the machine. It reads the
+GPU duct channel list from /etc/nix-meta/arctic-fan/gpu-duct-channels.
 EOF
 }
 
@@ -56,6 +57,11 @@ if ! load_amd_gpu_devices; then
 fi
 if [ "${#AMD_GPU_BDFS[@]}" -ne 2 ]; then
   echo "FAIL: this fan-controller test requires exactly two configured AMD GPUs" >&2
+  exit 2
+fi
+
+source "$script_dir/lib/arctic-gpu-fan-channels.sh"
+if ! load_gpu_fan_channels; then
   exit 2
 fi
 
@@ -272,17 +278,20 @@ check_gpu_sensors() {
 }
 
 check_physical_mapping() {
-  local h tach value
+  local h tach value index ch
   h="$(find_arctic_hwmon)" || { fail "cannot inspect physical fan mapping"; return; }
-  tach="$h/fan1_input"
-  if ! value="$(cat "$tach" 2>/dev/null)"; then
-    fail "fan1 tachometer cannot be read"
-  elif ! [[ "$value" =~ ^[0-9]+$ ]] || [ "$value" -le 0 ]; then
-    fail "fan1 has no tach response at PWM 255"
-  else
-    echo "mapping evidence: fan1 reports $value RPM at PWM 255"
-  fi
-  for index in 2 3 4 5 6 7 8 9 10; do
+  for ch in "${GPU_FAN_CHANNELS[@]}"; do
+    tach="$h/fan${ch}_input"
+    if ! value="$(cat "$tach" 2>/dev/null)"; then
+      fail "GPU duct tachometer cannot be read: $tach"
+    elif ! [[ "$value" =~ ^[0-9]+$ ]] || [ "$value" -le 0 ]; then
+      fail "GPU duct channel $ch has no tach response at PWM 255: $tach=$value"
+    else
+      echo "mapping evidence: GPU duct channel $ch reports $value RPM at PWM 255"
+    fi
+  done
+  for index in 1 2 3 4 5 6 7 8 9 10; do
+    is_gpu_channel "$index" && continue
     tach="$h/fan${index}_input"
     [ -f "$tach" ] || { fail "expected tach attribute is missing: $tach"; continue; }
     if ! value="$(cat "$tach")"; then
@@ -293,6 +302,27 @@ check_physical_mapping() {
       echo "mapping evidence: $tach=0 RPM; treated as unused, not failed"
     fi
   done
+}
+
+check_watchdog_status() {
+  local status_file="/run/arctic-fan/status" state
+  echo "=== watchdog status ==="
+  if ! systemctl is-active --quiet arctic-fan-watchdog.service; then
+    echo "watchdog status check skipped: watchdog is not active"
+    return 0
+  fi
+  # The status file appears after the first control sample, about two seconds
+  # after the service becomes active.
+  sleep 3
+  if ! state="$(cat "$status_file" 2>/dev/null)"; then
+    fail "watchdog status file is missing: $status_file"
+    return 1
+  fi
+  echo "$state"
+  case "$state" in
+    state=OK*) echo "WATCHDOG STATUS PASS: both GPU duct fans are running" ;;
+    *) fail "watchdog reports a degraded GPU duct state: $state" ;;
+  esac
 }
 
 check_localhost_listeners() {
@@ -427,71 +457,83 @@ test_coolercontrol_crash() {
   return 0
 }
 
-test_pwm_response() {
-  local h pwm fan rpm255 rpm200 rpm180 value index
-  echo "=== GPU duct fan PWM response test ==="
+# Sweep values for each GPU duct channel. 255 is the baseline. Lower values
+# record calibration data. A stalled lower value is recorded, not failed.
+SWEEP_PWM_VALUES=(255 200 150 120 100)
+
+test_gpu_fan_response() {
+  local h pwm fan rpm value index value_unused ch other_ch other_rpm
+  echo "=== GPU duct fan per-channel response sweep ==="
   systemctl stop coolercontrold.service || true
   systemctl stop arctic-fan-watchdog.service 2>/dev/null || true
   require_all_high || return 1
 
   h="$(find_arctic_hwmon)" || return 1
-  pwm="$h/pwm1"
-  fan="$h/fan1_input"
-  [ -f "$pwm" ] || { fail "known mapped channel is missing: $pwm"; return 1; }
-  [ -f "$fan" ] || { fail "known mapped tach is missing: $fan"; return 1; }
-  rpm255="$(cat "$fan")"
-  echo "physical_fan=GPU duct fan"
-  echo "channel=pwm1/fan1"
-  echo "rpm_at_255=$rpm255"
-  if [ "$rpm255" -le 0 ] 2>/dev/null; then
-    fail "fan1 stopped at PWM 255"
-    force_all_high || true
-    return 1
-  fi
+  for ch in "${GPU_FAN_CHANNELS[@]}"; do
+    pwm="$h/pwm$ch"
+    fan="$h/fan${ch}_input"
+    [ -f "$pwm" ] || { fail "known GPU duct PWM channel is missing: $pwm"; return 1; }
+    [ -f "$fan" ] || { fail "known GPU duct tach is missing: $fan"; return 1; }
+    echo "physical_fan_channel=$ch pwm=pwm$ch tach=fan${ch}_input"
 
-  for value in 200 180; do
-    require_all_high || return 1
-    echo "writing pwm1=$value; no other channel will be written"
-    if ! printf '%s\n' "$value" > "$pwm"; then
-      fail "PWM write failed at pwm1=$value"
-      force_all_high || true
-      return 1
-    fi
-    sleep 5
-    rpm="$(cat "$fan")"
-    echo "pwm1=$value rpm=$rpm"
-    if [ "$rpm" -le 0 ] 2>/dev/null; then
-      fail "fan1 stopped or tach became invalid at pwm1=$value"
-      force_all_high || true
-      return 1
-    fi
-    for index in 2 3 4 5 6 7 8 9 10; do
-      if ! value_unused="$(cat "$h/fan${index}_input")" || [ "$value_unused" != 0 ]; then
-        fail "unused tach channel changed during pwm1 response test: fan${index}_input=$value_unused"
+    for value in "${SWEEP_PWM_VALUES[@]}"; do
+      require_all_high || return 1
+      echo "writing pwm$ch=$value; no other channel will be written"
+      if ! printf '%s\n' "$value" > "$pwm"; then
+        fail "PWM write failed at pwm$ch=$value"
         force_all_high || true
         return 1
       fi
-      if ! value_unused="$(cat "$h/pwm${index}")" || [ "$value_unused" != 255 ]; then
-        fail "unused PWM channel changed during pwm1 response test: pwm${index}=$value_unused"
+      sleep 5
+      rpm="$(cat "$fan")"
+      other_rpm="n/a"
+      for other_ch in "${GPU_FAN_CHANNELS[@]}"; do
+        [ "$other_ch" = "$ch" ] && continue
+        other_rpm="$(cat "$h/fan${other_ch}_input")"
+        if [ "$(cat "$h/pwm$other_ch")" != 255 ]; then
+          fail "other GPU duct PWM changed during pwm$ch test: pwm$other_ch"
+          force_all_high || true
+          return 1
+        fi
+      done
+      echo "sweep channel=$ch pwm=$value rpm=$rpm other_rpm=$other_rpm"
+
+      if [ "$value" = 255 ] && { ! [[ "$rpm" =~ ^[0-9]+$ ]] || [ "$rpm" -le 0 ]; }; then
+        fail "GPU duct channel $ch has no tach response at PWM 255: rpm=$rpm"
         force_all_high || true
         return 1
       fi
+
+      for index in 1 2 3 4 5 6 7 8 9 10; do
+        is_gpu_channel "$index" && continue
+        if ! value_unused="$(cat "$h/fan${index}_input")" || [ "$value_unused" != 0 ]; then
+          fail "unused tach channel changed during pwm$ch response test: fan${index}_input=$value_unused"
+          force_all_high || true
+          return 1
+        fi
+        if ! value_unused="$(cat "$h/pwm${index}")" || [ "$value_unused" != 255 ]; then
+          fail "unused PWM channel changed during pwm$ch response test: pwm${index}=$value_unused"
+          force_all_high || true
+          return 1
+        fi
+      done
+      force_all_high || return 1
     done
-    force_all_high || return 1
   done
-  rpm200="$(grep '^pwm1=200 rpm=' "$log_file" | tail -1 | awk -F= '{print $3}')"
-  rpm180="$(grep '^pwm1=180 rpm=' "$log_file" | tail -1 | awk -F= '{print $3}')"
-  echo "response_summary=rpm255=$rpm255 rpm200=$rpm200 rpm180=$rpm180"
-  echo "minimum_reliable_pwm=180 (observed tach response; confirm acoustics and stall margin manually)"
+
+  echo "calibration_data: grep '^sweep channel=' $log_file"
+  grep '^sweep channel=' "$log_file" || true
+  echo "The lowest value per channel with a stable rpm sets the calibrated curve floor."
+  echo "Confirm acoustics and stall margin manually before using any value below 255."
   require_all_high
 }
 
-test_low_temperature_curve() {
-  local h bdf pci sensor value max_junction pwm i
-  echo "=== low-temperature curve test ==="
+test_curve_hold() {
+  local h bdf pci sensor value max_junction ch pwm i
+  echo "=== curve hold test ==="
   force_all_high || return 1
   if ! systemctl is-active --quiet arctic-fan-watchdog.service; then
-    echo "LOW-TEMP CURVE NOT TESTED: watchdog is not active"
+    echo "CURVE HOLD NOT TESTED: watchdog is not active"
     required_unverified=1
     return 0
   fi
@@ -503,31 +545,29 @@ test_low_temperature_curve() {
     sensor="$(find_gpu_sensor "$pci" junction)" || return 1
     value="$(cat "$sensor")" || return 1
     case "$value" in
-      ""|*[!0-9]*) fail "low-temperature junction value is invalid: $sensor=$value"; return 1 ;;
+      ""|*[!0-9]*) fail "junction value is invalid: $sensor=$value"; return 1 ;;
     esac
     [ "$value" -gt "$max_junction" ] && max_junction="$value"
   done
+  echo "max_gpu_junction_mC=$max_junction"
 
-  echo "low_temp_max_gpu_junction_mC=$max_junction"
-  if [ "$max_junction" -ge 45000 ]; then
-    echo "LOW-TEMP CURVE NOT TESTED: maximum junction is not below 45 C"
-    required_unverified=1
-    return 0
-  fi
-
-  for i in $(seq 1 10); do
-    pwm="$(cat "$h/pwm1")" || return 1
-    echo "low_temp_curve_sample=$i pwm1=$pwm"
-    if [ "$pwm" = 180 ]; then
-      echo "Low-temperature curve result: PASS; pwm1 reached 180"
-      require_all_high || return 1
-      return 0
-    fi
+  # The calibrated curve is pending. Until it exists, every GPU duct channel
+  # must stay at 255 at every temperature.
+  for i in $(seq 1 5); do
+    for ch in "${GPU_FAN_CHANNELS[@]}"; do
+      pwm="$(cat "$h/pwm$ch")" || return 1
+      echo "curve_hold_sample=$i pwm$ch=$pwm"
+      if [ "$pwm" != 255 ]; then
+        fail "GPU duct channel $ch left PWM 255 while the curve is uncalibrated: $pwm"
+        force_all_high || true
+        return 1
+      fi
+    done
     sleep 2
   done
-  fail "low-temperature curve did not reach PWM 180"
-  force_all_high || true
-  return 1
+  echo "Curve hold result: PASS; all GPU duct channels held at 255"
+  require_all_high || return 1
+  return 0
 }
 
 restore_service_state() {
@@ -624,16 +664,19 @@ if ! test_coolercontrol_stop; then failure=1; fi
 if [ "$failure" -eq 0 ] && ! test_coolercontrol_crash; then failure=1; fi
 
 echo "=== measured response tests ==="
-if [ "$failure" -eq 0 ] && ! test_pwm_response; then failure=1; fi
+if [ "$failure" -eq 0 ] && ! test_gpu_fan_response; then failure=1; fi
 
 if [ "$failure" -eq 0 ]; then
   restore_service_state
-  test_low_temperature_curve || failure=1
+  test_curve_hold || failure=1
+  check_watchdog_status || failure=1
 fi
 
 echo "=== intentionally untested cases ==="
 echo "NOT TESTED: GPU load; run only after this report passes review."
 echo "NOT TESTED: reboot persistence; ask for reboot approval first."
+echo "NOT TESTED: a stopped GPU duct fan; unplug one fan only in a supervised run."
+echo "NOT TESTED: calibrated curve below 255; calibration is pending."
 echo "NOT TESTED: synthetic GPU sensor removal; no sensor was removed."
 echo "NOT TESTED: USB disconnect/reconnect; the controller stayed connected."
 echo "NOT TESTED: suspend/resume; the workstation was not suspended."

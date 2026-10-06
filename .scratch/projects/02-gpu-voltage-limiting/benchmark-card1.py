@@ -83,8 +83,11 @@ def snapshot():
             'controls': controls(device),
             'temperatures': {read(p.with_name(p.name.replace('_input', '_label'))): int(read(p)) for p in h.glob('temp*_input')},
         }
-    fan = Path('/sys/class/hwmon/hwmon2')
-    data['fan'] = {'pwm1': read(fan / 'pwm1'), 'fan1_rpm': read(fan / 'fan1_input')}
+    # Resolve the ARCTIC controller by hwmon name. The hwmon number changes.
+    fan = next(p for p in Path('/sys/class/hwmon').glob('hwmon*') if read(p / 'name') == 'arctic_fan')
+    channels = [int(c) for c in read(Path('/etc/nix-meta/arctic-fan/gpu-duct-channels')).split()]
+    data['fan'] = {f'pwm{c}': read(fan / f'pwm{c}') for c in channels}
+    data['fan'].update({f'fan{c}_rpm': read(fan / f'fan{c}_input') for c in channels})
     return data
 
 
@@ -421,7 +424,7 @@ def main():
         results['peak_card1_gtt_delta_mib'] = (max(x['cards']['1']['gtt_used_bytes'] for x in samples) - before['cards']['1']['gtt_used_bytes']) / MIB
         results['peak_card1_power_w'] = max(int(x['cards']['1']['power_uw']) for x in samples) / 1e6
         results['peak_temperature_c'] = max(v for x in samples for card in x['cards'].values() for v in card['temperatures'].values()) / 1000
-        results['peak_fan_rpm'] = max(int(x['fan']['fan1_rpm']) for x in samples)
+        results['peak_fan_rpm'] = max(int(v) for x in samples for k, v in x['fan'].items() if k.endswith('_rpm'))
     log_text = (out / 'stdout-stderr.log').read_text(errors='replace')
     results['flash_attention_log'] = [line for line in log_text.splitlines() if 'flash' in line.lower() and 'attn' in line.lower()][:20]
     results['cache_log'] = [line for line in log_text.splitlines() if 'KV buffer' in line or 'cache type' in line.lower()][:20]

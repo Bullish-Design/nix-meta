@@ -1,0 +1,74 @@
+fake safe-high
+ARCTIC watchdog: state=OK max_gpu_junction_mC=22000 target_pwm=255 cooldown_samples=0 channel2(pwm=255 rpm=14470 failed=0) channel3(pwm=255 rpm=15029 failed=0)
+ARCTIC watchdog: state=OK max_gpu_junction_mC=22000 target_pwm=255 cooldown_samples=0 channel2(pwm=255 rpm=14470 failed=0) channel3(pwm=255 rpm=15029 failed=0)
+ARCTIC watchdog: state=OK max_gpu_junction_mC=22000 target_pwm=255 cooldown_samples=0 channel2(pwm=255 rpm=14470 failed=0) channel3(pwm=255 rpm=15029 failed=0)
+ARCTIC watchdog: state=OK max_gpu_junction_mC=22000 target_pwm=255 cooldown_samples=0 channel2(pwm=255 rpm=0 failed=0) channel3(pwm=255 rpm=0 failed=0)
+ARCTIC watchdog: state=OK max_gpu_junction_mC=22000 target_pwm=255 cooldown_samples=0 channel2(pwm=255 rpm=0 failed=0) channel3(pwm=255 rpm=0 failed=0)
+CRITICAL: GPU duct channel 2 stopped at 0 RPM; latched as failed
+CRITICAL: GPU duct channel 3 stopped at 0 RPM; latched as failed
+ARCTIC watchdog: state=NO_AIRFLOW max_gpu_junction_mC=22000 target_pwm=255 cooldown_samples=0 channel2(pwm=255 rpm=0 failed=1) channel3(pwm=255 rpm=0 failed=1)
+ARCTIC watchdog: state=NO_AIRFLOW max_gpu_junction_mC=22000 target_pwm=255 cooldown_samples=0 channel2(pwm=255 rpm=0 failed=1) channel3(pwm=255 rpm=0 failed=1)
+ARCTIC watchdog: state=NO_AIRFLOW max_gpu_junction_mC=22000 target_pwm=255 cooldown_samples=0 channel2(pwm=255 rpm=0 failed=1) channel3(pwm=255 rpm=0 failed=1)
+ARCTIC watchdog: state=NO_AIRFLOW max_gpu_junction_mC=22000 target_pwm=255 cooldown_samples=0 channel2(pwm=255 rpm=0 failed=1) channel3(pwm=255 rpm=0 failed=1)
+ARCTIC watchdog: state=NO_AIRFLOW max_gpu_junction_mC=22000 target_pwm=255 cooldown_samples=0 channel2(pwm=255 rpm=0 failed=1) channel3(pwm=255 rpm=0 failed=1)
+ARCTIC watchdog: state=NO_AIRFLOW max_gpu_junction_mC=22000 target_pwm=255 cooldown_samples=0 channel2(pwm=255 rpm=0 failed=1) channel3(pwm=255 rpm=0 failed=1)
+fake safe-high
+fake safe-high
+ARCTIC watchdog: state=OK max_gpu_junction_mC=22000 target_pwm=255 cooldown_samples=0 channel2(pwm=255 rpm=14470 failed=0) channel3(pwm=255 rpm=15029 failed=0)
+ARCTIC watchdog: state=OK max_gpu_junction_mC=22000 target_pwm=255 cooldown_samples=0 channel2(pwm=255 rpm=14470 failed=0) channel3(pwm=255 rpm=15029 failed=0)
+ARCTIC watchdog: state=OK max_gpu_junction_mC=22000 target_pwm=255 cooldown_samples=0 channel2(pwm=255 rpm=14470 failed=0) channel3(pwm=255 rpm=15029 failed=0)
+CoolerControl is not active; forcing all ARCTIC channels high
+fake safe-high
+fake safe-high
+ARCTIC watchdog: state=OK max_gpu_junction_mC=22000 target_pwm=255 cooldown_samples=0 channel2(pwm=255 rpm=14470 failed=0) channel3(pwm=255 rpm=15029 failed=0)
+ARCTIC watchdog: state=OK max_gpu_junction_mC=22000 target_pwm=255 cooldown_samples=0 channel2(pwm=255 rpm=14470 failed=0) channel3(pwm=255 rpm=15029 failed=0)
+ARCTIC watchdog: state=OK max_gpu_junction_mC=22000 target_pwm=255 cooldown_samples=0 channel2(pwm=255 rpm=14470 failed=0) channel3(pwm=255 rpm=15029 failed=0)
+ARCTIC watchdog: state=OK max_gpu_junction_mC=22000 target_pwm=255 cooldown_samples=0 channel2(pwm=255 rpm=0 failed=0) channel3(pwm=255 rpm=15029 failed=0)
+ARCTIC watchdog: state=OK max_gpu_junction_mC=22000 target_pwm=255 cooldown_samples=0 channel2(pwm=255 rpm=0 failed=0) channel3(pwm=255 rpm=15029 failed=0)
+CRITICAL: GPU duct channel 2 stopped at 0 RPM; latched as failed
+ARCTIC watchdog: state=DEGRADED max_gpu_junction_mC=22000 target_pwm=255 cooldown_samples=0 channel2(pwm=255 rpm=0 failed=1) channel3(pwm=255 rpm=15029 failed=0)
+ARCTIC watchdog: state=DEGRADED max_gpu_junction_mC=22000 target_pwm=255 cooldown_samples=0 channel2(pwm=255 rpm=0 failed=1) channel3(pwm=255 rpm=15029 failed=0)
+ARCTIC watchdog: state=DEGRADED max_gpu_junction_mC=22000 target_pwm=255 cooldown_samples=0 channel2(pwm=255 rpm=0 failed=1) channel3(pwm=255 rpm=15029 failed=0)
+ARCTIC watchdog: state=DEGRADED max_gpu_junction_mC=22000 target_pwm=255 cooldown_samples=0 channel2(pwm=255 rpm=0 failed=1) channel3(pwm=255 rpm=15029 failed=0)
+ARCTIC watchdog: state=DEGRADED max_gpu_junction_mC=22000 target_pwm=255 cooldown_samples=0 channel2(pwm=255 rpm=0 failed=1) channel3(pwm=255 rpm=15029 failed=0)
+ARCTIC watchdog: state=DEGRADED max_gpu_junction_mC=22000 target_pwm=255 cooldown_samples=0 channel2(pwm=255 rpm=0 failed=1) channel3(pwm=255 rpm=15029 failed=0)
+ARCTIC watchdog: state=DEGRADED max_gpu_junction_mC=22000 target_pwm=255 cooldown_samples=0 channel2(pwm=255 rpm=14000 failed=1) channel3(pwm=255 rpm=15029 failed=0)
+ARCTIC watchdog: state=DEGRADED max_gpu_junction_mC=22000 target_pwm=255 cooldown_samples=0 channel2(pwm=255 rpm=14000 failed=1) channel3(pwm=255 rpm=15029 failed=0)
+fake safe-high
+fake safe-high
+ARCTIC watchdog: state=OK max_gpu_junction_mC=22000 target_pwm=255 cooldown_samples=0 channel2(pwm=255 rpm=14470 failed=0) channel3(pwm=255 rpm=15029 failed=0)
+ARCTIC watchdog: state=OK max_gpu_junction_mC=22000 target_pwm=255 cooldown_samples=0 channel2(pwm=255 rpm=14470 failed=0) channel3(pwm=255 rpm=15029 failed=0)
+ARCTIC watchdog: state=OK max_gpu_junction_mC=22000 target_pwm=255 cooldown_samples=0 channel2(pwm=255 rpm=14470 failed=0) channel3(pwm=255 rpm=15029 failed=0)
+/tmp/arctic-sim/root/sys/class/hwmon/hwmon2/pwm2 is zero; forcing safe high
+fake safe-high
+fake safe-high
+ARCTIC watchdog: state=OK max_gpu_junction_mC=22000 target_pwm=255 cooldown_samples=0 channel2(pwm=255 rpm=14470 failed=0) channel3(pwm=255 rpm=15029 failed=0)
+ARCTIC watchdog: state=OK max_gpu_junction_mC=22000 target_pwm=255 cooldown_samples=0 channel2(pwm=255 rpm=14470 failed=0) channel3(pwm=255 rpm=15029 failed=0)
+ARCTIC watchdog: state=OK max_gpu_junction_mC=22000 target_pwm=255 cooldown_samples=0 channel2(pwm=255 rpm=14470 failed=0) channel3(pwm=255 rpm=15029 failed=0)
+ARCTIC watchdog: state=OK max_gpu_junction_mC=22000 target_pwm=255 cooldown_samples=0 channel2(pwm=255 rpm=14470 failed=0) channel3(pwm=255 rpm=15029 failed=0)
+ARCTIC watchdog: state=OK max_gpu_junction_mC=22000 target_pwm=255 cooldown_samples=0 channel2(pwm=255 rpm=14470 failed=0) channel3(pwm=255 rpm=15029 failed=0)
+fake safe-high
+/tmp/arctic-sim/root/bin/arctic-fans-100: line 2: /tmp/arctic-sim/root/sys/class/hwmon/hwmon2/pwm2: Permission denied
+fake safe-high
+/tmp/arctic-sim/wd-sim.sh: line 80: /tmp/arctic-sim/root/sys/class/hwmon/hwmon2/pwm2: Permission denied
+failed to write PWM 255 to channel 2; forcing safe high
+/tmp/arctic-sim/root/bin/arctic-fans-100: line 2: /tmp/arctic-sim/root/sys/class/hwmon/hwmon2/pwm2: Permission denied
+fake safe-high
+fake safe-high
+ARCTIC watchdog: state=OK max_gpu_junction_mC=22000 target_pwm=255 cooldown_samples=0 channel2(pwm=255 rpm=14470 failed=0) channel3(pwm=255 rpm=15029 failed=0)
+ARCTIC watchdog: state=OK max_gpu_junction_mC=22000 target_pwm=255 cooldown_samples=0 channel2(pwm=255 rpm=14470 failed=0) channel3(pwm=255 rpm=15029 failed=0)
+ARCTIC watchdog: state=OK max_gpu_junction_mC=22000 target_pwm=255 cooldown_samples=0 channel2(pwm=255 rpm=14470 failed=0) channel3(pwm=255 rpm=15029 failed=0)
+invalid tach value on GPU duct channel 3: abc
+fake safe-high
+fake safe-high
+ARCTIC watchdog: state=OK max_gpu_junction_mC=22000 target_pwm=255 cooldown_samples=0 channel2(pwm=255 rpm=14470 failed=0) channel3(pwm=255 rpm=15029 failed=0)
+ARCTIC watchdog: state=OK max_gpu_junction_mC=22000 target_pwm=255 cooldown_samples=0 channel2(pwm=255 rpm=14470 failed=0) channel3(pwm=255 rpm=15029 failed=0)
+ARCTIC watchdog: state=OK max_gpu_junction_mC=22000 target_pwm=255 cooldown_samples=0 channel2(pwm=255 rpm=14470 failed=0) channel3(pwm=255 rpm=15029 failed=0)
+GPU duct channel 3 is missing its PWM or tach attribute; forcing safe high
+fake safe-high
+fake safe-high
+ARCTIC watchdog: state=OK max_gpu_junction_mC=22000 target_pwm=255 cooldown_samples=0 channel2(pwm=255 rpm=14470 failed=0) channel3(pwm=255 rpm=15029 failed=0)
+ARCTIC watchdog: state=OK max_gpu_junction_mC=22000 target_pwm=255 cooldown_samples=0 channel2(pwm=255 rpm=14470 failed=0) channel3(pwm=255 rpm=15029 failed=0)
+ARCTIC watchdog: state=OK max_gpu_junction_mC=22000 target_pwm=255 cooldown_samples=0 channel2(pwm=255 rpm=14470 failed=0) channel3(pwm=255 rpm=15029 failed=0)
+unused ARCTIC channel is not high: /tmp/arctic-sim/root/sys/class/hwmon/hwmon2/pwm1=180
+fake safe-high

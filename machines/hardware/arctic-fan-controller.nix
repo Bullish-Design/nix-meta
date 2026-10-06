@@ -4,6 +4,13 @@ let
   gpuPciDevices = config.nix-meta.gpu-compute.amd.pciDevices;
   gpuPciDevicesForShell = lib.concatMapStringsSep " " lib.escapeShellArg gpuPciDevices;
 
+  # ARCTIC ports that carry the two GPU duct fans. Channel N drives pwmN and
+  # reports fanN_input. Change this list only after the physical channel map is
+  # verified with scripts/arctic-fan-controller-test. Every other channel stays
+  # at PWM 255.
+  gpuFanChannels = [ 2 3 ];
+  gpuFanChannelsForShell = lib.concatMapStringsSep " " toString gpuFanChannels;
+
   # Keep the system kernel unchanged. The driver source is taken from the
   # nixpkgs testing source where it is currently available, but compiled and
   # installed as an out-of-tree module for this host's selected kernel.
@@ -74,10 +81,10 @@ let
     echo "ARCTIC Fan Controller: verified $count PWM channel(s) at 100%"
   '';
 
-  # This watchdog is the normal controller for the mapped GPU duct fan. It
-  # starts high, uses the configured GPU PCI paths, and returns high on every
-  # error. CoolerControl leaves the ARCTIC fan unmanaged; it remains the
-  # localhost UI and hardware monitor.
+  # This watchdog is the normal controller for the two GPU duct fans. It starts
+  # high, uses the configured GPU PCI paths, and returns high on every error.
+  # CoolerControl leaves the ARCTIC fans unmanaged; it remains the localhost UI
+  # and hardware monitor.
   fanWatchdog = pkgs.writeShellScript "arctic-fan-watchdog" ''
     set -u
 
@@ -130,23 +137,43 @@ let
       return 1
     }
 
+    # Calibration is pending. Every GPU duct fan runs at full speed until the
+    # calibration sweep measures a stable low value. Add a lower value only when
+    # every GPU fan keeps a tach reading above min_running_rpm at that value.
     curve_pwm() {
-      junction="$1"
-      # The measured minimum reliable value is 180. Use full speed before
-      # 70 C, with a conservative margin below the requested 75--80 C limit.
-      if [ "$junction" -ge 65000 ]; then
-        printf '%s\n' 255
-      elif [ "$junction" -ge 60000 ]; then
-        printf '%s\n' 245
-      elif [ "$junction" -ge 55000 ]; then
-        printf '%s\n' 230
-      elif [ "$junction" -ge 50000 ]; then
-        printf '%s\n' 215
-      elif [ "$junction" -ge 45000 ]; then
-        printf '%s\n' 200
-      else
-        printf '%s\n' 180
-      fi
+      printf '%s\n' 255
+    }
+
+    # Thresholds for the fan failure latch. A GPU fan below min_running_rpm for
+    # stall_samples consecutive samples is failed. Startup_grace_samples skips
+    # the first samples while the fans start.
+    min_running_rpm=500
+    stall_samples=3
+    startup_grace_samples=5
+
+    declare -A pwm_now=() fan_rpm=() strikes=() failed=()
+    gpu_channel_list="${gpuFanChannelsForShell}"
+    gpu_channel_count=0
+    for ch in ${gpuFanChannelsForShell}; do
+      strikes[$ch]=0
+      failed[$ch]=0
+      gpu_channel_count=$((gpu_channel_count + 1))
+    done
+
+    # Write one value to every GPU duct channel, then read each channel back.
+    write_gpu_pwm() {
+      local arctic="$1" value="$2" ch readback
+      for ch in ${gpuFanChannelsForShell}; do
+        if ! printf '%s\n' "$value" > "$arctic/pwm$ch"; then
+          echo "failed to write PWM $value to channel $ch; forcing safe high" >&2
+          exit 1
+        fi
+        if ! readback="$(cat "$arctic/pwm$ch")" || [ "$readback" != "$value" ]; then
+          echo "PWM readback failed on channel $ch: expected $value, got $readback" >&2
+          exit 1
+        fi
+        pwm_now[$ch]="$readback"
+      done
     }
 
     # The watchdog is readiness-gated so CoolerControl starts only after this
@@ -166,8 +193,10 @@ let
       ${pkgs.coreutils}/bin/sleep 0.5
     done
 
+    samples=0
     cooldown_samples=0
     while :; do
+      samples=$((samples + 1))
       if ! ${pkgs.systemd}/bin/systemctl is-active --quiet coolercontrold.service; then
         echo "CoolerControl is not active; forcing all ARCTIC channels high" >&2
         exit 1
@@ -178,10 +207,12 @@ let
         exit 1
       fi
 
+      # Read every PWM channel. GPU channels must hold a valid nonzero value.
+      # Every other channel must stay at 255.
       pwm_count=0
-      pwm1_value=""
       for pwm in "$arctic"/pwm[0-9] "$arctic"/pwm[0-9][0-9]; do
         [ -r "$pwm" ] || continue
+        channel="''${pwm##*/pwm}"
         if ! value="$(cat "$pwm")"; then
           echo "failed to read $pwm; forcing safe high" >&2
           exit 1
@@ -200,9 +231,9 @@ let
           echo "invalid PWM value in $pwm: $value" >&2
           exit 1
         fi
-        case "$pwm" in
-          "$arctic"/pwm1)
-            pwm1_value="$value"
+        case " $gpu_channel_list " in
+          *" $channel "*)
+            pwm_now[$channel]="$value"
             ;;
           *)
             if [ "$value" -ne 255 ]; then
@@ -217,9 +248,53 @@ let
         echo "ARCTIC controller has no readable PWM channels" >&2
         exit 1
       fi
-      if [ -z "$pwm1_value" ]; then
-        echo "mapped GPU duct channel pwm1 is missing; forcing safe high" >&2
-        exit 1
+
+      for ch in ${gpuFanChannelsForShell}; do
+        if [ ! -r "$arctic/pwm$ch" ] || [ ! -r "$arctic/fan''${ch}_input" ]; then
+          echo "GPU duct channel $ch is missing its PWM or tach attribute; forcing safe high" >&2
+          exit 1
+        fi
+      done
+
+      # Read every GPU tach. A read error or invalid value forces safe high.
+      # A low tach value counts toward the stall latch for that channel.
+      for ch in ${gpuFanChannelsForShell}; do
+        if ! rpm="$(cat "$arctic/fan''${ch}_input")"; then
+          echo "tach read failed on GPU duct channel $ch; forcing safe high" >&2
+          exit 1
+        fi
+        case "$rpm" in
+          ""|*[!0-9]*)
+            echo "invalid tach value on GPU duct channel $ch: $rpm" >&2
+            exit 1
+            ;;
+        esac
+        fan_rpm[$ch]="$rpm"
+        if [ "$rpm" -lt "$min_running_rpm" ]; then
+          strikes[$ch]=$((strikes[$ch] + 1))
+        else
+          strikes[$ch]=0
+        fi
+        if [ "$samples" -gt "$startup_grace_samples" ] \
+          && [ "''${strikes[$ch]}" -ge "$stall_samples" ] \
+          && [ "''${failed[$ch]}" -eq 0 ]; then
+          failed[$ch]=1
+          echo "CRITICAL: GPU duct channel $ch stopped at $rpm RPM; latched as failed" >&2
+        fi
+      done
+
+      failed_count=0
+      for ch in ${gpuFanChannelsForShell}; do
+        if [ "''${failed[$ch]}" -ne 0 ]; then
+          failed_count=$((failed_count + 1))
+        fi
+      done
+      if [ "$failed_count" -eq 0 ]; then
+        state=OK
+      elif [ "$failed_count" -lt "$gpu_channel_count" ]; then
+        state=DEGRADED
+      else
+        state=NO_AIRFLOW
       fi
 
       max_junction=""
@@ -245,38 +320,47 @@ let
       done
 
       target_pwm="$(curve_pwm "$max_junction")"
-      if [ "$target_pwm" -gt "$pwm1_value" ]; then
+      if [ "$failed_count" -gt 0 ]; then
+        # PWM cannot repair a stopped motor. Hold every channel high while any
+        # GPU fan is failed. The remaining fans give the most airflow available.
+        target_pwm=255
+      fi
+
+      needs_up=0
+      needs_down=0
+      for ch in ${gpuFanChannelsForShell}; do
+        if [ "$target_pwm" -gt "''${pwm_now[$ch]}" ]; then
+          needs_up=1
+        fi
+        if [ "$target_pwm" -lt "''${pwm_now[$ch]}" ]; then
+          needs_down=1
+        fi
+      done
+
+      if [ "$needs_up" -eq 1 ]; then
         # Ramp up without delay when the maximum junction temperature rises.
         cooldown_samples=0
-        if ! printf '%s\n' "$target_pwm" > "$arctic/pwm1"; then
-          echo "failed to increase GPU duct PWM to $target_pwm; forcing safe high" >&2
-          exit 1
-        fi
-        if ! readback="$(cat "$arctic/pwm1")" || [ "$readback" != "$target_pwm" ]; then
-          echo "GPU duct PWM ramp-up readback failed: expected $target_pwm, got $readback" >&2
-          exit 1
-        fi
-        pwm1_value="$readback"
-      elif [ "$target_pwm" -lt "$pwm1_value" ]; then
+        write_gpu_pwm "$arctic" "$target_pwm"
+      elif [ "$needs_down" -eq 1 ]; then
         # Require five consecutive cool samples before ramping down.
         cooldown_samples=$((cooldown_samples + 1))
         if [ "$cooldown_samples" -ge 5 ]; then
-          if ! printf '%s\n' "$target_pwm" > "$arctic/pwm1"; then
-            echo "failed to decrease GPU duct PWM to $target_pwm; forcing safe high" >&2
-            exit 1
-          fi
-          if ! readback="$(cat "$arctic/pwm1")" || [ "$readback" != "$target_pwm" ]; then
-            echo "GPU duct PWM ramp-down readback failed: expected $target_pwm, got $readback" >&2
-            exit 1
-          fi
-          pwm1_value="$readback"
+          write_gpu_pwm "$arctic" "$target_pwm"
           cooldown_samples=0
         fi
       else
         cooldown_samples=0
       fi
 
-      echo "ARCTIC watchdog: max_gpu_junction_mC=$max_junction target_pwm1=$target_pwm actual_pwm1=$pwm1_value cooldown_samples=$cooldown_samples"
+      detail=""
+      for ch in ${gpuFanChannelsForShell}; do
+        detail="$detail channel$ch(pwm=''${pwm_now[$ch]} rpm=''${fan_rpm[$ch]} failed=''${failed[$ch]})"
+      done
+
+      printf 'state=%s target_pwm=%s max_gpu_junction_mC=%s\n' "$state" "$target_pwm" "$max_junction" \
+        > /run/arctic-fan/status || echo "could not write /run/arctic-fan/status" >&2
+      ${pkgs.systemd}/bin/systemd-notify --status="$state target_pwm=$target_pwm" || true
+      echo "ARCTIC watchdog: state=$state max_gpu_junction_mC=$max_junction target_pwm=$target_pwm cooldown_samples=$cooldown_samples$detail"
       ${pkgs.coreutils}/bin/sleep 2
     done
   '';
@@ -314,12 +398,20 @@ in
       assertion = config.nix-meta.gpu-compute.amd.enable && (builtins.length gpuPciDevices == 2);
       message = "The ARCTIC GPU fan watchdog requires exactly two configured AMD GPU PCI addresses.";
     }
+    {
+      assertion = builtins.length gpuFanChannels == 2;
+      message = "The ARCTIC GPU fan watchdog requires exactly two GPU duct fan channels.";
+    }
   ];
 
   boot.extraModulePackages = [ arcticFanController ];
   boot.kernelModules = [ "arctic_fan_controller" ];
 
   environment.systemPackages = [ allFansHigh ];
+
+  # Test scripts read the same channel list as the watchdog.
+  environment.etc."nix-meta/arctic-fan/gpu-duct-channels".text =
+    lib.concatMapStrings (channel: "${toString channel}\n") gpuFanChannels;
 
   systemd.services.arctic-fan-module-load = {
     description = "Load the kernel-matched ARCTIC Fan Controller module";
@@ -369,6 +461,8 @@ in
     serviceConfig = {
       Type = "notify";
       NotifyAccess = "main";
+      # Writes /run/arctic-fan/status. Lists the state for each GPU fan.
+      RuntimeDirectory = "arctic-fan";
       ExecStart = fanWatchdog;
       ExecStopPost = "${allFansHigh}/bin/arctic-fans-100";
       Restart = "on-failure";
