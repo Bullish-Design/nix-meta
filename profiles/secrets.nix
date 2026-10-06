@@ -8,6 +8,7 @@ let
   # that reads its placeholder is gated on this, so a rebuild succeeds while the
   # secret is still unprovisioned.
   hasDeepSeekKey = config.sops.secrets ? "deepseek-api-key";
+  hasAtticSigningKey = config.sops.secrets ? "attic-signing-key";
 in
 {
   imports = [
@@ -26,6 +27,7 @@ in
   # here. The full naming SSOT stays in nix-secrets.
   nix-secrets.secrets.activeNames = [
     "tailscale-auth-key"
+    "attic-signing-key"
     "subconscious-api-key"
     # Consumed by Pi and Paseo. Mnemonix Hindsight deliberately does not receive
     # this credential: its retain and reflect calls go to a local model, either
@@ -45,6 +47,13 @@ in
   # An override for a secret that has no material is inert: `effectiveNames`
   # never looks it up.
   nix-secrets.secrets.secrets = {
+    "attic-signing-key" = {
+      owner = "root";
+      group = "root";
+      mode = "0400";
+      restartUnits = [ "atticd.service" ];
+    };
+
     "subconscious-api-key" = {
       owner = config.nixos-core.base.username;
       group = "users";
@@ -68,17 +77,28 @@ in
   # Gated on the key existing. `sops.placeholder` is derived from
   # `sops.secrets`, so reading a placeholder for a secret that
   # `warnOnMissingKeys` filtered out is an evaluation error, not a warning.
-  sops.templates = lib.mkIf hasDeepSeekKey {
-    "paseo-deepseek.env" = {
-      owner = config.nixos-core.base.username;
-      group = "users";
-      mode = "0400";
-      content = ''
-        DEEPSEEK_API_KEY=${config.sops.placeholder."deepseek-api-key"}
-      '';
-    };
-
-  };
+  sops.templates = lib.mkMerge [
+    (lib.mkIf hasDeepSeekKey {
+      "paseo-deepseek.env" = {
+        owner = config.nixos-core.base.username;
+        group = "users";
+        mode = "0400";
+        content = ''
+          DEEPSEEK_API_KEY=${config.sops.placeholder."deepseek-api-key"}
+        '';
+      };
+    })
+    (lib.mkIf hasAtticSigningKey {
+      "atticd.env" = {
+        owner = "root";
+        group = "root";
+        mode = "0400";
+        content = ''
+          ATTIC_SERVER_TOKEN_RS256_SECRET_BASE64=${config.sops.placeholder."attic-signing-key"}
+        '';
+      };
+    })
+  ];
 
   # Consume tailscale-auth-key for declarative tailnet re-auth. The provider owns
   # the secret *declaration*; nixos-core.base owns the *service* wiring — the

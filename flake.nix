@@ -81,14 +81,11 @@
     # encrypted store + recipients live inside the nix-secrets flake.
     #
     # Consumed from the LOCAL working copy, pinned to a TAG. `git+file:` keeps
-    # the encrypted store on this box — a secret reaches the rebuild as soon as
-    # it is committed and tagged here, with no push to GitHub in the loop. The
-    # tag is what keeps that honest: `git+file:` sees committed files only, so a
-    # bare path or a branch ref would let an in-progress edit to the store slip
-    # into a rebuild. Bump the tag to adopt a new secret, exactly like the
-    # vendomat/repoman/devman pins above.
+    # the encrypted store on this box. The tag ensures Nix sees committed files
+    # only, so an in-progress edit cannot enter a rebuild. Bump the tag to adopt
+    # a new secret, exactly like the vendomat/repoman/devman pins above.
     nix-secrets = {
-      url = "git+file:///home/andrew/Documents/Projects/nix-secrets?ref=refs/tags/v0.1.3";
+      url = "git+file:///home/andrew/Documents/Projects/nix-secrets?ref=refs/tags/v0.1.4";
       inputs.nixpkgs.follows = "nixpkgs";
     };
 

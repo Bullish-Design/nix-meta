@@ -309,6 +309,67 @@ in
     };
   };
 
+  # Vendomat's private Nix binary cache. Keep the API on loopback and publish
+  # only its /attic path through the existing tailnet HTTPS endpoint.
+  services.atticd = {
+    enable = true;
+    environmentFile = config.sops.templates."atticd.env".path;
+    settings = {
+      listen = "127.0.0.1:8089";
+      database.url = "sqlite:///mnt/wd_green1/attic/server.db?mode=rwc";
+      storage = {
+        type = "local";
+        path = "/mnt/wd_green1/attic";
+      };
+    };
+  };
+
+  # Attic needs a stable account to write its durable state on the ext4 disk.
+  # The setup unit runs as root after the optional disk mount; Attic stays
+  # confined to its own account and refuses to start without that mount.
+  users.groups.atticd = { };
+  users.users.atticd = {
+    isSystemUser = true;
+    group = "atticd";
+  };
+
+  systemd.services.atticd-storage-setup = {
+    description = "Prepare Attic storage on /mnt/wd_green1";
+    before = [ "atticd.service" ];
+    unitConfig.RequiresMountsFor = [ "/mnt/wd_green1" ];
+    serviceConfig = {
+      Type = "oneshot";
+      ExecStart = "${pkgs.coreutils}/bin/install -d -m 0750 -o atticd -g atticd /mnt/wd_green1/attic";
+      RemainAfterExit = true;
+    };
+  };
+
+  systemd.services.atticd = {
+    requires = [ "atticd-storage-setup.service" ];
+    after = [ "atticd-storage-setup.service" ];
+    unitConfig.RequiresMountsFor = [ "/mnt/wd_green1" ];
+    serviceConfig.DynamicUser = lib.mkForce false;
+  };
+
+  systemd.services.atticd-tailscale-serve = {
+    description = "Publish Attic over Tailscale Serve at /attic";
+    after = [ "tailscaled.service" "atticd.service" ];
+    wants = [ "tailscaled.service" ];
+    requires = [ "atticd.service" ];
+    wantedBy = [ "multi-user.target" ];
+    serviceConfig =
+      let
+        tailscale = lib.getExe config.services.tailscale.package;
+      in
+      {
+        Type = "oneshot";
+        RemainAfterExit = true;
+        ExecStartPre = "${tailscale} wait --timeout=60s";
+        ExecStart = "${tailscale} serve --yes --bg --https=443 --set-path=/attic http://127.0.0.1:8089";
+        ExecStop = "${tailscale} serve --yes --https=443 --set-path=/attic off";
+      };
+  };
+
   # This switch introduces PostgreSQL to the box for the first time (nothing
   # else here used it), so the first activation initialises a fresh cluster at
   # /var/lib/postgresql/17.
