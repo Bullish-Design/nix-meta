@@ -365,3 +365,42 @@ Physical rollback: move the fans back to the old wiring. The old watchdog
 expects one fan on port 1.
 
 Safe state at any time: `sudo arctic-fans-100` writes 255 to all channels.
+
+## 12. Results, 2026-10-06
+
+Final state of the change:
+
+- Trunk commit `780be31`. Deployed generation matches the Nix config on trunk.
+- Watchdog `state=OK`. Curve table as in Section 5.
+- Restart limits now apply from `[Unit]`.
+
+Measured per-fan speed, same run for both fans (RPM at each PWM):
+
+| PWM | Channel 2 | Channel 3 |
+|---|---|---|
+| 255 | 14,588 | 15,058 |
+| 225 | 13,235 | 13,735 |
+| 200 | 12,088 | 12,647 |
+| 175 | 11,000 | 11,500 |
+| 150 | 9,588 | 10,058 |
+| 125 | 8,205 | 8,529 |
+| 100 | 6,647 | 6,941 |
+| 75 | 4,941 | 5,205 |
+| 50 | 3,411 | 3,529 |
+| 25 | 1,617 | 1,705 |
+
+Each channel changed only its own fan. The other fan stayed near its 255 speed.
+No stall at any value down to 25.
+
+Acceptance run: `artifacts/arctic-fan-controller-test-curve-20261006T180933Z/test.log`.
+Result: `RESULT=INCOMPLETE`. All automated checks passed. Untested cases are listed in the log.
+
+Earlier failed run: `artifacts/arctic-fan-controller-test-curve-20261006T175350Z/test.log`.
+It failed on a test bug, fixed in `780be31`. The curve match passed in that run.
+
+Still open before router use:
+
+- Loaded GPU run with the 72 C stop. The owner runs this elsewhere.
+- Reboot persistence.
+- Controller unplug and USB reconnect.
+- One or two fans stopped. The latch logs and holds channels at 255. Nothing stops GPU work.
