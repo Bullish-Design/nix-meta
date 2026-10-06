@@ -694,11 +694,37 @@ in
     options = [
       "nofail"
       "x-systemd.automount"
+      # The dedicated Attic subtree uses a named atticd ACL. NTFS3 requires
+      # this option to enable POSIX ACL support.
+      "acl"
       "uid=1000"
       "gid=100"
       "umask=022"
       "windows_names"
     ];
+  };
+
+  # Prepare the dedicated Attic subtree on the 2 TB SSD. Keep the active
+  # Attic service on /mnt/wd_green1 until the SSD permission and migration
+  # fixtures pass. This separate unit lets us prove SSD access without
+  # restarting the current service.
+  systemd.services.atticd-ssd-storage-setup = {
+    description = "Prepare Attic storage on /mnt/shared";
+    wantedBy = [ "multi-user.target" ];
+    unitConfig.RequiresMountsFor = [ "/mnt/shared" ];
+    serviceConfig = {
+      Type = "oneshot";
+      ExecStart = pkgs.writeShellScript "atticd-ssd-storage-setup" ''
+        set -eu
+        ${pkgs.coreutils}/bin/install -d -m 0700 /mnt/shared/attic
+        ${pkgs.acl}/bin/setfacl -m \
+          u::rwx,u:atticd:rwx,g::---,m::rwx,o::---,\
+          d:u::rwx,d:u:atticd:rwx,d:g::---,d:m::rwx,d:o::--- \
+          /mnt/shared/attic
+        ${pkgs.acl}/bin/getfacl -cp /mnt/shared/attic
+      '';
+      RemainAfterExit = true;
+    };
   };
 
   # Used WD Re (WD2000FYYZ) drive added to a flexbay, wiped of its prior
@@ -739,5 +765,16 @@ in
   nix-meta.backup = {
     enable = true;
     mountPoint = "/mnt/wd_green1";
+    # Keep the repository on WD Green. Back up only the dedicated Attic
+    # subtree from the SSD; the rest of /mnt/shared remains excluded.
+    paths = [ "/home/andrew" "/etc" "/var/lib" "/mnt/shared/attic" ];
+  };
+
+  # Restic keeps its repository on WD Green. Require both disks and the
+  # dedicated Attic directory setup before the backup reads its source.
+  systemd.services."restic-backups-system" = {
+    requires = [ "atticd-ssd-storage-setup.service" ];
+    after = [ "atticd-ssd-storage-setup.service" ];
+    unitConfig.RequiresMountsFor = [ "/mnt/shared" ];
   };
 }
