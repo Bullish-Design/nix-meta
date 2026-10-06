@@ -5,21 +5,30 @@ set -o pipefail
 
 usage() {
   cat <<'EOF'
-Usage: sudo ./scripts/arctic-fan-controller-test [--artifact-dir DIR]
+Usage: sudo ./scripts/arctic-fan-controller-test [--artifact-dir DIR] [--sweep "VALUES"]
 
 Runs the safe ARCTIC controller acceptance tests and writes a complete log.
 The script never writes PWM 0. It does not reboot, run GPU load, unload a
 module, disconnect USB, remove sensors, or suspend the machine. It reads the
 GPU duct channel list from /etc/nix-meta/arctic-fan/gpu-duct-channels.
+
+--sweep sets the PWM values written to each GPU duct channel, for example
+"90 80 70 60". Each value is 1 to 255. The default is "255 200 150 120 100".
 EOF
 }
 
 artifact_dir=""
+sweep_override=""
 while [ "$#" -gt 0 ]; do
   case "$1" in
     --artifact-dir)
       [ "$#" -ge 2 ] || { usage >&2; exit 3; }
       artifact_dir="$2"
+      shift 2
+      ;;
+    --sweep)
+      [ "$#" -ge 2 ] || { usage >&2; exit 3; }
+      sweep_override="$2"
       shift 2
       ;;
     --help|-h)
@@ -459,7 +468,21 @@ test_coolercontrol_crash() {
 
 # Sweep values for each GPU duct channel. 255 is the baseline. Lower values
 # record calibration data. A stalled lower value is recorded, not failed.
-SWEEP_PWM_VALUES=(255 200 150 120 100)
+if [ -n "$sweep_override" ]; then
+  read -r -a SWEEP_PWM_VALUES <<< "$sweep_override"
+  if [ "${#SWEEP_PWM_VALUES[@]}" -eq 0 ]; then
+    echo "FAIL: --sweep needs at least one value" >&2
+    exit 3
+  fi
+  for value in "${SWEEP_PWM_VALUES[@]}"; do
+    if ! [[ "$value" =~ ^[0-9]+$ ]] || [ "$value" -lt 1 ] || [ "$value" -gt 255 ]; then
+      echo "FAIL: --sweep value must be 1 to 255, never 0: $value" >&2
+      exit 3
+    fi
+  done
+else
+  SWEEP_PWM_VALUES=(255 200 150 120 100)
+fi
 
 test_gpu_fan_response() {
   local h pwm fan rpm value index value_unused ch other_ch other_rpm

@@ -458,6 +458,12 @@ in
     after = [ "arctic-fan-safe-high.service" ];
     before = [ "coolercontrold.service" "shutdown.target" ];
 
+    # systemd reads the start limit from [Unit], not [Service].
+    unitConfig = {
+      StartLimitIntervalSec = "60s";
+      StartLimitBurst = 6;
+    };
+
     serviceConfig = {
       Type = "notify";
       NotifyAccess = "main";
@@ -467,8 +473,6 @@ in
       ExecStopPost = "${allFansHigh}/bin/arctic-fans-100";
       Restart = "on-failure";
       RestartSec = "10s";
-      StartLimitIntervalSec = "60s";
-      StartLimitBurst = 6;
       TimeoutStopSec = "90s";
     };
   };

@@ -321,8 +321,9 @@ The long-prompt workload stays blocked until the short workload passes.
 
 ## 10. Commit and landing
 
-Gitman lane `arctic-dual-fan` holds the repository change. Landing does not
-activate the change. Section 8.3 does that.
+Gitman lane `arctic-dual-fan` landed into `main` and pushed to origin at
+`ebbb904eccbf214a4f42717e29643917f1343ec8`. Landing does not activate the
+change. Section 8.3 does that.
 
 ## 11. Rollback
 
