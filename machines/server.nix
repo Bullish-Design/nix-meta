@@ -12,6 +12,7 @@ in
   imports = [
     ./hardware/server.nix
     ./hardware/arctic-fan-controller.nix
+    ./hardware/amdgpu-power-profile.nix
 
     # THIS LIBRARY OWNS ALL LLM SERVING (inferference AGENTS.md, owner decision
     # 2026-09-04): every model this box serves is a child of the ONE llama.cpp
