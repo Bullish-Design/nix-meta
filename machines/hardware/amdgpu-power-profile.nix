@@ -107,16 +107,24 @@ let
         failures=$((failures + 1))
         continue
       fi
-      case "$active_now" in
-        *"${toString powerProfile} ${powerProfileName}"*) ;;
-        *)
-          echo "amdgpu-power-profile: $bdf active profile readback is '$active_now'," \
-            "expected ${toString powerProfile} ${powerProfileName}" >&2
-          failures=$((failures + 1))
-          continue
-          ;;
-      esac
+      # The driver right-aligns profile names in a fixed-width column, so the
+      # active line reads ' 2   POWER_SAVING*:' with variable spacing and the
+      # asterisk glued to the name. Compare the parsed index and name, never
+      # the raw spacing: matching a literal 'N NAME' fails on every profile
+      # whose name is shorter than the column.
+      active_index="$(${pkgs.coreutils}/bin/printf '%s\n' "$active_now" | ${pkgs.gawk}/bin/awk '{print $1}')"
+      active_name="$(${pkgs.coreutils}/bin/printf '%s\n' "$active_now" | ${pkgs.gawk}/bin/awk '{print $2}' | ${pkgs.coreutils}/bin/tr -d '*:')"
+      if [ "$active_index" != "${toString powerProfile}" ] || [ "$active_name" != "${powerProfileName}" ]; then
+        echo "amdgpu-power-profile: $bdf active profile readback is index='$active_index' name='$active_name'," \
+          "expected ${toString powerProfile} ${powerProfileName} (raw: '$active_now')" >&2
+        failures=$((failures + 1))
+        continue
+      fi
 
+      # A failed readback above leaves the written value in place rather than
+      # reverting. Profile 2 draws LESS power than the default, so an
+      # unverified application is not a hazard, and reverting would flap
+      # against the five-minute re-assert timer. The unit still fails loudly.
       echo "amdgpu-power-profile: $bdf level=$level_now profile=${toString powerProfile} ${powerProfileName} verified"
     done
 
