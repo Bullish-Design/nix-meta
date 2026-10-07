@@ -648,11 +648,11 @@
     "inferference": {
       "flake": false,
       "locked": {
-        "lastModified": 1791312629,
-        "narHash": "sha256-puNrn3RzGJZqGvHiMcJVMwQcqPbkRzMQb6ysorhxDrM=",
+        "lastModified": 1791381517,
+        "narHash": "sha256-QrXK8WW7rv8KluV57MP+H6rCNVaeUg8KImvrVranSYA=",
         "ref": "main",
-        "rev": "89f85be51f65f56d058a681851d5508245b0abcc",
-        "revCount": 131,
+        "rev": "c23d69876b09145ad636cb79fa41d4daf8df83a3",
+        "revCount": 158,
         "type": "git",
         "url": "ssh://git@github.com/Bullish-Design/inferference.git"
       },
