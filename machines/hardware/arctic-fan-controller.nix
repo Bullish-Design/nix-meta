@@ -54,7 +54,7 @@ let
   };
 
   # The active curve. Change this one name to switch curves.
-  selectedFanCurveName = "full";
+  selectedFanCurveName = "stepped";
   selectedFanCurve = fanCurves.${selectedFanCurveName};
 
   # Fail at evaluation time rather than shipping a curve that cannot answer
