@@ -1,0 +1,26 @@
+#!/usr/bin/env bash
+# Create one repository in the Vendomat source collection on this host.
+# Usage: collection-add <repo>
+# The repository takes only new release tags, over SSH, and git-daemon serves it read only.
+set -eu
+repo=${1:?usage: collection-add <repo>}
+case "$repo" in */* | .* | "") echo "collection-add: bad repository name: $repo" >&2; exit 2 ;; esac
+dir=${VENDOMAT_COLLECTION:-$HOME/vendor}/$repo
+[ ! -e "$dir" ] || { echo "collection-add: $dir exists" >&2; exit 1; }
+git init -q "$dir"
+cat > "$dir/.git/hooks/pre-receive" <<'HOOK'
+#!/bin/sh
+# Collection rule: only new release tags enter, and a tag never moves.
+zero=0000000000000000000000000000000000000000
+while read old new ref; do
+  case "$ref" in
+    refs/tags/*)
+      [ "$old" = "$zero" ] || { echo "collection: $ref exists; releases are immutable" >&2; exit 1; } ;;
+    *)
+      echo "collection: only release tags are accepted, not $ref" >&2; exit 1 ;;
+  esac
+done
+HOOK
+chmod 755 "$dir/.git/hooks/pre-receive"
+touch "$dir/.git/git-daemon-export-ok"
+echo "collection-add: created $dir (tags only, served read only)"
