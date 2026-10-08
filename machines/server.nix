@@ -176,6 +176,11 @@ in
   nix-paseo.paseo = {
     enable = true;
     subconscious.enable = true;
+    # Paseo's systemd service must pass the rendered credential to Pi. The
+    # interactive zsh export does not reach agents launched by the daemon.
+    agentShell.environmentFiles = lib.optional
+      (config.sops.secrets ? "deepseek-api-key")
+      config.sops.templates."paseo-deepseek.env".path;
 
     user = "andrew";
     group = "users";

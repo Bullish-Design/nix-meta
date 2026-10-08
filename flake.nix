@@ -8,13 +8,10 @@
     # package evaluation on an independently locked nixpkgs commit, so routine
     # system nixpkgs bumps cannot change the Pi binary unexpectedly.
     #
-    # Pinned to the nixos-unstable rev that carries pi-coding-agent 1.0.3
-    # (nixpkgs master commit 5e867b1db0f2, 2026-10-05, raised 1.0.2 -> 1.0.3 and
-    # has since reached the channel). Upstream pi is at v1.0.4 as of 2026-10-06,
-    # not yet packaged in nixpkgs. Prefer a channel rev over a bare master
-    # commit: Hydra has built it, so the package substitutes instead of
-    # compiling here.
-    pi-nixpkgs.url = "github:NixOS/nixpkgs/151fa4e8ddfdd8dd25d945ad94ed54a13de9f6e4";
+    # Pinned independently from system nixpkgs. This exact revision carries the
+    # latest stable pi-coding-agent (1.0.4, released 2026-10-05), so Pi can be
+    # updated or rolled back without coupling it to routine system package bumps.
+    pi-nixpkgs.url = "github:NixOS/nixpkgs/e7439b6b14ad3cc35d05608ebca9bce01a25f5f8";
 
     # Pin to a released devenv version. This pin is what profiles/developer.nix
     # installs. It used to be declared here and ignored, while `pkgs.devenv`
