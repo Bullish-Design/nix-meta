@@ -139,6 +139,22 @@ in
       };
     })
 
+    (lib.mkIf (cfg.amd.enable && cfg.amd.model == "v620") {
+      # V620 power-cap floor. The VBIOS sets hwmon power1_cap min = max = 250 W,
+      # so root cannot lower the PPT limit. A runtime pp_table upload does not
+      # work: it wedges the SMU (inferference project 032, incident 2026-10-08).
+      # This kernel patch lowers only the minimum to 120 W, and only for PCI
+      # 1002:73a1 with subsystem 1002:0e34. The default and maximum stay at 250 W.
+      # The cap changes only when root writes power1_cap (SetPptLimit message).
+      # Re-check the patch on every kernel bump. A failed apply stops the build.
+      boot.kernelPatches = [
+        {
+          name = "v620-powercap-min-120w";
+          patch = ./patches/v620-powercap-min-120w.patch;
+        }
+      ];
+    })
+
     (lib.mkIf cfg.nvidia.enable {
       # Headless CUDA substrate for local LLM inference on a host with supported
       # NVIDIA GPUs. This remains disabled on the AMD-only server.
