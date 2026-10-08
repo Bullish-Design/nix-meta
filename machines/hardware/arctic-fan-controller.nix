@@ -469,7 +469,7 @@ ${curveDispatchFunction}
           expires_epoch="$(${pkgs.coreutils}/bin/date -d "$req_expires" +%s 2>/dev/null)" || expires_epoch=""
           now_epoch="$(${pkgs.coreutils}/bin/date +%s)"
           case "$req_owner_pid" in
-            ''|*[!0-9]*) owner_alive=0 ;;
+            ""|*[!0-9]*) owner_alive=0 ;;
             *) if kill -0 "$req_owner_pid" 2>/dev/null; then owner_alive=1; else owner_alive=0; fi ;;
           esac
           if [ "$profile_allowed" -ne 1 ]; then
