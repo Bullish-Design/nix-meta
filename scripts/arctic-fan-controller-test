@@ -331,10 +331,13 @@ check_watchdog_status() {
     return 1
   fi
   echo "$state"
-  case "$state" in
-    state=OK*) echo "WATCHDOG STATUS PASS: both GPU duct fans are running" ;;
-    *) fail "watchdog reports a degraded GPU duct state: $state" ;;
-  esac
+  if [[ "$state" != state=OK* ]]; then
+    fail "watchdog reports a degraded GPU duct state: $state"
+  elif [[ ! "$state" =~ (^|[[:space:]])profile=[A-Za-z0-9-]+([[:space:]]|$) ]]; then
+    fail "watchdog status has no profile readback: $state"
+  else
+    echo "WATCHDOG STATUS PASS: both GPU duct fans are running; profile readback is present"
+  fi
 }
 
 check_localhost_listeners() {

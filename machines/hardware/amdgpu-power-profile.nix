@@ -31,9 +31,17 @@ let
   expectedSubsystemVendor = "0x1002";
   expectedSubsystemDevice = "0x0e34";
 
-  # Stock V620 PowerPlay table hash, read on 2026-10-05 and identical on both
-  # cards. A different table means different profile semantics, so stop.
-  expectedPpTableSha256 = "a6fc019fdada096422629293bee778e8857af3330fd2dc2de42dd9d9d921b1c8";
+  # Exact stock and reviewed project 032 table hashes. Unknown tables can
+  # change profile semantics, so the applier must refuse them.
+  acceptedPpTableSha256 = [
+    "a6fc019fdada096422629293bee778e8857af3330fd2dc2de42dd9d9d921b1c8" # stock
+    "eb2cff9c67b0fe01c6d4b6041d6ab6c19ee638ec454c7a25feaa589beb48b3d8" # thermal arm B
+    "e2040fbc34210eef02a4c74a00d8d3e22700b87a5aa7320fc42fcd260e3ff35b" # thermal arm C
+    "6d43d46574c09d42c4a2cf5a8ab1db015f9a0500487bf26dcec9671def281730" # thermal arm D
+    "f1808c664058b66a919ef4b6395dad836c18ba17621bf85356c5f0182d7afc62" # cap 220 W
+    "ed0e6402728f43ba47e160b4d19c896e6ffed0dc9014631766b9d2e443a8ac14" # cap 200 W
+    "34b46aeb295fd59b4483f3789f1bbf3f9875d2984400bafcfbdf421a835f6a6c" # cap 180 W
+  ];
 
   applyProfile = pkgs.writeShellScript "amdgpu-apply-power-profile" ''
     set -uo pipefail
@@ -64,16 +72,25 @@ let
         continue
       fi
 
-      # A profile index is only meaningful against the table it was measured
-      # on. Refuse a card whose PowerPlay table is not the stock blob.
-      if [ ! -r "$dev/pp_table" ]; then
-        echo "amdgpu-power-profile: $bdf has no readable pp_table" >&2
+      # The driver can expose the PCI device before its PowerPlay table is
+      # readable. Wait for that boot race before applying the measured profile.
+      pp_table="$dev/pp_table"
+      pp_table_waits=0
+      while [ ! -r "$pp_table" ] && [ "$pp_table_waits" -lt 120 ]; do
+        ${pkgs.coreutils}/bin/sleep 1
+        pp_table_waits=$((pp_table_waits + 1))
+      done
+      if [ ! -r "$pp_table" ]; then
+        echo "amdgpu-power-profile: $bdf pp_table stayed unreadable for 120 seconds" >&2
         failures=$((failures + 1))
         continue
       fi
-      table_hash="$(${pkgs.coreutils}/bin/sha256sum "$dev/pp_table" | ${pkgs.coreutils}/bin/cut -d' ' -f1)"
-      if [ "$table_hash" != "${expectedPpTableSha256}" ]; then
-        echo "amdgpu-power-profile: $bdf PowerPlay table hash is $table_hash, expected ${expectedPpTableSha256}" >&2
+      table_hash="$(${pkgs.coreutils}/bin/sha256sum "$pp_table" | ${pkgs.coreutils}/bin/cut -d' ' -f1)"
+      if ! ${pkgs.gnugrep}/bin/grep -Fqx "$table_hash" <<'ACCEPTED_PP_TABLE_HASHES'
+${lib.concatStringsSep "\n" acceptedPpTableSha256}
+ACCEPTED_PP_TABLE_HASHES
+      then
+        echo "amdgpu-power-profile: $bdf PowerPlay table hash $table_hash is not in the reviewed allowlist" >&2
         failures=$((failures + 1))
         continue
       fi
@@ -161,6 +178,7 @@ in
       Type = "oneshot";
       RemainAfterExit = true;
       ExecStart = applyProfile;
+      TimeoutStartSec = "5min";
     };
   };
 
