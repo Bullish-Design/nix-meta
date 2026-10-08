@@ -34,15 +34,15 @@ let
     # Project 024 arm 1 (C-FULL). Flat maximum duty at every temperature. This
     # is an EXPERIMENT curve: it runs both fans at about 14,600 and 15,100 RPM
     # continuously and is loud. It exists to put an upper bound on airflow, so
-    # a long decode can be measured with no fan ramp in the result. REVERT to
-    # `stepped` when the measurement is complete.
+    # a long decode can be measured with no fan ramp in the result. Reachable
+    # at runtime as fan-profile lease "flat-max" (see profileCurveNames).
     full = [
       { minC = 0; pwm = 255; }
     ];
 
     # Project 024 arm 2 candidate (C-STEEP). Reaches full duty at 55 C instead
-    # of 75 C, so the fans are already at maximum before the hot window. Build
-    # this only if C-FULL shows that airflow changes the junction slope.
+    # of 75 C, so the fans are already at maximum before the hot window.
+    # Reachable at runtime as fan-profile lease "curve-steep".
     steep = [
       { minC = 55000; pwm = 255; }
       { minC = 50000; pwm = 125; }
@@ -53,37 +53,88 @@ let
     ];
   };
 
-  # The active curve. Change this one name to switch curves.
+  # The active curve when no fan-profile lease is held. Change this one name
+  # to switch the default.
   selectedFanCurveName = "stepped";
   selectedFanCurve = fanCurves.${selectedFanCurveName};
 
   # Fail at evaluation time rather than shipping a curve that cannot answer
   # every temperature or that commands a stopped fan.
-  curveIsValid =
+  curveIsValidFor = curve:
     let
-      last = lib.last selectedFanCurve;
-      descending = lib.all (i: (lib.elemAt selectedFanCurve i).minC > (lib.elemAt selectedFanCurve (i + 1)).minC)
-        (lib.range 0 (lib.length selectedFanCurve - 2));
-      pwmInRange = lib.all (e: e.pwm >= 1 && e.pwm <= 255) selectedFanCurve;
+      last = lib.last curve;
+      descending = lib.all (i: (lib.elemAt curve i).minC > (lib.elemAt curve (i + 1)).minC)
+        (lib.range 0 (lib.length curve - 2));
+      pwmInRange = lib.all (e: e.pwm >= 1 && e.pwm <= 255) curve;
     in
-    selectedFanCurve != [ ] && last.minC == 0 && descending && pwmInRange;
+    curve != [ ] && last.minC == 0 && descending && pwmInRange;
 
-  # Render the curve as a shell function. Every entry becomes a comparison, so
+  curveIsValid = curveIsValidFor selectedFanCurve;
+
+  # The fan-profile lease (project 030 `DESIGN.md` section 5.1,
+  # `inferference.experiment.control`). An experiment never writes a PWM: it
+  # writes `/run/arctic-fan/request` naming one of these profiles, and this
+  # watchdog is the only thing that turns that into a curve. "curve-default"
+  # always resolves to whatever `selectedFanCurveName` names above, so a
+  # request that is absent, expired, dead-owner, or unknown falls back to
+  # exactly today's behaviour.
+  profileCurveNames = {
+    "flat-max" = "full";
+    "curve-default" = selectedFanCurveName;
+    "curve-steep" = "steep";
+  };
+  allowedProfiles = builtins.attrNames profileCurveNames;
+  allowedProfilesForShell = lib.concatStringsSep " " allowedProfiles;
+  defaultProfile = "curve-default";
+
+  # Every curve a lease profile can select must exist and be valid, not only
+  # the one selected by default -- a lease can reach `full` or `steep` at
+  # runtime even though neither is the shipped default.
+  curveNamesNeeded = lib.unique (builtins.attrValues profileCurveNames);
+
+  # Render one shell function per curve actually reachable through a lease
+  # profile, named by curve rather than by profile so two profile names that
+  # share a curve do not duplicate work. Every entry becomes a comparison, so
   # no branch tests a constant. The final `else` is unreachable for a valid
   # sensor reading and fails high rather than guessing.
-  curveShellFunction = ''
-    curve_pwm() {
+  mkCurveFunction = name: curve: ''
+    curve_pwm_${name}() {
       junction="$1"
   '' + lib.concatImapStrings
     (i: e: ''
       ${if i == 1 then "    if" else "    elif"} [ "$junction" -ge ${toString e.minC} ]; then
         printf '%s\n' ${toString e.pwm}
     '')
-    selectedFanCurve
+    curve
   + ''
       else
         printf '%s\n' 255
       fi
+    }
+  '';
+
+  allCurveFunctions = lib.concatMapStrings
+    (name: mkCurveFunction name fanCurves.${name})
+    curveNamesNeeded;
+
+  # One case arm per lease profile, dispatching to that profile's curve
+  # function. Generated from `profileCurveNames` so the shell dispatch and
+  # the Nix-level profile table can never drift apart. "full-duty-fault" is
+  # not a selectable profile -- it is the synthetic name the fault branch
+  # below reports -- and is handled before this table, never through it.
+  profileDispatchCase = lib.concatStrings (lib.mapAttrsToList
+    (profile: curve: "    ${profile}) curve_pwm_${curve} \"$junction\" ;;\n")
+    profileCurveNames);
+
+  curveDispatchFunction = ''
+    curve_pwm_for_profile() {
+      profile="$1"
+      junction="$2"
+      case "$profile" in
+        full-duty-fault) printf '%s\n' 255 ;;
+    ${profileDispatchCase}
+        *) curve_pwm_${selectedFanCurveName} "$junction" ;;
+      esac
     }
   '';
 
@@ -213,11 +264,14 @@ let
       return 1
     }
 
-    # Fan curve for both GPU duct fans, generated from `selectedFanCurve` in
-    # this module's `let` block. Each step applies from its lower bound up to
-    # the next bound. Values are PWM. The test scripts read the same curve from
-    # /etc/nix-meta/arctic-fan/gpu-curve, so the two cannot drift apart.
-${curveShellFunction}
+    # Fan curves for both GPU duct fans, one shell function per curve reachable
+    # through a fan-profile lease, generated from `fanCurves` /
+    # `profileCurveNames` in this module's `let` block. Each step applies from
+    # its lower bound up to the next bound. Values are PWM. The test scripts
+    # read the same curve from /etc/nix-meta/arctic-fan/gpu-curve, so the two
+    # cannot drift apart.
+${allCurveFunctions}
+${curveDispatchFunction}
 
     # Thresholds for the fan failure latch. A GPU fan below min_running_rpm for
     # stall_samples consecutive samples is failed. Startup_grace_samples skips
@@ -295,10 +349,6 @@ ${curveShellFunction}
         case "$value" in
           ""|*[!0-9]*)
             echo "invalid PWM value in $pwm: $value" >&2
-            exit 1
-            ;;
-          0)
-            echo "$pwm is zero; forcing safe high" >&2
             exit 1
             ;;
         esac
@@ -394,12 +444,48 @@ ${curveShellFunction}
         fi
       done
 
-      target_pwm="$(curve_pwm "$max_junction")"
+      # --- fan-profile lease arbitration (DESIGN.md section 5.1) ---
+      # Mirrors inferference.experiment.control.arbitrate() exactly. This
+      # watchdog is the sole authority over the actuator: the request file
+      # only ever NAMES a wish. A fault always wins, even over a live lease.
+      active_profile="${defaultProfile}"
+      active_reason="no request"
       if [ "$failed_count" -gt 0 ]; then
-        # PWM cannot repair a stopped motor. Hold every channel high while any
-        # GPU fan is failed. The remaining fans give the most airflow available.
-        target_pwm=255
+        active_profile="full-duty-fault"
+        active_reason="fault override"
+      elif [ -r /run/arctic-fan/request ]; then
+        req_text="$(cat /run/arctic-fan/request 2>/dev/null)" || req_text=""
+        req_profile="$(printf '%s\n' "$req_text" | sed -n 's/^profile=\(.*\)$/\1/p' | head -n1)"
+        req_expires="$(printf '%s\n' "$req_text" | sed -n 's/^expires=\(.*\)$/\1/p' | head -n1)"
+        req_owner_pid="$(printf '%s\n' "$req_text" | sed -n 's/^owner_pid=\(.*\)$/\1/p' | head -n1)"
+        if [ -z "$req_profile" ] || [ -z "$req_expires" ] || [ -z "$req_owner_pid" ]; then
+          active_profile="${defaultProfile}"
+          active_reason="malformed request"
+        else
+          case " ${allowedProfilesForShell} " in
+            *" $req_profile "*) profile_allowed=1 ;;
+            *) profile_allowed=0 ;;
+          esac
+          expires_epoch="$(${pkgs.coreutils}/bin/date -d "$req_expires" +%s 2>/dev/null)" || expires_epoch=""
+          now_epoch="$(${pkgs.coreutils}/bin/date +%s)"
+          case "$req_owner_pid" in
+            ''|*[!0-9]*) owner_alive=0 ;;
+            *) if kill -0 "$req_owner_pid" 2>/dev/null; then owner_alive=1; else owner_alive=0; fi ;;
+          esac
+          if [ "$profile_allowed" -ne 1 ]; then
+            active_profile="${defaultProfile}"
+            active_reason="unknown profile ignored"
+          elif [ -z "$expires_epoch" ] || [ "$expires_epoch" -le "$now_epoch" ] || [ "$owner_alive" -ne 1 ]; then
+            active_profile="${defaultProfile}"
+            active_reason="lease dropped"
+          else
+            active_profile="$req_profile"
+            active_reason="requested"
+          fi
+        fi
       fi
+
+      target_pwm="$(curve_pwm_for_profile "$active_profile" "$max_junction")"
 
       needs_up=0
       needs_down=0
@@ -432,10 +518,10 @@ ${curveShellFunction}
         detail="$detail channel$ch(pwm=''${pwm_now[$ch]} rpm=''${fan_rpm[$ch]} failed=''${failed[$ch]})"
       done
 
-      printf 'state=%s target_pwm=%s max_gpu_junction_mC=%s\n' "$state" "$target_pwm" "$max_junction" \
+      printf 'state=%s target_pwm=%s max_gpu_junction_mC=%s profile=%s\n' "$state" "$target_pwm" "$max_junction" "$active_profile" \
         > /run/arctic-fan/status || echo "could not write /run/arctic-fan/status" >&2
-      ${pkgs.systemd}/bin/systemd-notify --status="$state target_pwm=$target_pwm" || true
-      echo "ARCTIC watchdog: state=$state max_gpu_junction_mC=$max_junction target_pwm=$target_pwm cooldown_samples=$cooldown_samples$detail"
+      ${pkgs.systemd}/bin/systemd-notify --status="$state target_pwm=$target_pwm profile=$active_profile" || true
+      echo "ARCTIC watchdog: state=$state max_gpu_junction_mC=$max_junction target_pwm=$target_pwm active_profile=$active_profile reason=\"$active_reason\" cooldown_samples=$cooldown_samples$detail"
       ${pkgs.coreutils}/bin/sleep 2
     done
   '';
@@ -487,6 +573,14 @@ in
         "The selected ARCTIC GPU fan curve '${selectedFanCurveName}' is invalid. "
         + "It must be non-empty, ordered from the hottest step to the coolest, "
         + "end with a minC = 0 step, and command PWM 1 to 255 at every step.";
+    }
+    {
+      assertion = lib.all (name: fanCurves ? ${name}) curveNamesNeeded;
+      message = "A fan-profile lease names a curve that does not exist in fanCurves.";
+    }
+    {
+      assertion = lib.all (name: curveIsValidFor fanCurves.${name}) curveNamesNeeded;
+      message = "One of the ARCTIC GPU fan curves reachable through a fan-profile lease is invalid.";
     }
   ];
 
@@ -558,8 +652,13 @@ in
     serviceConfig = {
       Type = "notify";
       NotifyAccess = "main";
-      # Writes /run/arctic-fan/status. Lists the state for each GPU fan.
+      # Writes /run/arctic-fan/status and reads /run/arctic-fan/request. Group
+      # "users" (the operator's primary group) plus 0775 lets an unprivileged
+      # experiment request a fan-profile lease; the watchdog itself still runs
+      # as root, so every hwmon/PWM write is unaffected by this group change.
       RuntimeDirectory = "arctic-fan";
+      RuntimeDirectoryMode = "0775";
+      Group = "users";
       ExecStart = fanWatchdog;
       ExecStopPost = "${allFansHigh}/bin/arctic-fans-100";
       Restart = "on-failure";
