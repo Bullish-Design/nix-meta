@@ -135,7 +135,7 @@
     # Shared Hindsight service and declarative Claude/Codex/Pi wiring. This is
     # a direct composer input: nix-paseo does not depend on Mnemonix.
     mnemonix = {
-      url = "git+file:///home/andrew/Documents/Projects/mnemonix?ref=refs/tags/v0.2.5";
+      url = "git+file:///home/andrew/Documents/Projects/mnemonix?ref=refs/tags/v0.2.6";
       inputs.nixpkgs.follows = "nixpkgs";
     };
 
