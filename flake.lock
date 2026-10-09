@@ -717,16 +717,16 @@
         ]
       },
       "locked": {
-        "lastModified": 1791554357,
-        "narHash": "sha256-v+BqjLRBTiswQNaJANWY6NZRvnzyxXiq3zhlgJY9/nc=",
-        "ref": "refs/tags/v0.2.1",
-        "rev": "0ca037dc77145a1ab605866734f86614334c4151",
-        "revCount": 9,
+        "lastModified": 1791555949,
+        "narHash": "sha256-Iob0chEK0upRHzsTs8KFyZtlWw4Z05JOov8QCUTIeP0=",
+        "ref": "refs/tags/v0.2.3",
+        "rev": "b8d618f870d857b7d7ba7957efb0a4d700e6f96a",
+        "revCount": 11,
         "type": "git",
         "url": "file:///home/andrew/Documents/Projects/mnemonix"
       },
       "original": {
-        "ref": "refs/tags/v0.2.1",
+        "ref": "refs/tags/v0.2.3",
         "type": "git",
         "url": "file:///home/andrew/Documents/Projects/mnemonix"
       }
