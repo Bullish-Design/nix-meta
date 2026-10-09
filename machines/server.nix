@@ -710,7 +710,7 @@ in
 
   # Optional shared NTFS data drive. nofail = won't block boot if absent/dirty.
   fileSystems."/mnt/shared" = {
-    device = "/dev/disk/by-label/SHARED";
+    device = "/dev/disk/by-uuid/C24C954D4C953CDB";
     fsType = "ntfs3";
     options = [
       "nofail"
