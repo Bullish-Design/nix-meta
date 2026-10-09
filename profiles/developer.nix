@@ -9,6 +9,12 @@ let
   # ignored while pkgs.devenv supplied the binary (023-toolchain P4).
   pinnedDevenv = inputs.devenv.packages.${pkgs.stdenv.hostPlatform.system}.default;
 
+  # Gitman 0.12 and the one jj it needs (0.46.0 or later; nixpkgs lags). Both come from
+  # gitman's own flake, so no second jj version can touch a repository. They sit in
+  # home.packages, which precedes the repoman closure on PATH, so they shadow the
+  # closure's older gitman.
+  gitmanPackages = inputs.gitman.packages.${pkgs.stdenv.hostPlatform.system};
+
   # The shared command closure: repoman, copyroom, docman, gitman, templateer and
   # agentman, built once as Nix Python applications and content-addressed. One immutable derivation per
   # source revision, so every shell that names this input resolves the same store paths.
@@ -38,6 +44,8 @@ in
         # keep the launcher available from every developer profile. This is
         # inputs.devenv, the flake's pin — NOT pkgs.devenv.
         pinnedDevenv
+        gitmanPackages.gitman
+        gitmanPackages.jujutsu-bin
       ];
       description = "Developer tools installed for the configured base user, including Gitman's devenv launcher.";
     };

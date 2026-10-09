@@ -586,6 +586,27 @@
       }
     },
     "gitman": {
+      "inputs": {
+        "nixpkgs": [
+          "nixpkgs"
+        ]
+      },
+      "locked": {
+        "lastModified": 1791568753,
+        "narHash": "sha256-rAhG7H3uab3PQVJMLL/D0n4ctnqJ/RO4kE0pWBsrZEI=",
+        "ref": "refs/tags/v0.12.1",
+        "rev": "dc43ffb2c6a0a9eb841252d5ae65bac2ffe979d7",
+        "revCount": 249,
+        "type": "git",
+        "url": "https://github.com/Bullish-Design/gitman"
+      },
+      "original": {
+        "ref": "refs/tags/v0.12.1",
+        "type": "git",
+        "url": "https://github.com/Bullish-Design/gitman"
+      }
+    },
+    "gitman_2": {
       "flake": false,
       "locked": {
         "lastModified": 1789697351,
@@ -1317,6 +1338,7 @@
         "devenv": "devenv",
         "devman": "devman",
         "fornix-host": "fornix-host",
+        "gitman": "gitman",
         "home-manager": "home-manager",
         "inferference": "inferference",
         "mnemonix": "mnemonix",
@@ -1570,7 +1592,7 @@
         "copyroom": "copyroom",
         "devman": "devman_3",
         "docman": "docman",
-        "gitman": "gitman",
+        "gitman": "gitman_2",
         "nixpkgs": "nixpkgs_6",
         "pyjutsu": "pyjutsu",
         "pyproject-build-systems": "pyproject-build-systems",
