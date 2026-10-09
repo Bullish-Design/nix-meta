@@ -156,7 +156,28 @@ in
   # Accept SSH only from the tailnet.  The daemon is enabled by the shared base
   # profile; this host rule makes Framework → server transfers possible without
   # opening port 22 on the LAN or public interfaces.
-  networking.firewall.interfaces.tailscale0.allowedTCPPorts = [ 22 8077 ];
+  networking.firewall.interfaces.tailscale0.allowedTCPPorts = [ 22 8077 9418 ];
+
+  # ── Vendomat source collection ──────────────────────────────────────────────
+  # One collection of the owner's released source at /home/andrew/vendor/<repo>.
+  # Nix on every machine reads it at evaluation over git://server/<repo>; the owner
+  # and agents read it for context. Attic never holds it.
+  #
+  # Read only: git-daemon serves upload-pack and nothing else. It serves a repository
+  # only when that repository has .git/git-daemon-export-ok, so the other clones
+  # under /home/andrew/vendor stay private. Port 9418 is open on tailscale0 only
+  # (above); the tailnet is the access boundary. Idle, the daemon sleeps.
+  #
+  # Release tags arrive over SSH (port 22). Each repository takes only new tags:
+  # create it with scripts/collection-add (a pre-receive hook refuses branches and
+  # refuses to move a tag). Proof: PV-18 in the vendomat repository.
+  services.gitDaemon = {
+    enable = true;
+    basePath = "/home/${user}/vendor";
+    repositories = [ "/home/${user}/vendor" ];
+    inherit user;
+    group = "users";
+  };
 
   # Accept the ESP32 microphone stream on the wired LAN only.
   networking.firewall.interfaces.eno1.allowedUDPPorts = [ 54500 54501 ];
