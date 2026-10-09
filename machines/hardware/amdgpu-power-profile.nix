@@ -21,6 +21,27 @@ let
   # Known limit: under profile 2 a 27,601-token prefill still reached 72 C in
   # about 15 seconds. This setting is not expected to fix prefill on its own.
   powerProfile = 2;
+
+  # Default board power cap, in watts, applied to every configured GPU.
+  #
+  # The owner chose 180 W. Inferference project 032 phase 4a measured it on
+  # 2026-10-09 with fans at flat maximum and a 300 second continuous decode
+  # soak (`.scratch/projects/032-v620-pptable-control-surface/FINDINGS.md`
+  # section 7). At 180 W the junction levels off at 68-72 C. At the stock
+  # 250 W it climbs to the 75 C bound. Decode speed does not change, about
+  # 20 tok/s on one stream, because decode is memory bound. Prefill drops from
+  # 355 to 316 tok/s, which is -11% against stock. Multi-lane aggregate speed
+  # drops 3% or less.
+  #
+  # The stock kernel sets power1_cap_min above this target. The patched kernel
+  # (profiles/patches/v620-powercap-min-120w.patch) lowers power1_cap_min to
+  # 120 W. A power1_cap write does not survive a reboot or a GPU reset. A reset
+  # restores 250 W. The five-minute timer re-asserts the cap.
+  powerCapWatts = 180;
+
+  # An experiment creates this file to hold a different cap. While it exists,
+  # the applier leaves power1_cap alone. The first line names the owner.
+  powerCapHoldFile = "/run/nix-meta/amdgpu-power-cap-hold";
   powerProfileName = "POWER_SAVING";
   performanceLevel = "manual";
 
@@ -51,6 +72,81 @@ let
     }
 
     failures=0
+
+    # Apply the default power cap to one card. Run it after the profile is
+    # verified. It counts one failure per card in "failures" and never reverts.
+    apply_power_cap() {
+      local bdf="$1" dev="$2" hwmon_dir="" candidate name_now
+      local cap_file cap_min cap_max cap_now target_uw
+
+      for candidate in "$dev"/hwmon/hwmon*; do
+        [ -d "$candidate" ] || continue
+        if [ -r "$candidate/name" ]; then
+          name_now="$(sysfs_read "$candidate/name")"
+          [ "$name_now" = "amdgpu" ] || continue
+        fi
+        hwmon_dir="$candidate"
+        break
+      done
+      if [ -z "$hwmon_dir" ]; then
+        echo "amdgpu-power-profile: $bdf has no amdgpu hwmon directory" >&2
+        failures=$((failures + 1))
+        return
+      fi
+
+      cap_file="$hwmon_dir/power1_cap"
+      cap_now="$(sysfs_read "$cap_file")"
+
+      # An experiment holds the cap with this file. Skip the write.
+      if [ -e "${powerCapHoldFile}" ]; then
+        hold_owner="$(${pkgs.coreutils}/bin/head -n 1 "${powerCapHoldFile}" 2>/dev/null)"
+        echo "amdgpu-power-profile: $bdf cap held by $hold_owner; power1_cap=$(( ''${cap_now:-0} / 1000000 )) W"
+        return
+      fi
+
+      target_uw=$(( ${toString powerCapWatts} * 1000000 ))
+      cap_min="$(sysfs_read "$hwmon_dir/power1_cap_min")"
+      cap_max="$(sysfs_read "$hwmon_dir/power1_cap_max")"
+      case "$cap_min$cap_max$cap_now" in
+        "" | *[!0-9]*)
+          echo "amdgpu-power-profile: $bdf power1_cap files are missing or not numeric" \
+            "(min='$cap_min' max='$cap_max' cap='$cap_now')" >&2
+          failures=$((failures + 1))
+          return
+          ;;
+      esac
+
+      if [ "$cap_min" -gt "$target_uw" ]; then
+        echo "amdgpu-power-profile: $bdf power1_cap_min is $(( cap_min / 1000000 )) W," \
+          "above the ${toString powerCapWatts} W target. The patched kernel is not running." >&2
+        failures=$((failures + 1))
+        return
+      fi
+      if [ "$cap_max" -lt "$target_uw" ]; then
+        echo "amdgpu-power-profile: $bdf power1_cap_max is $(( cap_max / 1000000 )) W," \
+          "below the ${toString powerCapWatts} W target" >&2
+        failures=$((failures + 1))
+        return
+      fi
+
+      if [ "$cap_now" = "$target_uw" ]; then
+        echo "amdgpu-power-profile: $bdf power1_cap=${toString powerCapWatts} W verified"
+        return
+      fi
+
+      if ! ${pkgs.coreutils}/bin/printf '%s\n' "$target_uw" > "$cap_file"; then
+        echo "amdgpu-power-profile: $bdf could not write power1_cap ${toString powerCapWatts} W" >&2
+        failures=$((failures + 1))
+        return
+      fi
+      cap_now="$(sysfs_read "$cap_file")"
+      if [ "$cap_now" != "$target_uw" ]; then
+        echo "amdgpu-power-profile: $bdf power1_cap readback is '$cap_now', expected $target_uw" >&2
+        failures=$((failures + 1))
+        return
+      fi
+      echo "amdgpu-power-profile: $bdf power1_cap=${toString powerCapWatts} W verified"
+    }
 
     for bdf in ${gpuPciDevicesForShell}; do
       dev="/sys/bus/pci/devices/$bdf"
@@ -143,6 +239,10 @@ ACCEPTED_PP_TABLE_HASHES
       # unverified application is not a hazard, and reverting would flap
       # against the five-minute re-assert timer. The unit still fails loudly.
       echo "amdgpu-power-profile: $bdf level=$level_now profile=${toString powerProfile} ${powerProfileName} verified"
+
+      # The cap step has its own verification. A failure leaves the written
+      # value in place, as for the profile, and the unit still fails loudly.
+      apply_power_cap "$bdf" "$dev"
     done
 
     if [ "$failures" -ne 0 ]; then
@@ -152,10 +252,11 @@ ACCEPTED_PP_TABLE_HASHES
   '';
 in
 {
-  # The profile is a measured experiment setting, applied at the system level so
-  # that every benchmark sees the same controls and the profile is the only
-  # variable between comparison runs. Nothing else here changes clocks, the
-  # 250 W power cap, the voltage offset, or the PowerPlay table.
+  # The profile and the ${toString powerCapWatts} W power cap are measured
+  # settings, applied at the system level so that every benchmark sees the same
+  # controls. Nothing else here changes clocks, the voltage offset, or the
+  # PowerPlay table. An experiment can hold a different cap with
+  # ${powerCapHoldFile}.
   assertions = [
     {
       assertion = config.nix-meta.gpu-compute.amd.enable && gpuPciDevices != [ ];
@@ -167,10 +268,15 @@ in
     performance_level=${performanceLevel}
     power_profile_mode=${toString powerProfile}
     power_profile_name=${powerProfileName}
+    power_cap_w=${toString powerCapWatts}
+    power_cap_hold_file=${powerCapHoldFile}
   '';
 
+  # Tools create the hold file here. Nothing else creates this directory.
+  systemd.tmpfiles.rules = [ "d /run/nix-meta 0755 root root -" ];
+
   systemd.services.amdgpu-power-profile = {
-    description = "Select the measured AMD GPU power profile (${toString powerProfile} ${powerProfileName})";
+    description = "Select the measured AMD GPU power profile (${toString powerProfile} ${powerProfileName}) and ${toString powerCapWatts} W power cap";
     wantedBy = [ "multi-user.target" ];
     after = [ "systemd-modules-load.service" ];
 
@@ -198,7 +304,7 @@ in
   };
 
   systemd.services.amdgpu-power-profile-verify = {
-    description = "Re-assert and verify the AMD GPU power profile";
+    description = "Re-assert and verify the AMD GPU power profile and power cap";
     serviceConfig = {
       Type = "oneshot";
       ExecStart = applyProfile;
