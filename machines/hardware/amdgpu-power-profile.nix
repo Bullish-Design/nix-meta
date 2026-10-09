@@ -24,20 +24,24 @@ let
 
   # Default board power cap, in watts, applied to every configured GPU.
   #
-  # The owner chose 180 W. Inferference project 032 phase 4a measured it on
-  # 2026-10-09 with fans at flat maximum and a 300 second continuous decode
-  # soak (`.scratch/projects/032-v620-pptable-control-surface/FINDINGS.md`
-  # section 7). At 180 W the junction levels off at 68-72 C. At the stock
-  # 250 W it climbs to the 75 C bound. Decode speed does not change, about
-  # 20 tok/s on one stream, because decode is memory bound. Prefill drops from
-  # 355 to 316 tok/s, which is -11% against stock. Multi-lane aggregate speed
-  # drops 3% or less.
+  # The owner chose 160 W on 2026-10-09, after inferference project 032
+  # phase 4a swept 250 W down to 120 W on card 0 (fans at flat maximum,
+  # `experiments/032-v620-board-power-cap/`). 160 W is the lowest cap that
+  # leaves single-stream decode unchanged, about 20 tok/s, because decode is
+  # memory bound. It is also the highest cap at which every run finished its
+  # 300 second soak under the 75 C arm bound: peak junction 66 C, peak memory
+  # 73 C. Against stock, prefill drops from 355 to 294 tok/s (-17%). Against
+  # 200 W, 8-lane aggregate speed drops from 66 to 60 tok/s (-10%).
+  #
+  # 180 W kept 7% more prefill, but its memory sensor reached 75 C after 4 to
+  # 5 minutes of continuous load. Below 160 W the losses grow quickly: at
+  # 140 W decode is -6% and prefill -12%; at 120 W decode is -29%.
   #
   # The stock kernel sets power1_cap_min above this target. The patched kernel
   # (profiles/patches/v620-powercap-min-120w.patch) lowers power1_cap_min to
   # 120 W. A power1_cap write does not survive a reboot or a GPU reset. A reset
   # restores 250 W. The five-minute timer re-asserts the cap.
-  powerCapWatts = 180;
+  powerCapWatts = 160;
 
   # An experiment creates this file to hold a different cap. While it exists,
   # the applier leaves power1_cap alone. The first line names the owner.
