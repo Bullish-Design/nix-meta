@@ -59,7 +59,7 @@
     # declaring its own `repoman` input.
     # The project manifest supplies each repository's manager roster. The shared closure
     # is now the only provider for the pure-CLI managers.
-    repoman.url = "git+https://github.com/Bullish-Design/repoman?ref=refs/tags/v0.9.2";
+    repoman.url = "git+https://github.com/Bullish-Design/repoman?ref=refs/tags/v0.11.0";
 
     nix-paseo = {
       url = "git+file:///home/andrew/Documents/Projects/nix-paseo?ref=main";
