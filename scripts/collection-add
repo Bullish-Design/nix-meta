@@ -1,14 +1,18 @@
 #!/usr/bin/env bash
-# Create one repository in the Vendomat source collection on this host.
+# Create one repository in the Vendomat source collection on this host, or refresh its hooks.
 # Usage: collection-add <repo>
+#        collection-add --hooks <repo>     rewrite the hooks of an existing collection repository
 # The repository takes only new release tags, over SSH, and git-daemon serves it read only.
+# After a tag push, the working tree shows the newest release (STORE-023 in the vendomat repository).
 set -eu
-repo=${1:?usage: collection-add <repo>}
+mode=create
+if [ "${1:-}" = "--hooks" ]; then mode=hooks; shift; fi
+repo=${1:?usage: collection-add [--hooks] <repo>}
 case "$repo" in */* | .* | "") echo "collection-add: bad repository name: $repo" >&2; exit 2 ;; esac
 dir=${VENDOMAT_COLLECTION:-$HOME/vendor}/$repo
-[ ! -e "$dir" ] || { echo "collection-add: $dir exists" >&2; exit 1; }
-git init -q "$dir"
-cat > "$dir/.git/hooks/pre-receive" <<'HOOK'
+
+install_hooks() {
+  cat > "$dir/.git/hooks/pre-receive" <<'HOOK'
 #!/bin/sh
 # Collection rule: only new release tags enter, and a tag never moves.
 zero=0000000000000000000000000000000000000000
@@ -21,6 +25,52 @@ while read old new ref; do
   esac
 done
 HOOK
-chmod 755 "$dir/.git/hooks/pre-receive"
+  # Same text as hooks/collection-post-receive in the vendomat repository.
+  cat > "$dir/.git/hooks/post-receive" <<'HOOK'
+#!/bin/sh
+# Collection post-receive hook (STORE-023).
+# After a tag push, show the newest release tag in the working tree, so the owner and agents read
+# current files. The rules match `vendomat sync --collection` (STORE-022): newest tag by version
+# order, detached checkout, clean tree only, unborn branch allowed, tags never changed.
+# A post-receive hook cannot reject a push. This one also never reports failure.
+
+git_dir=$(git rev-parse --absolute-git-dir 2>/dev/null) || exit 0
+unset GIT_DIR GIT_WORK_TREE GIT_INDEX_FILE
+[ "$(git --git-dir="$git_dir" rev-parse --is-bare-repository)" = false ] || exit 0
+cd "$(dirname "$git_dir")" || exit 0
+
+if [ -n "$(git --no-optional-locks status --porcelain 2>/dev/null)" ]; then
+  echo "collection: working tree has uncommitted changes; left alone" >&2
+  exit 0
+fi
+
+ref=$(git for-each-ref --sort=-v:refname --count=1 --format='%(refname)' refs/tags)
+[ -n "$ref" ] || exit 0
+commit=$(git rev-parse --verify --quiet "$ref^{commit}") || exit 0
+head=$(git rev-parse --verify --quiet 'HEAD^{commit}')
+if [ "$head" = "$commit" ] && ! git symbolic-ref --quiet HEAD >/dev/null; then
+  exit 0
+fi
+
+if git checkout --quiet --detach "$commit" 2>/dev/null; then
+  echo "collection: working tree now shows ${ref#refs/tags/}" >&2
+else
+  echo "collection: could not check out ${ref#refs/tags/}; run 'vendomat sync --collection'" >&2
+fi
+exit 0
+HOOK
+  chmod 755 "$dir/.git/hooks/pre-receive" "$dir/.git/hooks/post-receive"
+}
+
+if [ "$mode" = hooks ]; then
+  [ -e "$dir/.git/git-daemon-export-ok" ] || { echo "collection-add: $dir is not a collection repository" >&2; exit 1; }
+  install_hooks
+  echo "collection-add: refreshed the hooks of $dir"
+  exit 0
+fi
+
+[ ! -e "$dir" ] || { echo "collection-add: $dir exists" >&2; exit 1; }
+git init -q "$dir"
+install_hooks
 touch "$dir/.git/git-daemon-export-ok"
 echo "collection-add: created $dir (tags only, served read only)"
