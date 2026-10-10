@@ -7,6 +7,9 @@ let
   # One package output owns the client, daemon, PTY proxy, and sync server.
   # profiles/terminal.nix imports this same helper.
   atuinPackage = import ../nix/atuin-18.23.0.nix { inherit inputs lib pkgs; };
+  atticServer = pkgs.attic-server.overrideAttrs (old: {
+    patches = (old.patches or [ ]) ++ [ ../nix/attic-database-pool-options.patch ];
+  });
 in
 {
   imports = [
@@ -340,14 +343,19 @@ in
   # only its /attic path through the existing tailnet HTTPS endpoint.
   services.atticd = {
     enable = true;
+    package = atticServer;
     environmentFile = config.sops.templates."atticd.env".path;
     settings = {
       listen = "127.0.0.1:8089";
       database.url = "sqlite:///mnt/wd_green1/attic/server.db?mode=rwc";
+      # Stock Attic ignores database pool keys without an error. They need
+      # nix/attic-database-pool-options.patch. Optional keys: max-connections,
+      # busy-timeout.
+      database.acquire-timeout = "1 minute";
       chunking = {
-        avg-size = 262144;
-        min-size = 65536;
-        max-size = 1048576;
+        avg-size = 65536;
+        min-size = 16384;
+        max-size = 262144;
         nar-size-threshold = 65536;
       };
       storage = {

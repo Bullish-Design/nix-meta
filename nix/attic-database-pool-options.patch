@@ -1,0 +1,132 @@
+--- a/server/src/config.rs
++++ b/server/src/config.rs
+@@ -3,6 +3,7 @@
+ use std::collections::HashSet;
+ use std::env;
+ use std::net::SocketAddr;
++use std::num::NonZeroU32;
+ use std::path::{Path, PathBuf};
+ use std::time::Duration;
+ 
+@@ -214,6 +215,34 @@
+     /// If enabled, a heartbeat query will be sent every minute.
+     #[serde(default = "default_db_heartbeat")]
+     pub heartbeat: bool,
++
++    /// How long a request waits for a free connection from the pool.
++    ///
++    /// If unspecified, the driver default (30 seconds) applies.
++    #[serde(
++        rename = "acquire-timeout",
++        with = "humantime_serde",
++        default
++    )]
++    pub acquire_timeout: Option<Duration>,
++
++    /// The maximum number of connections in the pool.
++    ///
++    /// If unspecified, SQLite uses one connection and PostgreSQL
++    /// uses the driver default.
++    #[serde(rename = "max-connections", default)]
++    pub max_connections: Option<NonZeroU32>,
++
++    /// How long a SQLite connection waits for a database lock.
++    ///
++    /// Only SQLite uses this. If unspecified, the driver default
++    /// (5 seconds) applies.
++    #[serde(
++        rename = "busy-timeout",
++        with = "humantime_serde",
++        default
++    )]
++    pub busy_timeout: Option<Duration>,
+ }
+ 
+ /// File storage configuration.
+--- a/server/src/config-template.toml
++++ b/server/src/config-template.toml
+@@ -49,6 +49,23 @@
+ # If enabled, a heartbeat query will be sent every minute
+ #heartbeat = false
+ 
++# How long a request waits for a free database connection
++#
++# Defaults to 30 seconds.
++#acquire-timeout = "30 seconds"
++
++# The maximum number of database connections
++#
++# SQLite defaults to one connection. More than one lets reads run beside a
++# write, but writers can then fail with "database is locked" after
++# `busy-timeout`.
++#max-connections = 1
++
++# How long a SQLite connection waits for a database lock (SQLite only)
++#
++# Defaults to 5 seconds.
++#busy-timeout = "5 seconds"
++
+ # File storage configuration
+ [storage]
+ # Storage type
+--- a/server/src/lib.rs
++++ b/server/src/lib.rs
+@@ -37,7 +37,7 @@
+     extract::Extension,
+     http::{Uri, uri::Scheme},
+ };
+-use sea_orm::{ConnectionTrait, Database, DatabaseConnection, query::Statement};
++use sea_orm::{ConnectOptions, ConnectionTrait, Database, DatabaseConnection, query::Statement};
+ use tokio::net::TcpListener;
+ use tokio::sync::OnceCell;
+ use tokio::time;
+@@ -107,7 +107,33 @@
+     async fn database(&self) -> ServerResult<&DatabaseConnection> {
+         self.database
+             .get_or_try_init(|| async {
+-                let db = Database::connect(&self.config.database.url)
++                let database = &self.config.database;
++                let mut options = ConnectOptions::new(database.url.clone());
++                if let Some(timeout) = database.acquire_timeout {
++                    options.acquire_timeout(timeout);
++                }
++                if let Some(max) = database.max_connections {
++                    options.max_connections(max.get());
++                }
++                // The pragmas below run once, on the first connection. Extra
++                // connections need them set at connect time.
++                let extra_connections = database.max_connections.is_some_and(|n| n.get() > 1);
++                let busy_timeout = database.busy_timeout;
++                if extra_connections || busy_timeout.is_some() {
++                    options.map_sqlx_sqlite_opts(move |mut opts| {
++                        if let Some(timeout) = busy_timeout {
++                            opts = opts.busy_timeout(timeout);
++                        }
++                        if extra_connections {
++                            opts = opts
++                                .pragma("synchronous", "normal")
++                                .pragma("temp_store", "memory")
++                                .pragma("mmap_size", "30000000000");
++                        }
++                        opts
++                    });
++                }
++                let db = Database::connect(options)
+                     .await
+                     .map_err(ServerError::database_error);
+                 if let Ok(DatabaseConnection::SqlxSqlitePoolConnection(ref conn)) = db {
+@@ -272,9 +298,13 @@
+ }
+ 
+ /// Runs database migrations.
+-pub async fn run_migrations(config: Config) -> Result<()> {
++pub async fn run_migrations(mut config: Config) -> Result<()> {
+     eprintln!("Running migrations...");
+ 
++    // Some SQLite migrations keep state on one connection, such as an added
++    // temporary column. Always migrate with the default pool size.
++    config.database.max_connections = None;
++
+     let state = StateInner::new(config).await;
+     let db = state.database().await?;
+     Migrator::up(db, None).await?;
