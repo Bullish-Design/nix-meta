@@ -344,6 +344,12 @@ in
     settings = {
       listen = "127.0.0.1:8089";
       database.url = "sqlite:///mnt/wd_green1/attic/server.db?mode=rwc";
+      chunking = {
+        avg-size = 262144;
+        min-size = 65536;
+        max-size = 1048576;
+        nar-size-threshold = 65536;
+      };
       storage = {
         type = "local";
         path = "/mnt/wd_green1/attic";
