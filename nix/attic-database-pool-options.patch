@@ -1,3 +1,30 @@
+Attic database pool options.
+
+Adds three optional keys to the [database] section of the Attic server
+configuration. With no key set, behavior is unchanged.
+
+  acquire-timeout   How long a request waits for a pool connection.
+                    Default: 30 seconds (the SQLx default).
+  max-connections   The pool size. Default: 1 for SQLite.
+  busy-timeout      How long a SQLite connection waits for a lock.
+                    Default: 5 seconds. SQLite only.
+
+When max-connections is above 1, the patch sets synchronous, temp_store,
+and mmap_size on every connection at connect time. run_migrations always
+uses the default pool size, because the "migrate NARs to chunks" migration
+keeps a temporary column on one connection.
+
+A stock Attic accepts these keys and ignores them without an error.
+Keep this patch applied wherever the keys are set.
+
+Source: zhaofengli/attic b7c905657cb81b8ec9c26b0d9f53aa2e4f231810
+        (attic-0-unstable-2026-06-26), sea-orm 1.1.20, sqlx 0.8.6.
+Upstream: zhaofengli/attic pull request 311 proposes pool settings and is
+        open. This patch is not that change.
+Evidence: .scratch/projects/16-vendomat-devenv-layer/evidence/attic-timeouts.md
+        in the vendomat repository.
+Requirement: CACHE-013.
+
 --- a/server/src/config.rs
 +++ b/server/src/config.rs
 @@ -3,6 +3,7 @@
