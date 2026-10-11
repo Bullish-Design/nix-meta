@@ -349,9 +349,10 @@ in
       listen = "127.0.0.1:8089";
       database.url = "sqlite:///mnt/wd_green1/attic/server.db?mode=rwc";
       # Stock Attic ignores database pool keys without an error. They need
-      # nix/attic-database-pool-options.patch. Optional keys: max-connections,
-      # busy-timeout.
+      # nix/attic-database-pool-options.patch.
       database.acquire-timeout = "1 minute";
+      database.max-connections = 4;
+      database.busy-timeout = "30 seconds";
       chunking = {
         avg-size = 65536;
         min-size = 16384;
