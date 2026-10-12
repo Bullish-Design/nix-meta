@@ -4,10 +4,10 @@ inputs:
 let
   username = config.nixos-core.base.username;
 
-  # The runtime map scans this root. Exclusions stay in a small source file, so
-  # creating a project or editing the list does not require a machine rebuild.
+  # The runtime map scans this root. Approved repositories stay in a small
+  # source file, so editing the list does not require a machine rebuild.
   projectsRoot = "/home/${username}/Documents/Projects";
-  memignoreFile = "${projectsRoot}/mnemonix/.memignore";
+  memprojectsFile = "${projectsRoot}/mnemonix/.memprojects";
 
   hindsight = config.services.mnemonix.hindsight;
 in
@@ -21,7 +21,7 @@ in
   # no task router, no curated bank tiers.
   services.mnemonix.hindsight = {
     enable = true;
-    inherit projectsRoot memignoreFile;
+    inherit projectsRoot memprojectsFile;
 
     # 8891, not upstream's 8888 — machines/server.nix already binds 8888 for
     # the Atuin sync server.
@@ -52,7 +52,7 @@ in
 
     programs.mnemonix = {
       enable = true;
-      inherit projectsRoot memignoreFile;
+      inherit projectsRoot memprojectsFile;
       autoInject = "pages";
 
       # Read the derived URL rather than restating the port. One declaration
