@@ -66,7 +66,7 @@
     # The flake builds the command and pinned jj 0.46.0, so nix-meta installs both from one
     # input and the V4 closure's older gitman stays off PATH. `follows` keeps one nixpkgs.
     gitman = {
-      url = "git+https://github.com/Bullish-Design/gitman?ref=refs/tags/v0.13.0";
+      url = "git+https://github.com/Bullish-Design/gitman?ref=refs/tags/v0.13.1";
       inputs.nixpkgs.follows = "nixpkgs";
     };
 
