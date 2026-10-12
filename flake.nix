@@ -61,11 +61,12 @@
     # is now the only provider for the pure-CLI managers.
     repoman.url = "git+https://github.com/Bullish-Design/repoman?ref=refs/tags/v0.11.0";
 
-    # Gitman 0.12 is work-only: `gitman work` opens jj workspaces. Its own flake builds the
-    # command and the pinned jj 0.46.0, so nix-meta installs both from this one input and
-    # the V4 closure's older gitman is shadowed on PATH. `follows` keeps one nixpkgs.
+    # Gitman 0.13 opens workspaces under each repository's `.gitman/workspaces/` directory.
+    # `work` creates a workspace. `done` removes it after its work reaches `trunk()`.
+    # The flake builds the command and pinned jj 0.46.0, so nix-meta installs both from one
+    # input and the V4 closure's older gitman stays off PATH. `follows` keeps one nixpkgs.
     gitman = {
-      url = "git+https://github.com/Bullish-Design/gitman?ref=refs/tags/v0.12.1";
+      url = "git+https://github.com/Bullish-Design/gitman?ref=refs/tags/v0.13.0";
       inputs.nixpkgs.follows = "nixpkgs";
     };
 
