@@ -224,16 +224,16 @@
     "copyroom": {
       "flake": false,
       "locked": {
-        "lastModified": 1791552511,
-        "narHash": "sha256-gcMFjQQ/lWwakPVl4g0B9de0YwemO8RsUMOJEXYT6Cw=",
-        "ref": "refs/tags/v0.8.0",
-        "rev": "f9df67a13fa1596d38df1e44bcd31568c89b244f",
-        "revCount": 114,
+        "lastModified": 1791848957,
+        "narHash": "sha256-x7WpQr1wcKxKTlmnTvl/ibwRIL34JmCGB3VDtAn7tXg=",
+        "ref": "refs/tags/v0.8.6",
+        "rev": "56b71fce6c7cfee806ae3af0f6acb9fbbbe33674",
+        "revCount": 151,
         "type": "git",
         "url": "https://github.com/Bullish-Design/copyroom"
       },
       "original": {
-        "ref": "refs/tags/v0.8.0",
+        "ref": "refs/tags/v0.8.6",
         "type": "git",
         "url": "https://github.com/Bullish-Design/copyroom"
       }
@@ -1497,16 +1497,16 @@
     "templateer": {
       "flake": false,
       "locked": {
-        "lastModified": 1788888086,
-        "narHash": "sha256-lL+/QOmIJI5PXb3Pn6JTuerFregmsORMXy8OhBFC8Fc=",
-        "ref": "refs/tags/v0.4.1",
-        "rev": "73afed43ecdee99027cc687e1599861322dab6a9",
-        "revCount": 46,
+        "lastModified": 1791835037,
+        "narHash": "sha256-05j3nadtG/0P/BIHyQGkhkuMVcXKA+oMQOkXQjKaoyE=",
+        "ref": "refs/tags/v0.6.0",
+        "rev": "a6d609d5b662d79a8f2512772e23ec32129c59ec",
+        "revCount": 71,
         "type": "git",
         "url": "https://github.com/Bullish-Design/templateer_v2"
       },
       "original": {
-        "ref": "refs/tags/v0.4.1",
+        "ref": "refs/tags/v0.6.0",
         "type": "git",
         "url": "https://github.com/Bullish-Design/templateer_v2"
       }

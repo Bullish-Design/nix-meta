@@ -49,7 +49,22 @@
     # shell must resolve the SAME store paths for the same commands. Making vendomat
     # follow the system nixpkgs forks the closure in two — same source, same version,
     # different build — which is the duplication this whole design removes.
-    vendomat.url = "git+https://github.com/Bullish-Design/vendomat?rev=d5a90f0aff97224b34e9bc2647e56b44cbf790d5";
+    #
+    # The roster pins of that revision are overridden for two commands. Vendomat holds V5
+    # only since 0.6.0, so a newer revision no longer ships `repoman-toolchain-core`.
+    # templateer 0.6.0 and copyroom 0.8.6 are a pair: copyroom 0.8.6 pins templateer 0.6.0,
+    # and the revision builds copyroom against the templateer input. Move them together.
+    vendomat = {
+      url = "git+https://github.com/Bullish-Design/vendomat?rev=d5a90f0aff97224b34e9bc2647e56b44cbf790d5";
+      inputs.templateer = {
+        url = "git+https://github.com/Bullish-Design/templateer_v2?ref=refs/tags/v0.6.0";
+        flake = false;
+      };
+      inputs.copyroom = {
+        url = "git+https://github.com/Bullish-Design/copyroom?ref=refs/tags/v0.8.6";
+        flake = false;
+      };
+    };
 
     # Project 039 (repoman half): the repoman devenv meta-module, machine-installed.
     # This ONE pin replaces the twenty-three per-repository `devenv.yaml` pins the
