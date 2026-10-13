@@ -769,24 +769,18 @@
     },
     "nix-terminal": {
       "inputs": {
-        "devman": [
-          "devman"
-        ],
         "nix-nvim": "nix-nvim",
         "nixbuild": "nixbuild",
         "nixpkgs": [
           "nixpkgs"
-        ],
-        "repoman": [
-          "repoman"
         ]
       },
       "locked": {
-        "lastModified": 1789056893,
-        "narHash": "sha256-LxtiaMT2NNPXGP184LqvGJAXY4gEmaCZ+qAZsJCf9ig=",
+        "lastModified": 1791916098,
+        "narHash": "sha256-51oVjBY5ae9nyUn8/y78KZxTM6MHbxRCeS9IJrIqb44=",
         "ref": "main",
-        "rev": "75d4041b341dbff79d6217ec45eb863e60bdf36a",
-        "revCount": 75,
+        "rev": "727447e585c855e6f7669ff267e81996727b212a",
+        "revCount": 82,
         "type": "git",
         "url": "file:///home/andrew/Documents/Projects/nix-terminal"
       },

@@ -153,8 +153,8 @@
     # Agent CLIs (Claude Code, Codex) — consumed by profiles/agent.nix, the sole
     # installation point for agent tooling. sadjow's flakes wrap the upstream npm
     # packages with pinned Nix builds; pinned at ref=main, resolved to concrete
-    # revs in flake.lock. devman (via nix-terminal) declares the same inputs, so
-    # the lock dedupes both paths onto the same nodes.
+    # revs in flake.lock. profiles/agent.nix owns these packages. nix-terminal
+    # does not include the agent CLIs.
     claude-code = {
       url = "github:sadjow/claude-code-nix?ref=main";
       inputs.nixpkgs.follows = "nixpkgs";
@@ -172,10 +172,6 @@
     nix-terminal = {
       url = "git+file:///home/andrew/Documents/Projects/nix-terminal?ref=main";
       inputs.nixpkgs.follows = "nixpkgs";
-      # Share the canonical machine pins with nix-terminal's optional manager
-      # integrations. Its legacy DevMan package is disabled in this profile.
-      inputs.devman.follows = "devman";
-      inputs.repoman.follows = "repoman";
     };
 
     # Shared Hindsight service and declarative Claude/Codex/Pi wiring. This is

@@ -29,11 +29,8 @@ in
 {
   imports = [ inputs.home-manager.nixosModules.home-manager ];
 
-  # Agent tooling for working ON the box over SSH. This profile is the SOLE
-  # installation point for agent CLIs: Claude Code + Codex (from sadjow's pinned
-  # flakes — the same upstream devman used to bundle; see terminal.nix which
-  # keeps the devman orchestrator but drops the bundled agents) + Pi (pinned via
-  # pi-nixpkgs below). Per-repo toolchains still come from each repo's devenv.
+  # Agent tooling for working on the box over SSH. This profile installs
+  # Claude Code, Codex, and Pi from the pins in the machine flake.
   # Stacked on top of `minimal` like gpu-compute, so it's trivial to promote
   # into nixos-core.base (fleet-wide) or drop later.
   environment.systemPackages = with pkgs; [

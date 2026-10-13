@@ -187,11 +187,6 @@ in
   # Developer workflow policy is host-owned: the shared profile provides the
   # tools and user-relative defaults, while this box sets its own log root.
   #
-  # The repoman baseDir/accounts checkout set that used to live here is gone.
-  # It only ever fed nix-terminal's repoman module, which profiles/developer.nix
-  # now disables so the shared toolchain venv is the single owner of the
-  # `repoman` name. repoman 0.7.1 reads no config file, so that generated
-  # config was already unread.
   nix-meta.developer = {
     nixbuild.outputDir = "/home/${user}/.nixbuild-logs";
   };
