@@ -52,8 +52,9 @@
     #
     # The roster pins of that revision are overridden for two commands. Vendomat holds V5
     # only since 0.6.0, so a newer revision no longer ships `repoman-toolchain-core`.
-    # templateer 0.6.0 and copyroom 0.8.6 are a pair: copyroom 0.8.6 pins templateer 0.6.0,
-    # and the revision builds copyroom against the templateer input. Move them together.
+    # Templateer 0.6.0 and CopyRoom must move together. This CopyRoom revision
+    # adds path omissions so projects can keep their own manifests outside the
+    # base layer. Replace it with a release after omission support ships.
     vendomat = {
       url = "git+https://github.com/Bullish-Design/vendomat?rev=d5a90f0aff97224b34e9bc2647e56b44cbf790d5";
       inputs.templateer = {
@@ -61,7 +62,7 @@
         flake = false;
       };
       inputs.copyroom = {
-        url = "git+https://github.com/Bullish-Design/copyroom?ref=refs/tags/v0.8.6";
+        url = "git+https://github.com/Bullish-Design/copyroom?rev=c4ee8f411a22674058082d7e6a36da0f905588af";
         flake = false;
       };
       # Vendomat's machine plane and project shells use the same family
