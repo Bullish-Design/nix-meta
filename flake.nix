@@ -66,16 +66,6 @@
       };
     };
 
-    # Project 039 (repoman half): the repoman devenv meta-module, machine-installed.
-    # This ONE pin replaces the twenty-three per-repository `devenv.yaml` pins the
-    # measurement found (2026-09-15). `nixosModules.default` installs
-    # `/run/current-system/sw/share/repoman/module/devenv.nix`, and each repository's
-    # central `devenv.local.nix` imports it from that stable path instead of
-    # declaring its own `repoman` input.
-    # The project manifest supplies each repository's manager roster. The shared closure
-    # is now the only provider for the pure-CLI managers.
-    repoman.url = "git+https://github.com/Bullish-Design/repoman?ref=refs/tags/v0.11.0";
-
     # Gitman 0.13 opens workspaces under each repository's `.gitman/workspaces/` directory.
     # `work` creates a workspace. `done` removes it after its work reaches `trunk()`.
     # The flake builds the command and pinned jj 0.46.0, so nix-meta installs both from one
@@ -104,7 +94,7 @@
     # Consumed from the LOCAL working copy, pinned to a TAG. `git+file:` keeps
     # the encrypted store on this box. The tag ensures Nix sees committed files
     # only, so an in-progress edit cannot enter a rebuild. Bump the tag to adopt
-    # a new secret, exactly like the vendomat/repoman/devman pins above.
+    # a new secret, exactly like the vendomat/devman pins above.
     nix-secrets = {
       url = "git+file:///home/andrew/Documents/Projects/nix-secrets?ref=refs/tags/v0.1.4";
       inputs.nixpkgs.follows = "nixpkgs";
