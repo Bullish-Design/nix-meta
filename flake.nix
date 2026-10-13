@@ -38,12 +38,12 @@
 
     nixos-core.url = "git+https://github.com/Bullish-Design/nixos-core.git?ref=main";
 
-    # The shared RepoMan command closure (Vendomat). profiles/developer.nix puts
-    # its bin on the login shell's PATH, replacing the mutable venv used by the
-    # retired machine bootstrap path.
+    # The shared command closure (Vendomat). profiles/developer.nix adds its
+    # filtered commands to the login shell's PATH. RepoMan and Gitman have
+    # direct owners in this flake, so their older Vendomat entrypoints stay out.
     #
-    # Pinned to an exact source revision so "which repoman is on my PATH" stays
-    # answerable while the shared toolchain release is prepared.
+    # Pinned to an exact source revision so the shared command set stays
+    # answerable while the toolchain release is prepared.
     # NO `inputs.nixpkgs.follows`. Vendomat pins the same nixpkgs the devenv stack uses,
     # and that pin is what makes the closure shared: a devenv consumer and this login
     # shell must resolve the SAME store paths for the same commands. Making vendomat
@@ -64,6 +64,37 @@
         url = "git+https://github.com/Bullish-Design/copyroom?ref=refs/tags/v0.8.6";
         flake = false;
       };
+    };
+
+    # RepoMan's CLI and devenv module are personal machine tools. Pin the
+    # release here so project repositories can import the module from the
+    # system profile instead of selecting a RepoMan version themselves.
+    repoman = {
+      url = "git+https://github.com/Bullish-Design/repoman?ref=refs/tags/v0.14.1";
+      inputs.nixpkgs.follows = "nixpkgs";
+    };
+
+    # LinkMan's CLI is a host tool. Its project-side declarations remain data
+    # in each repository and use the separately installed devman module.
+    linkman = {
+      url = "git+https://github.com/Bullish-Design/linkman?ref=refs/tags/v0.1.1";
+      inputs.nixpkgs.follows = "nixpkgs";
+    };
+
+    # LinkMan's CLI uses the family error/report contract at runtime. Keep that
+    # package source in the machine lock, beside LinkMan, rather than relying on
+    # an undeclared per-project Python import.
+    mancore = {
+      url = "git+https://github.com/Bullish-Design/mancore?ref=refs/tags/v0.1.0";
+      flake = false;
+    };
+
+    # The host Testee runner is personal tooling. Repositories keep their own
+    # Testee module pins when their test declarations need that interface.
+    # Its package uses the same curated nixpkgs as devenv.
+    testee = {
+      url = "git+https://github.com/Bullish-Design/testee?ref=refs/tags/v0.7.0";
+      inputs.nixpkgs.follows = "devenv/nixpkgs";
     };
 
     # Gitman 0.13 opens workspaces under each repository's `.gitman/workspaces/` directory.
@@ -135,7 +166,10 @@
     nix-terminal = {
       url = "git+file:///home/andrew/Documents/Projects/nix-terminal?ref=main";
       inputs.nixpkgs.follows = "nixpkgs";
-      inputs.devman.inputs.devenv.follows = "devenv";
+      # Share the canonical machine pins with nix-terminal's optional manager
+      # integrations. Its legacy DevMan package is disabled in this profile.
+      inputs.devman.follows = "devman";
+      inputs.repoman.follows = "repoman";
     };
 
     # Shared Hindsight service and declarative Claude/Codex/Pi wiring. This is

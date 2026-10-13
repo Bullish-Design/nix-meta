@@ -133,26 +133,23 @@ config.nix-meta.developer.packages = with pkgs; [
 ];
 ```
 
-`repoman` is supplied by the developer profile. `gitman` runs from its pinned
-repository environment. Enter the devenv shell in the gitman repo. Then `cd`
-into the target repo before the `gitman` call:
+The developer profile supplies `repoman`, `gitman`, `linkman`, `copyroom`, and
+`testee`. The DevMan module supplies `devman`. Run each command from the target
+repository so it reads that repository's files:
 
 ```bash
-cd ~/Documents/Projects/gitman && devenv shell -- bash -c 'cd ~/Documents/Projects/nix-meta && gitman status'
+cd ~/Documents/Projects/nix-meta && jj status
 ```
 
-Never run `devenv` from inside the target repo. It overwrites that repo's
-`devenv.lock` with gitman's own input closure and drops the repo's real
-inputs.
-
-Earlier documentation used `devenv --dir <path>`. devenv 2.2.2 removed
-`--dir`. The `--from path:` flag does not replace it: that flag loads gitman's
-config but evaluates it against the current directory.
+Use `gitman work NAME` to open a workspace. Use `gitman done NAME` after the
+workspace changes reach `main`. Enter the target repository's devenv only when
+you need that project's commands. Do not use another repository's devenv to
+run a machine-installed tool.
 
 ### Add shell alias for all machines
-Update `profiles/developer.nix` under `zsh.aliases`:
+Update `profiles/terminal.nix` under `programs.nix-terminal.zsh.aliases`:
 ```nix
-aliases = {
+programs.nix-terminal.zsh.aliases = {
   # existing...
   newalias = "command";
 };
@@ -167,7 +164,7 @@ home-manager.users.${config.nixos-core.base.username}.programs.nix-terminal.zsh.
 ```
 
 ### Change default git branch
-Update `profiles/developer.nix`:
+Update `profiles/terminal.nix`:
 ```nix
 programs.nix-terminal.gitDefaultBranch = "main";
 ```

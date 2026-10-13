@@ -126,11 +126,8 @@ in
             vim = "nv";
             vi = "nv";
 
-            # These come from nix-terminal's repoman module, which gates them
-            # behind its own `enable`. profiles/developer.nix turns that module
-            # off so the shared toolchain venv is the single owner of the
-            # `repoman` name, so re-declare the aliases here. They now run the
-            # venv's 0.7.1 rather than the module's 0.7.0.
+            # Keep the familiar aliases pointed at the RepoMan package owned by
+            # nix-meta's developer profile.
             rsync = "repoman sync";
             rlist = "repoman list";
             rstatus = "repoman status";

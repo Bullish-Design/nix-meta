@@ -151,30 +151,6 @@
         "type": "github"
       }
     },
-    "claude-code_2": {
-      "inputs": {
-        "flake-utils": "flake-utils_2",
-        "nixpkgs": [
-          "nix-terminal",
-          "devman",
-          "nixpkgs"
-        ]
-      },
-      "locked": {
-        "lastModified": 1785285785,
-        "narHash": "sha256-r1cMlvXjRVKe+uQ/GKwy4TpionpmbNgksFP2758D/MM=",
-        "owner": "sadjow",
-        "repo": "claude-code-nix",
-        "rev": "da78262708d858861afbe1f68ea65fedda4054c4",
-        "type": "github"
-      },
-      "original": {
-        "owner": "sadjow",
-        "ref": "main",
-        "repo": "claude-code-nix",
-        "type": "github"
-      }
-    },
     "codex-cli": {
       "inputs": {
         "flake-utils": "flake-utils",
@@ -188,30 +164,6 @@
         "owner": "sadjow",
         "repo": "codex-cli-nix",
         "rev": "52421aa18bebfee9ee29aadba39e774027a77926",
-        "type": "github"
-      },
-      "original": {
-        "owner": "sadjow",
-        "ref": "main",
-        "repo": "codex-cli-nix",
-        "type": "github"
-      }
-    },
-    "codex-cli_2": {
-      "inputs": {
-        "flake-utils": "flake-utils_3",
-        "nixpkgs": [
-          "nix-terminal",
-          "devman",
-          "nixpkgs"
-        ]
-      },
-      "locked": {
-        "lastModified": 1785294467,
-        "narHash": "sha256-mylUWHK2wIw8S07K5hbkrLELnflJkDwsSWz2YFbJzLI=",
-        "owner": "sadjow",
-        "repo": "codex-cli-nix",
-        "rev": "e4e3b0672bbb8fba7f32fe53cd9c604990970374",
         "type": "github"
       },
       "original": {
@@ -305,33 +257,6 @@
       }
     },
     "devman_2": {
-      "inputs": {
-        "claude-code": "claude-code_2",
-        "codex-cli": "codex-cli_2",
-        "devenv": [
-          "devenv"
-        ],
-        "nixpkgs": [
-          "nix-terminal",
-          "nixpkgs"
-        ]
-      },
-      "locked": {
-        "lastModified": 1767250540,
-        "narHash": "sha256-AA6XMqRh3SiDNCbWprBfucuy02sQY9epTq9Wg/97LVU=",
-        "owner": "Bullish-Design",
-        "repo": "devman",
-        "rev": "d8a302c80b9a5e8f5e55b1894f4a690dd5fb05d7",
-        "type": "github"
-      },
-      "original": {
-        "owner": "Bullish-Design",
-        "ref": "main",
-        "repo": "devman",
-        "type": "github"
-      }
-    },
-    "devman_3": {
       "inputs": {
         "nixpkgs": "nixpkgs_4"
       },
@@ -480,42 +405,6 @@
     "flake-utils": {
       "inputs": {
         "systems": "systems_2"
-      },
-      "locked": {
-        "lastModified": 1731533236,
-        "narHash": "sha256-l0KFg5HjrsfsO/JpG+r7fRrqm12kzFHyUHqHCVpMMbI=",
-        "owner": "numtide",
-        "repo": "flake-utils",
-        "rev": "11707dc2f618dd54ca8739b309ec4fc024de578b",
-        "type": "github"
-      },
-      "original": {
-        "owner": "numtide",
-        "repo": "flake-utils",
-        "type": "github"
-      }
-    },
-    "flake-utils_2": {
-      "inputs": {
-        "systems": "systems_3"
-      },
-      "locked": {
-        "lastModified": 1731533236,
-        "narHash": "sha256-l0KFg5HjrsfsO/JpG+r7fRrqm12kzFHyUHqHCVpMMbI=",
-        "owner": "numtide",
-        "repo": "flake-utils",
-        "rev": "11707dc2f618dd54ca8739b309ec4fc024de578b",
-        "type": "github"
-      },
-      "original": {
-        "owner": "numtide",
-        "repo": "flake-utils",
-        "type": "github"
-      }
-    },
-    "flake-utils_3": {
-      "inputs": {
-        "systems": "systems_4"
       },
       "locked": {
         "lastModified": 1731533236,
@@ -683,6 +572,27 @@
         "url": "ssh://git@github.com/Bullish-Design/inferference.git"
       }
     },
+    "linkman": {
+      "inputs": {
+        "nixpkgs": [
+          "nixpkgs"
+        ]
+      },
+      "locked": {
+        "lastModified": 1791602827,
+        "narHash": "sha256-Ht5JZBQVmYT+vc9kHQ3AmCD4ScBRjqBcQL6bFi4RIhE=",
+        "ref": "refs/tags/v0.1.1",
+        "rev": "b923040f4b7ad67fb40a1755adba1c91af330d57",
+        "revCount": 30,
+        "type": "git",
+        "url": "https://github.com/Bullish-Design/linkman"
+      },
+      "original": {
+        "ref": "refs/tags/v0.1.1",
+        "type": "git",
+        "url": "https://github.com/Bullish-Design/linkman"
+      }
+    },
     "loci-core": {
       "inputs": {
         "nixpkgs": [
@@ -729,6 +639,23 @@
         "ref": "v0.3.1",
         "repo": "loci.nvim",
         "type": "github"
+      }
+    },
+    "mancore": {
+      "flake": false,
+      "locked": {
+        "lastModified": 1791391879,
+        "narHash": "sha256-/8/QoVE+oJ+sVx59Kpq2N5JDFpw7eByKfv1dAVMyaS8=",
+        "ref": "refs/tags/v0.1.0",
+        "rev": "af557e167af0a799bd9dd00472b9023c3a50dc0f",
+        "revCount": 6,
+        "type": "git",
+        "url": "https://github.com/Bullish-Design/mancore"
+      },
+      "original": {
+        "ref": "refs/tags/v0.1.0",
+        "type": "git",
+        "url": "https://github.com/Bullish-Design/mancore"
       }
     },
     "mnemonix": {
@@ -862,13 +789,17 @@
     },
     "nix-terminal": {
       "inputs": {
-        "devman": "devman_2",
+        "devman": [
+          "devman"
+        ],
         "nix-nvim": "nix-nvim",
         "nixbuild": "nixbuild",
         "nixpkgs": [
           "nixpkgs"
         ],
-        "repoman": "repoman"
+        "repoman": [
+          "repoman"
+        ]
       },
       "locked": {
         "lastModified": 1789056893,
@@ -1257,21 +1188,20 @@
     "repoman": {
       "inputs": {
         "nixpkgs": [
-          "nix-terminal",
           "nixpkgs"
         ]
       },
       "locked": {
-        "lastModified": 1788823452,
-        "narHash": "sha256-G9ke+XOt5uK6gweQca1ARnF+8WCfpiwHA9Zaal3DGYg=",
-        "ref": "refs/tags/v0.7.5",
-        "rev": "cd34bfd4845d6dde310d3a263816c86cad977a9f",
-        "revCount": 154,
+        "lastModified": 1791849627,
+        "narHash": "sha256-4NFLms8NT8xrQSKC/50jo38Y7lHRYOWxGB7/yZ1P9zY=",
+        "ref": "refs/tags/v0.14.1",
+        "rev": "d50c30292c8c71812cc746b44b5624932d2acc80",
+        "revCount": 237,
         "type": "git",
         "url": "https://github.com/Bullish-Design/repoman"
       },
       "original": {
-        "ref": "refs/tags/v0.7.5",
+        "ref": "refs/tags/v0.14.1",
         "type": "git",
         "url": "https://github.com/Bullish-Design/repoman"
       }
@@ -1306,6 +1236,8 @@
         "gitman": "gitman",
         "home-manager": "home-manager",
         "inferference": "inferference",
+        "linkman": "linkman",
+        "mancore": "mancore",
         "mnemonix": "mnemonix",
         "nix-paseo": "nix-paseo",
         "nix-secrets": "nix-secrets",
@@ -1314,7 +1246,9 @@
         "nixpkgs": "nixpkgs_3",
         "pi-nixpkgs": "pi-nixpkgs",
         "pytuin": "pytuin",
+        "repoman": "repoman",
         "silverbullet-server": "silverbullet-server",
+        "testee": "testee",
         "vendomat": "vendomat"
       }
     },
@@ -1428,36 +1362,6 @@
         "type": "github"
       }
     },
-    "systems_3": {
-      "locked": {
-        "lastModified": 1681028828,
-        "narHash": "sha256-Vy1rq5AaRuLzOxct8nz4T6wlgyUR7zLU309k9mBC768=",
-        "owner": "nix-systems",
-        "repo": "default",
-        "rev": "da67096a3b9bf56a91d16901293e51ba5b49a27e",
-        "type": "github"
-      },
-      "original": {
-        "owner": "nix-systems",
-        "repo": "default",
-        "type": "github"
-      }
-    },
-    "systems_4": {
-      "locked": {
-        "lastModified": 1681028828,
-        "narHash": "sha256-Vy1rq5AaRuLzOxct8nz4T6wlgyUR7zLU309k9mBC768=",
-        "owner": "nix-systems",
-        "repo": "default",
-        "rev": "da67096a3b9bf56a91d16901293e51ba5b49a27e",
-        "type": "github"
-      },
-      "original": {
-        "owner": "nix-systems",
-        "repo": "default",
-        "type": "github"
-      }
-    },
     "templateer": {
       "flake": false,
       "locked": {
@@ -1473,6 +1377,28 @@
         "ref": "refs/tags/v0.6.0",
         "type": "git",
         "url": "https://github.com/Bullish-Design/templateer_v2"
+      }
+    },
+    "testee": {
+      "inputs": {
+        "nixpkgs": [
+          "devenv",
+          "nixpkgs"
+        ]
+      },
+      "locked": {
+        "lastModified": 1791816937,
+        "narHash": "sha256-WeQszOQUCmukGiQ6COO+/Ok8vMj5FWnEf8GG9DMEB50=",
+        "ref": "refs/tags/v0.7.0",
+        "rev": "fdfe8f3cdba98d33d837c973ea4323066a5a3890",
+        "revCount": 89,
+        "type": "git",
+        "url": "https://github.com/Bullish-Design/testee"
+      },
+      "original": {
+        "ref": "refs/tags/v0.7.0",
+        "type": "git",
+        "url": "https://github.com/Bullish-Design/testee"
       }
     },
     "treefmt-nix": {
@@ -1554,7 +1480,7 @@
         "agentman": "agentman",
         "agentman-inferference": "agentman-inferference",
         "copyroom": "copyroom",
-        "devman": "devman_3",
+        "devman": "devman_2",
         "docman": "docman",
         "gitman": "gitman_2",
         "nixpkgs": "nixpkgs_5",

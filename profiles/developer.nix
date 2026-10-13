@@ -9,17 +9,46 @@ let
   # ignored while pkgs.devenv supplied the binary (023-toolchain P4).
   pinnedDevenv = inputs.devenv.packages.${pkgs.stdenv.hostPlatform.system}.default;
 
-  # Gitman 0.12 and the one jj it needs (0.46.0 or later; nixpkgs lags). Both come from
-  # gitman's own flake, so no second jj version can touch a repository. They sit in
-  # home.packages, which precedes the repoman closure on PATH, so they shadow the
-  # closure's older gitman.
+  # Gitman 0.13 and the one jj it needs (0.46.0 or later; nixpkgs lags). Both
+  # come from Gitman's flake, so no second jj version can touch a repository.
   gitmanPackages = inputs.gitman.packages.${pkgs.stdenv.hostPlatform.system};
+
+  system = pkgs.stdenv.hostPlatform.system;
+
+  # LinkMan's upstream Nix package omits its declared mancore runtime dependency.
+  # Reuse the mancore source pinned by devman and add it to this host package.
+  mancorePackage = pkgs.python313Packages.buildPythonPackage {
+    pname = "mancore";
+    version = "0.1.0";
+    src = inputs.mancore;
+    pyproject = true;
+    build-system = [ pkgs.python313Packages.hatchling ];
+    dependencies = with pkgs.python313Packages; [ pydantic typer ];
+  };
+
+  linkmanLibrary = inputs.linkman.packages.${system}.linkman-lib.overridePythonAttrs (old: {
+    dependencies = (old.dependencies or [ ]) ++ [ mancorePackage ];
+  });
+  linkmanPackage = pkgs.python313Packages.toPythonApplication linkmanLibrary;
 
   # The shared command closure: repoman, copyroom, docman, gitman, templateer and
   # agentman, built once as Nix Python applications and content-addressed. One immutable derivation per
   # source revision, so every shell that names this input resolves the same store paths.
   repomanToolchain =
     inputs.vendomat.packages.${pkgs.stdenv.hostPlatform.system}.repoman-toolchain-core;
+
+  # Vendomat still packages older RepoMan and Gitman entrypoints, plus DocMan.
+  # DocMan is archived. Keep the other commands without duplicate names.
+  interactiveToolchain = pkgs.runCommand "developer-toolchain-commands" { } ''
+    mkdir -p "$out/bin"
+    for command in ${repomanToolchain}/bin/*; do
+      case "$command" in
+        ${repomanToolchain}/bin/docman|${repomanToolchain}/bin/gitman|${repomanToolchain}/bin/repoman) continue ;;
+      esac
+      command_name="''${command##*/}"
+      ln -s "$command" "$out/bin/$command_name"
+    done
+  '';
 
   cfg = config.nix-meta.developer;
   username = config.nixos-core.base.username;
@@ -46,8 +75,11 @@ in
         pinnedDevenv
         gitmanPackages.gitman
         gitmanPackages.jujutsu-bin
+        inputs.repoman.packages.${system}.default
+        linkmanPackage
+        inputs.testee.packages.${system}.testee
       ];
-      description = "Developer tools installed for the configured base user, including Gitman's devenv launcher.";
+      description = "Developer tools installed for the configured base user.";
     };
 
     nixbuild = {
@@ -61,54 +93,6 @@ in
         type = lib.types.nullOr lib.types.str;
         default = null;
         description = "Directory for nixbuild logs; null derives a user-relative default.";
-      };
-    };
-
-    repoman = {
-      enable = lib.mkOption {
-        type = lib.types.bool;
-        default = false;
-        description = ''
-          Install Home Manager's repoman package for the configured developer
-          user. Off by default: that package is 0.7.0 on Python 3.12, while the
-          RepoMan shared toolchain venv on home.sessionVariablesExtra above
-          holds 0.7.1 on 3.13. Two owners of one name let PATH order decide
-          which runs. The venv copy is the single owner.
-
-          The 3.12 build cannot load pyjutsu (cp313-abi3), and repoman 0.7.1
-          reads no config file, so the xdg.configFile this module writes is
-          unread. Setting this true reinstates both problems.
-        '';
-      };
-
-      baseDir = lib.mkOption {
-        type = lib.types.nullOr lib.types.str;
-        default = null;
-        description = "Repository checkout root; null derives ~/Documents/Projects.";
-      };
-
-      accounts = lib.mkOption {
-        type = lib.types.listOf lib.types.attrs;
-        default = [ ];
-        description = "Per-host repoman account and repository policy.";
-      };
-
-      useSsh = lib.mkOption {
-        type = lib.types.bool;
-        default = true;
-        description = "Use SSH remotes for repoman operations.";
-      };
-
-      maxConcurrent = lib.mkOption {
-        type = lib.types.int;
-        default = 5;
-        description = "Maximum concurrent repoman git operations.";
-      };
-
-      timeout = lib.mkOption {
-        type = lib.types.int;
-        default = 300;
-        description = "Repoman operation timeout in seconds.";
       };
     };
   };
@@ -145,7 +129,6 @@ in
         users.${username} = { ... }: {
           imports = [
             nix-terminal.homeManagerModules.nixbuild
-            nix-terminal.homeManagerModules.repoman
             # DISABLED 2026-08-01 with the shellij input (see flake.nix note).
             # shellij.homeManagerModules.default
           ];
@@ -160,7 +143,7 @@ in
           # and every devenv target CPython 3.13. pyjutsu ships cp313-abi3,
           # which cannot load on 3.12.
           #
-          # The shared toolchain's console scripts, for interactive use.
+          # The shared toolchain's remaining console scripts, for interactive use.
           #
           # This USED to point at ~/.local/share/repoman/venv/bin: one mutable
           # virtualenv, installed from live working trees by `repoman-sync
@@ -172,11 +155,11 @@ in
           # `home.sessionPath`) because that is emitted after the PATH export in
           # hm-session-vars.sh and therefore appends. The original reason was that
           # the venv's bin/ held python, python3 and python3.13 and would shadow
-          # pkgs.python3 in every login shell. The closure holds only manager
-          # commands, so that specific hazard is gone — but the profile's
-          # rule stands: developer tooling never shadows a Nix-managed binary.
+          # pkgs.python3 in every login shell. The closure now omits the RepoMan
+          # and Gitman entrypoints that have direct package owners above. The
+          # remaining commands stay last on PATH.
           home.sessionVariablesExtra = ''
-            export PATH="$PATH''${PATH:+:}${repomanToolchain}/bin"
+            export PATH="$PATH''${PATH:+:}${interactiveToolchain}/bin"
           '';
 
           # One user socket serves every repository. The socket is enabled; the
@@ -224,17 +207,6 @@ in
             defaultAction = "test";
             keepLast = 10;
             enableRecording = true;
-          };
-
-          programs.repoman = {
-            enable = cfg.repoman.enable;
-            baseDir = if cfg.repoman.baseDir == null
-              then "${homeDir}/Documents/Projects"
-              else cfg.repoman.baseDir;
-            accounts = cfg.repoman.accounts;
-            useSsh = cfg.repoman.useSsh;
-            maxConcurrent = cfg.repoman.maxConcurrent;
-            timeout = cfg.repoman.timeout;
           };
         };
       };
