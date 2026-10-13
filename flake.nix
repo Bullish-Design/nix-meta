@@ -64,6 +64,12 @@
         url = "git+https://github.com/Bullish-Design/copyroom?ref=refs/tags/v0.8.6";
         flake = false;
       };
+      # Vendomat's machine plane and project shells use the same family
+      # revisions installed by this flake. Vendomat declares RepoMan as a
+      # source-only input, so this follows the canonical source while keeping
+      # its `flake = false` edge.
+      inputs.devman.follows = "devman";
+      inputs.repoman.follows = "repoman";
     };
 
     # RepoMan's CLI and devenv module are personal machine tools. Pin the

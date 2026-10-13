@@ -256,26 +256,6 @@
         "url": "https://github.com/Bullish-Design/devman"
       }
     },
-    "devman_2": {
-      "inputs": {
-        "nixpkgs": "nixpkgs_4"
-      },
-      "locked": {
-        "lastModified": 1789243182,
-        "narHash": "sha256-Pvs3mWxQmD/AMf5SQheZjd1rJicqnkGjeKFYywMBV3Q=",
-        "ref": "refs/tags/v0.5.2",
-        "rev": "8e7c3be6c8c02e7438cf3bb0b7be086b0e98ee12",
-        "revCount": 423,
-        "type": "git",
-        "url": "https://github.com/Bullish-Design/devman"
-      },
-      "original": {
-        "ref": "refs/tags/v0.5.2",
-        "rev": "8e7c3be6c8c02e7438cf3bb0b7be086b0e98ee12",
-        "type": "git",
-        "url": "https://github.com/Bullish-Design/devman"
-      }
-    },
     "docman": {
       "flake": false,
       "locked": {
@@ -1023,22 +1003,6 @@
       }
     },
     "nixpkgs_4": {
-      "locked": {
-        "lastModified": 1787135253,
-        "narHash": "sha256-RD2kNWCG+Bjo6h+JVjWVNntZs2GtRoeY2xHjts/FNkA=",
-        "owner": "NixOS",
-        "repo": "nixpkgs",
-        "rev": "ffb3c9b700e759be2ef13237c9d8f953b32a1e46",
-        "type": "github"
-      },
-      "original": {
-        "owner": "NixOS",
-        "ref": "nixos-unstable",
-        "repo": "nixpkgs",
-        "type": "github"
-      }
-    },
-    "nixpkgs_5": {
       "inputs": {
         "nixpkgs-src": "nixpkgs-src_2"
       },
@@ -1202,23 +1166,6 @@
       },
       "original": {
         "ref": "refs/tags/v0.14.1",
-        "type": "git",
-        "url": "https://github.com/Bullish-Design/repoman"
-      }
-    },
-    "repoman_2": {
-      "flake": false,
-      "locked": {
-        "lastModified": 1791391575,
-        "narHash": "sha256-oiW++PEnJ5ross+whueB2u93sQfWuz34RFBKYqhnx5E=",
-        "ref": "refs/tags/v0.10.0",
-        "rev": "e31923ece4de77f6f5dd293cef158a94b7c477ed",
-        "revCount": 214,
-        "type": "git",
-        "url": "https://github.com/Bullish-Design/repoman"
-      },
-      "original": {
-        "ref": "refs/tags/v0.10.0",
         "type": "git",
         "url": "https://github.com/Bullish-Design/repoman"
       }
@@ -1480,14 +1427,18 @@
         "agentman": "agentman",
         "agentman-inferference": "agentman-inferference",
         "copyroom": "copyroom",
-        "devman": "devman_2",
+        "devman": [
+          "devman"
+        ],
         "docman": "docman",
         "gitman": "gitman_2",
-        "nixpkgs": "nixpkgs_5",
+        "nixpkgs": "nixpkgs_4",
         "pyjutsu": "pyjutsu",
         "pyproject-build-systems": "pyproject-build-systems",
         "pyproject-nix": "pyproject-nix",
-        "repoman": "repoman_2",
+        "repoman": [
+          "repoman"
+        ],
         "templateer": "templateer",
         "uv2nix": "uv2nix_2"
       },
