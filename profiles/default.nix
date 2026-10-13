@@ -38,4 +38,9 @@ inputs:
   # devenv tasks. Stacked on `developer`, which installs the devenv launcher the
   # plane's workflow steps call.
   devman = import ./devman.nix inputs;
+
+  # The devlayer pointer: a regular file that names the new system's devman
+  # link module, rewritten on every switch (vendomat project 22 OI-08). Stacked
+  # on `devman`, which installs the module the pointer names.
+  devlayer = import ./devlayer.nix inputs;
 }
