@@ -62,7 +62,7 @@
         flake = false;
       };
       inputs.copyroom = {
-        url = "git+https://github.com/Bullish-Design/copyroom?rev=c4ee8f411a22674058082d7e6a36da0f905588af";
+        url = "git+https://github.com/Bullish-Design/copyroom?rev=1805d197982003e1081b252315b978142cc0d423";
         flake = false;
       };
       # Vendomat's machine plane and project shells use the same family
