@@ -176,16 +176,16 @@
     "copyroom": {
       "flake": false,
       "locked": {
-        "lastModified": 1791918977,
-        "narHash": "sha256-ptYkUtRLli1tSCjbPCdbjgNcLIJbibBgPaSAPUJW8Ok=",
-        "ref": "refs/heads/main",
-        "rev": "1805d197982003e1081b252315b978142cc0d423",
-        "revCount": 164,
+        "lastModified": 1791942682,
+        "narHash": "sha256-aI+JXkXA8CNNR68VhMZRNWpRhpPjCdS0SKn3gC3AOVM=",
+        "ref": "refs/tags/v0.8.7",
+        "rev": "944301649683f74edf61620749f2998ccb80b504",
+        "revCount": 166,
         "type": "git",
         "url": "https://github.com/Bullish-Design/copyroom"
       },
       "original": {
-        "rev": "1805d197982003e1081b252315b978142cc0d423",
+        "ref": "refs/tags/v0.8.7",
         "type": "git",
         "url": "https://github.com/Bullish-Design/copyroom"
       }
