@@ -50,6 +50,13 @@ let
     done
   '';
 
+  # Projects import this path from their tracked nix/testee.nix. The module
+  # comes from the same Testee input as the CLI, so both share one version.
+  testeeDevenvModule = pkgs.runCommand "testee-devenv-module" { } ''
+    mkdir -p "$out/share/testee/module"
+    cp -r ${inputs.testee}/nix/. "$out/share/testee/module/"
+  '';
+
   cfg = config.nix-meta.developer;
   username = config.nixos-core.base.username;
   homeDir = "/home/${username}";
@@ -118,6 +125,11 @@ in
           "devenv.cachix.org-1:w1cLUi8dv3hnoSPGAuibQv+f9TZLr6cv/Hm9XgU50cw="
         ];
       };
+
+      # Publish /run/current-system/sw/share/testee/module/testee.nix.
+      # NixOS links only listed share paths, so the pathsToLink entry is required.
+      environment.systemPackages = [ testeeDevenvModule ];
+      environment.pathsToLink = [ "/share/testee" ];
 
       # This is deliberately independent of `terminal`: it can merge with that
       # profile's HM user module without re-owning shell, git, or terminal config.
