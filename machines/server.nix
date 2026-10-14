@@ -69,11 +69,6 @@ in
     # box reaches the module through the central overlay instead of its own
     # vendomat flake input.
     inputs.vendomat.nixosModules.default
-
-    # Machine delivery of RepoMan's devenv module tree. Project overlays import
-    # `/run/current-system/sw/share/repoman/module/devenv.nix`, so repositories
-    # do not need a RepoMan input for manager wiring.
-    inputs.repoman.nixosModules.default
   ];
 
   # ── Bootloader: systemd-boot on the EFI partition at /boot (UEFI) ───────────
