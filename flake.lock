@@ -1328,16 +1328,16 @@
         ]
       },
       "locked": {
-        "lastModified": 1791816937,
-        "narHash": "sha256-WeQszOQUCmukGiQ6COO+/Ok8vMj5FWnEf8GG9DMEB50=",
-        "ref": "refs/tags/v0.7.0",
-        "rev": "fdfe8f3cdba98d33d837c973ea4323066a5a3890",
-        "revCount": 89,
+        "lastModified": 1791948447,
+        "narHash": "sha256-pWrIfA6YnU1ikkeQGn/Zdg3mLNCGRUc2Rj/drwphZPI=",
+        "ref": "refs/tags/v0.8.0",
+        "rev": "0c97f4bd7c706c37ec300dbb3d7005c5d63780a0",
+        "revCount": 93,
         "type": "git",
         "url": "https://github.com/Bullish-Design/testee"
       },
       "original": {
-        "ref": "refs/tags/v0.7.0",
+        "ref": "refs/tags/v0.8.0",
         "type": "git",
         "url": "https://github.com/Bullish-Design/testee"
       }
