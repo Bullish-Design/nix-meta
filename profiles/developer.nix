@@ -4,10 +4,11 @@ inputs:
 let
   inherit (inputs) home-manager nix-terminal;
 
-  # The devenv the flake PINS, not the one the system nixpkgs happens to carry.
-  # These are different versions, and before this the pin was declared and
-  # ignored while pkgs.devenv supplied the binary (023-toolchain P4).
-  pinnedDevenv = inputs.devenv.packages.${pkgs.stdenv.hostPlatform.system}.default;
+  # Vendomat's patched devenv 2.4.0 (Vendomat project 23 S2; project 22 R13),
+  # from the `vendomat-host` input. Not pkgs.devenv, and not the unpatched
+  # upstream build from inputs.devenv. inputs.devenv stays in the flake only
+  # because the testee input follows its nixpkgs.
+  pinnedDevenv = inputs.vendomat-host.packages.${pkgs.stdenv.hostPlatform.system}.devenv;
 
   # Gitman 0.13 and the one jj it needs (0.46.0 or later; nixpkgs lags). Both
   # come from Gitman's flake, so no second jj version can touch a repository.
@@ -71,7 +72,7 @@ in
       ] ++ [
         # Gitman owns its Python/pyjutsu runtime through its own pinned devenv;
         # keep the launcher available from every developer profile. This is
-        # inputs.devenv, the flake's pin — NOT pkgs.devenv.
+        # inputs.vendomat-host's patched devenv — NOT pkgs.devenv.
         pinnedDevenv
         gitmanPackages.gitman
         gitmanPackages.jujutsu-bin
@@ -112,6 +113,11 @@ in
       # This only works because `inputs.devenv` carries its own nixpkgs; see the
       # comment on that input in flake.nix. Overriding it changes every hash and
       # nothing here can be served.
+      #
+      # The host devenv binary itself no longer comes from this cache. It is
+      # Vendomat's patched build (input `vendomat-host`), taken from the local
+      # store and its GC root. The cache still serves what builds from
+      # `inputs.devenv` (for example the testee input, which follows its nixpkgs).
       nix.settings = {
         extra-substituters = [ "https://devenv.cachix.org" ];
         extra-trusted-public-keys = [

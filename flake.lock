@@ -235,6 +235,24 @@
         "type": "github"
       }
     },
+    "devenv_2": {
+      "locked": {
+        "dir": "src/modules",
+        "lastModified": 1791504000,
+        "narHash": "sha256-tOYEk6WSJZ8yquJv61p6Xwi0giBjZqeutcBMSOaeZkQ=",
+        "ref": "refs/tags/v2.4.0-vendomat-modules.1",
+        "rev": "061c2184cfcc2e84d2013b5f5a0b57b003ccc7a9",
+        "revCount": 7374,
+        "type": "git",
+        "url": "git://server/devenv"
+      },
+      "original": {
+        "dir": "src/modules",
+        "ref": "refs/tags/v2.4.0-vendomat-modules.1",
+        "type": "git",
+        "url": "git://server/devenv"
+      }
+    },
     "devman": {
       "inputs": {
         "nixpkgs": [
@@ -1015,6 +1033,22 @@
         "type": "github"
       }
     },
+    "nixpkgs_5": {
+      "locked": {
+        "lastModified": 1791456040,
+        "narHash": "sha256-H83yz/do+hjOO0uujHyH8RgtIQP2v7Mw+cLwcZK/xKc=",
+        "owner": "NixOS",
+        "repo": "nixpkgs",
+        "rev": "e7439b6b14ad3cc35d05608ebca9bce01a25f5f8",
+        "type": "github"
+      },
+      "original": {
+        "owner": "NixOS",
+        "repo": "nixpkgs",
+        "rev": "e7439b6b14ad3cc35d05608ebca9bce01a25f5f8",
+        "type": "github"
+      }
+    },
     "paseo": {
       "inputs": {
         "nixpkgs": [
@@ -1190,7 +1224,8 @@
         "repoman": "repoman",
         "silverbullet-server": "silverbullet-server",
         "testee": "testee",
-        "vendomat": "vendomat"
+        "vendomat": "vendomat",
+        "vendomat-host": "vendomat-host"
       }
     },
     "rust-analyzer-src": {
@@ -1449,6 +1484,26 @@
         "rev": "d5a90f0aff97224b34e9bc2647e56b44cbf790d5",
         "type": "git",
         "url": "https://github.com/Bullish-Design/vendomat"
+      }
+    },
+    "vendomat-host": {
+      "inputs": {
+        "devenv": "devenv_2",
+        "nixpkgs": "nixpkgs_5"
+      },
+      "locked": {
+        "lastModified": 1792002963,
+        "narHash": "sha256-LoAH+NeGTq4EHQkJNf7NVJWtkqkoLYieL8JzH73tnE8=",
+        "ref": "master",
+        "rev": "465ce48f60465715df7dee36090c0b243fc741f8",
+        "revCount": 312,
+        "type": "git",
+        "url": "file:///home/andrew/Documents/Projects/vendomat"
+      },
+      "original": {
+        "rev": "465ce48f60465715df7dee36090c0b243fc741f8",
+        "type": "git",
+        "url": "file:///home/andrew/Documents/Projects/vendomat"
       }
     }
   },

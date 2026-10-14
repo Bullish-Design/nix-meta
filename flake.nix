@@ -73,6 +73,17 @@
       inputs.repoman.follows = "repoman";
     };
 
+    # Patched host devenv (Vendomat project 23 S2; project 22 R13). A second
+    # Vendomat input, separate from `vendomat` above, which keeps its older
+    # outputs for machines/server.nix and profiles/developer.nix. Only
+    # `packages.<system>.devenv` is read from it.
+    # NO `inputs.nixpkgs.follows`: the binary must build from Vendomat's own
+    # pinned nixpkgs, or it misses the built store path.
+    # Pinned to the full commit of Vendomat main from the LOCAL repository
+    # (`git+file:`, like nix-secrets; GitHub is no part of this pipeline).
+    # A collection tag will replace this pin later.
+    vendomat-host.url = "git+file:///home/andrew/Documents/Projects/vendomat?rev=465ce48f60465715df7dee36090c0b243fc741f8";
+
     # RepoMan's CLI and devenv module are personal machine tools. Pin the
     # release here so project repositories can import the module from the
     # system profile instead of selecting a RepoMan version themselves.
