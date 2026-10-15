@@ -2,8 +2,8 @@
 # Create one repository in the Vendomat source collection on this host, or refresh its hooks.
 # Usage: collection-add <repo>
 #        collection-add --hooks <repo>     rewrite the hooks of an existing collection repository
-# Repositories take only new release tags, over SSH. Vendomat also takes fast-forward updates to
-# its `release` branch. git-daemon serves every repository read only.
+# Repositories take new release tags and fast-forward updates to their `release` branch (R37),
+# over SSH. git-daemon serves every repository read only.
 # After a tag push, the working tree shows the newest release (STORE-023 in the vendomat repository).
 set -eu
 mode=create
@@ -15,22 +15,14 @@ dir=${VENDOMAT_COLLECTION:-$HOME/vendor}/$repo
 install_hooks() {
   cat > "$dir/.git/hooks/pre-receive" <<'HOOK'
 #!/bin/sh
-# Collection rule: new release tags enter, and a tag never moves. Only the `vendomat` repository
-# also accepts fast-forward updates to its `release` branch.
+# Collection rule: new release tags enter, and a tag never moves. Every repository also accepts
+# fast-forward updates to its `release` branch (R37).
 zero=0000000000000000000000000000000000000000
-git_dir=$(git rev-parse --absolute-git-dir 2>/dev/null) || exit 1
-case "$git_dir" in
-  */.git) repo_name=${git_dir%/.git}; repo_name=${repo_name##*/} ;;
-  *) repo_name=${git_dir##*/} ;;
-esac
 while read old new ref; do
   case "$ref" in
     refs/tags/*)
       [ "$old" = "$zero" ] || { echo "collection: $ref exists; releases are immutable" >&2; exit 1; } ;;
     refs/heads/release)
-      [ "$repo_name" = vendomat ] || {
-        echo "collection: only release tags are accepted, not $ref" >&2; exit 1;
-      }
       [ "$new" != "$zero" ] || {
         echo "collection: refs/heads/release cannot be deleted" >&2; exit 1;
       }
@@ -90,4 +82,4 @@ fi
 git init -q "$dir"
 install_hooks
 touch "$dir/.git/git-daemon-export-ok"
-echo "collection-add: created $dir (release tags; Vendomat release branch; served read only)"
+echo "collection-add: created $dir (release tags; release branch; served read only)"
