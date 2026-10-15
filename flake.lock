@@ -1492,16 +1492,16 @@
         "nixpkgs": "nixpkgs_5"
       },
       "locked": {
-        "lastModified": 1792002963,
-        "narHash": "sha256-LoAH+NeGTq4EHQkJNf7NVJWtkqkoLYieL8JzH73tnE8=",
+        "lastModified": 1792103756,
+        "narHash": "sha256-3os1NWORL8tpQir8gEGoLLc0Yoe/qwp0yqefbmR67Mw=",
         "ref": "master",
-        "rev": "465ce48f60465715df7dee36090c0b243fc741f8",
-        "revCount": 312,
+        "rev": "e315ea4302192f4b0c8d37d0573bf0d8ff2f2a2e",
+        "revCount": 342,
         "type": "git",
         "url": "file:///home/andrew/Documents/Projects/vendomat"
       },
       "original": {
-        "rev": "465ce48f60465715df7dee36090c0b243fc741f8",
+        "rev": "e315ea4302192f4b0c8d37d0573bf0d8ff2f2a2e",
         "type": "git",
         "url": "file:///home/andrew/Documents/Projects/vendomat"
       }

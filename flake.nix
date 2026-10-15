@@ -82,7 +82,7 @@
     # Pinned to the full commit of Vendomat main from the LOCAL repository
     # (`git+file:`, like nix-secrets; GitHub is no part of this pipeline).
     # A collection tag will replace this pin later.
-    vendomat-host.url = "git+file:///home/andrew/Documents/Projects/vendomat?rev=465ce48f60465715df7dee36090c0b243fc741f8";
+    vendomat-host.url = "git+file:///home/andrew/Documents/Projects/vendomat?rev=e315ea4302192f4b0c8d37d0573bf0d8ff2f2a2e";
 
     # RepoMan's CLI and devenv module are personal machine tools. Pin the
     # release here so project repositories can import the module from the
