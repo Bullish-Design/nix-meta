@@ -255,21 +255,45 @@
     },
     "devman": {
       "inputs": {
+        "home-manager": "home-manager",
         "nixpkgs": [
           "nixpkgs"
-        ]
+        ],
+        "pyproject-build-systems": "pyproject-build-systems",
+        "pyproject-nix": "pyproject-nix",
+        "uv2nix": "uv2nix"
       },
       "locked": {
-        "lastModified": 1789478635,
-        "narHash": "sha256-pKf7QG4dLxfqakacpc9Yzbuo+rFY0ZcEhQoTgv4/jts=",
-        "ref": "refs/tags/v0.7.0",
-        "rev": "4c9927ada27a5c12a5ee2acdf8ad85648f7aafa1",
-        "revCount": 514,
+        "lastModified": 1792150140,
+        "narHash": "sha256-XGgEsPGgsy/0r5tgYe05nKJpN3JHl75wCdMyIXW/mi0=",
+        "ref": "refs/tags/v0.9.0",
+        "rev": "7ebaf6ae2c773b52231c68c666913f51875faa62",
+        "revCount": 589,
         "type": "git",
         "url": "https://github.com/Bullish-Design/devman"
       },
       "original": {
-        "ref": "refs/tags/v0.7.0",
+        "ref": "refs/tags/v0.9.0",
+        "type": "git",
+        "url": "https://github.com/Bullish-Design/devman"
+      }
+    },
+    "devman_2": {
+      "inputs": {
+        "nixpkgs": "nixpkgs_4"
+      },
+      "locked": {
+        "lastModified": 1789243182,
+        "narHash": "sha256-Pvs3mWxQmD/AMf5SQheZjd1rJicqnkGjeKFYywMBV3Q=",
+        "ref": "refs/tags/v0.5.2",
+        "rev": "8e7c3be6c8c02e7438cf3bb0b7be086b0e98ee12",
+        "revCount": 423,
+        "type": "git",
+        "url": "https://github.com/Bullish-Design/devman"
+      },
+      "original": {
+        "ref": "refs/tags/v0.5.2",
+        "rev": "8e7c3be6c8c02e7438cf3bb0b7be086b0e98ee12",
         "type": "git",
         "url": "https://github.com/Bullish-Design/devman"
       }
@@ -513,6 +537,27 @@
     "home-manager": {
       "inputs": {
         "nixpkgs": [
+          "devman",
+          "nixpkgs"
+        ]
+      },
+      "locked": {
+        "lastModified": 1792098797,
+        "narHash": "sha256-u4DIIZgznEGzByxXrxWCXK19VcMtTBmi/M9gZ7Jk9bM=",
+        "owner": "nix-community",
+        "repo": "home-manager",
+        "rev": "640725978b99076e18e069f6e7d2959124584f8f",
+        "type": "github"
+      },
+      "original": {
+        "owner": "nix-community",
+        "repo": "home-manager",
+        "type": "github"
+      }
+    },
+    "home-manager_2": {
+      "inputs": {
+        "nixpkgs": [
           "nixpkgs"
         ]
       },
@@ -531,7 +576,7 @@
         "url": "https://github.com/nix-community/home-manager.git"
       }
     },
-    "home-manager_2": {
+    "home-manager_3": {
       "inputs": {
         "nixpkgs": [
           "nix-terminal",
@@ -719,7 +764,7 @@
     },
     "nix-nvim": {
       "inputs": {
-        "home-manager": "home-manager_2",
+        "home-manager": "home-manager_3",
         "loci-nvim": "loci-nvim",
         "nixpkgs": [
           "nix-terminal",
@@ -1015,6 +1060,22 @@
       }
     },
     "nixpkgs_4": {
+      "locked": {
+        "lastModified": 1787135253,
+        "narHash": "sha256-RD2kNWCG+Bjo6h+JVjWVNntZs2GtRoeY2xHjts/FNkA=",
+        "owner": "NixOS",
+        "repo": "nixpkgs",
+        "rev": "ffb3c9b700e759be2ef13237c9d8f953b32a1e46",
+        "type": "github"
+      },
+      "original": {
+        "owner": "NixOS",
+        "ref": "nixos-unstable",
+        "repo": "nixpkgs",
+        "type": "github"
+      }
+    },
+    "nixpkgs_5": {
       "inputs": {
         "nixpkgs-src": "nixpkgs-src_2"
       },
@@ -1033,7 +1094,7 @@
         "type": "github"
       }
     },
-    "nixpkgs_5": {
+    "nixpkgs_6": {
       "locked": {
         "lastModified": 1791456040,
         "narHash": "sha256-H83yz/do+hjOO0uujHyH8RgtIQP2v7Mw+cLwcZK/xKc=",
@@ -1107,6 +1168,35 @@
     "pyproject-build-systems": {
       "inputs": {
         "nixpkgs": [
+          "devman",
+          "nixpkgs"
+        ],
+        "pyproject-nix": [
+          "devman",
+          "pyproject-nix"
+        ],
+        "uv2nix": [
+          "devman",
+          "uv2nix"
+        ]
+      },
+      "locked": {
+        "lastModified": 1791170410,
+        "narHash": "sha256-pyru9MpuXRiyq0Bd4q0nHpL4T6HCuZT4B+alcgAYE4A=",
+        "owner": "pyproject-nix",
+        "repo": "build-system-pkgs",
+        "rev": "953d35d03a51dbecaf3feb3fb679eb63e90ebeb4",
+        "type": "github"
+      },
+      "original": {
+        "owner": "pyproject-nix",
+        "repo": "build-system-pkgs",
+        "type": "github"
+      }
+    },
+    "pyproject-build-systems_2": {
+      "inputs": {
+        "nixpkgs": [
           "vendomat",
           "nixpkgs"
         ],
@@ -1114,7 +1204,7 @@
           "vendomat",
           "pyproject-nix"
         ],
-        "uv2nix": "uv2nix"
+        "uv2nix": "uv2nix_2"
       },
       "locked": {
         "lastModified": 1788149501,
@@ -1131,6 +1221,27 @@
       }
     },
     "pyproject-nix": {
+      "inputs": {
+        "nixpkgs": [
+          "devman",
+          "nixpkgs"
+        ]
+      },
+      "locked": {
+        "lastModified": 1791657700,
+        "narHash": "sha256-vcCAvhtA7hG+/gOge29hYHy7I/dLkIsr5nLx4sFEQic=",
+        "owner": "pyproject-nix",
+        "repo": "pyproject.nix",
+        "rev": "ddc400a6883b042646d0940e65971bb7f7e96107",
+        "type": "github"
+      },
+      "original": {
+        "owner": "pyproject-nix",
+        "repo": "pyproject.nix",
+        "type": "github"
+      }
+    },
+    "pyproject-nix_2": {
       "inputs": {
         "nixpkgs": [
           "vendomat",
@@ -1209,7 +1320,7 @@
         "devman": "devman",
         "fornix-host": "fornix-host",
         "gitman": "gitman",
-        "home-manager": "home-manager",
+        "home-manager": "home-manager_2",
         "inferference": "inferference",
         "linkman": "linkman",
         "mancore": "mancore",
@@ -1402,6 +1513,31 @@
     "uv2nix": {
       "inputs": {
         "nixpkgs": [
+          "devman",
+          "nixpkgs"
+        ],
+        "pyproject-nix": [
+          "devman",
+          "pyproject-nix"
+        ]
+      },
+      "locked": {
+        "lastModified": 1791981146,
+        "narHash": "sha256-PeENT3Fu7a7YrX5zIHjdxai8GzPcxpKn+nQsgByhwNo=",
+        "owner": "pyproject-nix",
+        "repo": "uv2nix",
+        "rev": "a541fda20d6784d88789cfcb221638b7c25a23dd",
+        "type": "github"
+      },
+      "original": {
+        "owner": "pyproject-nix",
+        "repo": "uv2nix",
+        "type": "github"
+      }
+    },
+    "uv2nix_2": {
+      "inputs": {
+        "nixpkgs": [
           "vendomat",
           "pyproject-build-systems",
           "nixpkgs"
@@ -1426,7 +1562,7 @@
         "type": "github"
       }
     },
-    "uv2nix_2": {
+    "uv2nix_3": {
       "inputs": {
         "nixpkgs": [
           "vendomat",
@@ -1456,20 +1592,18 @@
         "agentman": "agentman",
         "agentman-inferference": "agentman-inferference",
         "copyroom": "copyroom",
-        "devman": [
-          "devman"
-        ],
+        "devman": "devman_2",
         "docman": "docman",
         "gitman": "gitman_2",
-        "nixpkgs": "nixpkgs_4",
+        "nixpkgs": "nixpkgs_5",
         "pyjutsu": "pyjutsu",
-        "pyproject-build-systems": "pyproject-build-systems",
-        "pyproject-nix": "pyproject-nix",
+        "pyproject-build-systems": "pyproject-build-systems_2",
+        "pyproject-nix": "pyproject-nix_2",
         "repoman": [
           "repoman"
         ],
         "templateer": "templateer",
-        "uv2nix": "uv2nix_2"
+        "uv2nix": "uv2nix_3"
       },
       "locked": {
         "lastModified": 1791552542,
@@ -1489,7 +1623,7 @@
     "vendomat-host": {
       "inputs": {
         "devenv": "devenv_2",
-        "nixpkgs": "nixpkgs_5"
+        "nixpkgs": "nixpkgs_6"
       },
       "locked": {
         "lastModified": 1792103756,

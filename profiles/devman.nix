@@ -5,48 +5,27 @@ let
   username = config.nixos-core.base.username;
 in
 {
-  # The devman automation plane, machine side (devman CONCEPT.md §4).
+  # The devman workflow plane, machine side (devman 047, CONCEPT.md §10).
   #
-  # One Dagu control plane per machine, as a systemd USER service. Every
-  # workflow step runs a developer's own `devenv` in a developer's own checkout,
-  # so the service needs that developer's $HOME, Nix profile, ~/.cache, git
-  # credentials and SSH agent. A system service would need all of that plumbed
-  # explicitly.
+  # One Dagu control plane per machine, as two systemd USER services:
+  # `devman-dagu` (the server and scheduler) and `devman-watch` (the watcher).
+  # Every workflow step runs the developer's own `devenv` in the developer's own
+  # checkout, so the services need that user's $HOME, Nix profile and credentials.
+  # Home Manager owns them. Home Manager still runs as a NixOS module here, so
+  # the module goes into `home-manager.users.${username}`. Vendomat phase 4
+  # (standalone home) will move this one import.
   #
-  # This profile authors nothing. The whole machine interface is devman's
-  # module, and every value below is a decision this host makes rather than a
-  # default it repeats.
-  imports = [ inputs.devman.nixosModules.default ];
-
-  services.devman-dagu = {
-    enable = true;
-
-    # Without lingering, the user manager exists only while andrew is logged in,
-    # so the plane is not running on a box nobody has SSH'd into — and, less
-    # obviously, activation cannot restart it either, because
-    # `switch-to-configuration` reaches exactly the users logind lists (devman
-    # finding C7). This host already has Linger=yes for andrew; stating it here
-    # makes it a property of the configuration rather than of the machine's
-    # accumulated state.
-    lingerUsers = [ username ];
-
-    # THE MACHINE PLANE CUTOVER (devman project 038, §10). Vendomat now owns
-    # generation, activation, and rollback; the registry Dagu reads is the
-    # active generation's own tree, not the compatibility shell-entry
-    # registry every consumer repository used to write on its own shell
-    # entry. `stateDir` stays at devman's default — watcher state and project
-    # metadata outlive any one generation, and Vendomat's own generation store
-    # lives at $HOME/.local/state/vendomat/devman, entirely separate from it.
-    registryDir = "$HOME/.local/state/vendomat/devman/active";
-
-    # Everything else is devman's default and is deliberately not repeated:
-    # ports 8080 and 50055, the five queues (light 4, normal 2, heavy 1, gpu 1,
-    # exclusive 1), DAGU_HOME at %h/.local/share/dagu, seven-day history
-    # retention, and the profile roots prepended to the unit's PATH. Restating
-    # a default here would be a second place to keep in sync with the flake.
-    #
-    # The two ports are the only thing this host shares with anything else. Both
-    # were free when this was written; a second Dagu fails loudly on the
-    # coordinator with `bind: address already in use`.
+  # The module installs the wrapped `devman` command and the `dagu` command. It
+  # reads the overlay at ~/.config/devman and writes compiled files, run logs and
+  # events under ~/.local/state/devman. Every option keeps its default: ports 8080
+  # and 50055, six queues, and DAGU_HOME at ~/.local/share/dagu.
+  home-manager.users.${username} = {
+    imports = [ inputs.devman.homeManagerModules.default ];
+    services.devman.enable = true;
   };
+
+  # Home Manager cannot set linger. Without it, the user manager runs only while
+  # the user is logged in, so the plane stops on a box nobody has SSH'd into.
+  # machines/server.nix sets the same value; two equal definitions merge.
+  users.users.${username}.linger = true;
 }

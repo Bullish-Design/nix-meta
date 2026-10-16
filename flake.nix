@@ -69,7 +69,11 @@
       # revisions installed by this flake. Vendomat declares RepoMan as a
       # source-only input, so this follows the canonical source while keeping
       # its `flake = false` edge.
-      inputs.devman.follows = "devman";
+      #
+      # `devman` does NOT follow (devman 047). This pinned Vendomat revision reads
+      # nix/renderer.nix, nix/devman-cli.nix and the old modules from its devman
+      # input. devman v0.9.0 deleted them, so a follow fails evaluation. Vendomat
+      # keeps its own devman pin (v0.5.2) until a Vendomat release drops that use.
       inputs.repoman.follows = "repoman";
     };
 
@@ -278,31 +282,16 @@
       inputs.nixpkgs.follows = "nixpkgs";
     };
 
-    # The devman automation plane. One flake exposes both interfaces at one
-    # revision: `nixosModules.default` is this machine's Dagu service (consumed
-    # by profiles/devman.nix), and the SAME rev's `modules/` directory is what
-    # every adopted repository imports from its own devenv.yaml. That is the
-    # whole anti-drift argument — the machine and the repos cannot disagree
-    # about queue names, the registry layout or `DEVMAN_PROJECT_DIR`, because
-    # there is one version of all three.
-    #
-    # `git+file:` records `rev` and `narHash` in flake.lock, just as
-    # `git+https:` does, but it sees committed files only. Use `path:` for the
-    # one repository under active edit; every other local consumer is pinned
-    # with `git+file:`. A `github:` input hits the GitHub API rate limit on every
-    # evaluation. (devman FINDINGS.md B4, corrected; CONCEPT.md §3.2.)
-    #
-    # The Project 038 link work that once needed a bare-rev pin is now in the
-    # published tag: `v0.7.0` carries the independent link adapter and its
-    # machine-installed link-only module (038 Stages 16-18), so this machine
-    # gets `devman-link` on its PATH and `/share/devman/link-module.nix`
-    # through `services.devman-dagu.installLinkAdapter`, which defaults to
-    # true. A rollback is a pin to an earlier tag.
-    # `follows` here only removes a duplicate nixpkgs node from the lock. The
-    # NixOS module takes `pkgs` from this machine and never reads devman's own
-    # nixpkgs input, which serves that flake's `packages` and `checks` alone.
+    # The devman workflow plane (047). The flake exposes `homeManagerModules.default`,
+    # which profiles/devman.nix imports into the user's Home Manager config, and
+    # the `devman` and `dagu` packages that module installs. One revision of the
+    # flake means the machine and the CLI cannot disagree about the Dagu version,
+    # the queues or the state layout. Rollback: pin an earlier tag.
+    # `follows` removes a duplicate nixpkgs node from the lock. The Home Manager
+    # module takes `pkgs` from this machine; the flake's own nixpkgs serves its
+    # `packages` and `checks`.
     devman = {
-      url = "git+https://github.com/Bullish-Design/devman?ref=refs/tags/v0.7.0";
+      url = "git+https://github.com/Bullish-Design/devman?ref=refs/tags/v0.9.0";
       inputs.nixpkgs.follows = "nixpkgs";
     };
 
@@ -351,7 +340,7 @@
         # profiles.terminal restored: nix-terminal now consumes nix-nvim (the
         # loci-rich config promoted from ~/.dotfiles/nvim) instead of the retired,
         # broken nixvim input.
-        server = mkMachine "server" [ profiles.minimal profiles.terminal profiles.developer profiles.gpu-compute profiles.agent profiles.secrets profiles.backup profiles.devman profiles.devlayer profiles.mnemonix ];
+        server = mkMachine "server" [ profiles.minimal profiles.terminal profiles.developer profiles.gpu-compute profiles.agent profiles.secrets profiles.backup profiles.devman profiles.mnemonix ];
       };
 
       checks.${system}.atuin-server-runtime =

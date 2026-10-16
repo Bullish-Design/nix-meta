@@ -34,13 +34,8 @@ inputs:
   # password to /run/secrets.
   backup = import ./backup.nix inputs;
 
-  # The devman automation plane: one Dagu user service that runs each repo's own
-  # devenv tasks. Stacked on `developer`, which installs the devenv launcher the
-  # plane's workflow steps call.
+  # The devman workflow plane: a Dagu user service and a watcher user service,
+  # installed through Home Manager. Stacked on `developer`, which installs the
+  # devenv launcher the plane's workflow steps call.
   devman = import ./devman.nix inputs;
-
-  # The devlayer pointer: a regular file that names the new system's devman
-  # link module, rewritten on every switch (vendomat project 22 OI-08). Stacked
-  # on `devman`, which installs the module the pointer names.
-  devlayer = import ./devlayer.nix inputs;
 }
