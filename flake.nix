@@ -291,7 +291,7 @@
     # module takes `pkgs` from this machine; the flake's own nixpkgs serves its
     # `packages` and `checks`.
     devman = {
-      url = "git+https://github.com/Bullish-Design/devman?ref=refs/tags/v0.9.0";
+      url = "git+https://github.com/Bullish-Design/devman?ref=refs/tags/v0.9.1";
       inputs.nixpkgs.follows = "nixpkgs";
     };
 

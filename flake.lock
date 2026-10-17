@@ -264,16 +264,16 @@
         "uv2nix": "uv2nix"
       },
       "locked": {
-        "lastModified": 1792150140,
-        "narHash": "sha256-XGgEsPGgsy/0r5tgYe05nKJpN3JHl75wCdMyIXW/mi0=",
-        "ref": "refs/tags/v0.9.0",
-        "rev": "7ebaf6ae2c773b52231c68c666913f51875faa62",
-        "revCount": 589,
+        "lastModified": 1792270713,
+        "narHash": "sha256-Jb1X36647KAiVHvkgR/6iy0CMVfcJGmS5CpiZhexZw0=",
+        "ref": "refs/tags/v0.9.1",
+        "rev": "5b3eb94155631ff4d43e4660afdeca5c90abe7d0",
+        "revCount": 598,
         "type": "git",
         "url": "https://github.com/Bullish-Design/devman"
       },
       "original": {
-        "ref": "refs/tags/v0.9.0",
+        "ref": "refs/tags/v0.9.1",
         "type": "git",
         "url": "https://github.com/Bullish-Design/devman"
       }
