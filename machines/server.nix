@@ -634,7 +634,7 @@ in
   services.btrfs.autoScrub = {
     enable = true;
     interval = "monthly";
-    fileSystems = [ "/" ];
+    fileSystems = [ "/" "/mnt/shared" ];
   };
 
   # Snapshots: DEFERRED 2026-08-14. The @snapshots subvolume stays mounted but
@@ -697,7 +697,7 @@ in
   #   };
   # };
 
-  # Secondary NTFS data drive. Same contract as /mnt/shared below:
+  # Secondary NTFS data drive. nofail = won't block boot if absent/dirty.
   # x-systemd.automount defers the mount to first access of the path.
   fileSystems."/mnt/flex" = {
     device = "/dev/disk/by-label/FLEX_252";
@@ -712,18 +712,13 @@ in
     ];
   };
 
-  # Optional shared NTFS data drive. nofail = won't block boot if absent/dirty.
+  # Optional shared btrfs data drive (HDD). nofail = won't block boot if
+  # absent. Mount by label: mkfs sets the label, but each format makes a new UUID.
+  # zstd skips data that does not compress, such as model weights.
   fileSystems."/mnt/shared" = {
-    device = "/dev/disk/by-uuid/C24C954D4C953CDB";
-    fsType = "ntfs3";
-    options = [
-      "nofail"
-      "x-systemd.automount"
-      "uid=1000"
-      "gid=100"
-      "umask=022"
-      "windows_names"
-    ];
+    device = "/dev/disk/by-label/SHARED";
+    fsType = "btrfs";
+    options = [ "nofail" "x-systemd.automount" "noatime" "compress=zstd" ];
   };
 
   # Used WD Re (WD2000FYYZ) drive added to a flexbay, wiped of its prior
