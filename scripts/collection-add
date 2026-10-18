@@ -2,7 +2,7 @@
 # Create one repository in the Vendomat source collection on this host, or refresh its hooks.
 # Usage: collection-add <repo>
 #        collection-add --hooks <repo>     rewrite the hooks of an existing collection repository
-# Repositories take new release tags and fast-forward updates to their `release` branch (R37),
+# Repositories take new release tags and fast-forward updates to their `release` and `release-v2` branches (R37, 010-D38),
 # over SSH. git-daemon serves every repository read only.
 # After a tag push, the working tree shows the newest release (STORE-023 in the vendomat repository).
 set -eu
@@ -16,18 +16,18 @@ install_hooks() {
   cat > "$dir/.git/hooks/pre-receive" <<'HOOK'
 #!/bin/sh
 # Collection rule: new release tags enter, and a tag never moves. Every repository also accepts
-# fast-forward updates to its `release` branch (R37).
+# fast-forward updates to its `release` branch (R37) and to its `release-v2` branch (010-D38).
 zero=0000000000000000000000000000000000000000
 while read old new ref; do
   case "$ref" in
     refs/tags/*)
       [ "$old" = "$zero" ] || { echo "collection: $ref exists; releases are immutable" >&2; exit 1; } ;;
-    refs/heads/release)
+    refs/heads/release|refs/heads/release-v2)
       [ "$new" != "$zero" ] || {
-        echo "collection: refs/heads/release cannot be deleted" >&2; exit 1;
+        echo "collection: $ref cannot be deleted" >&2; exit 1;
       }
       [ "$old" = "$zero" ] || git merge-base --is-ancestor "$old" "$new" || {
-        echo "collection: refs/heads/release must move forward" >&2; exit 1;
+        echo "collection: $ref must move forward" >&2; exit 1;
       } ;;
     *)
       echo "collection: only release tags are accepted, not $ref" >&2; exit 1 ;;

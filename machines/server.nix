@@ -165,8 +165,8 @@ in
   # under /home/andrew/vendor stay private. Port 9418 is open on tailscale0 only
   # (above); the tailnet is the access boundary. Idle, the daemon sleeps.
   #
-  # Release tags arrive over SSH (port 22). Each repository takes only new tags, except
-  # `vendomat`, which also takes fast-forward updates to `refs/heads/release`.
+  # Release tags arrive over SSH (port 22). Each repository takes new tags, and
+  # fast-forward updates to `refs/heads/release` and `refs/heads/release-v2`.
   # The pre-receive hook rejects every other branch and refuses to move a tag.
   services.gitDaemon = {
     enable = true;
