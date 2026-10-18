@@ -111,11 +111,11 @@
       flake = false;
     };
 
-    # The host Testee runner is personal tooling. Testee 0.8 runs the standard
+    # The host Testee runner is personal tooling. Testee 0.10 runs the standard
     # devenv tasks of each repository, so no repository imports a Testee module.
     # Its package uses the same curated nixpkgs as devenv.
     testee = {
-      url = "git+https://github.com/Bullish-Design/testee?ref=refs/tags/v0.8.0";
+      url = "git+https://github.com/Bullish-Design/testee?ref=refs/tags/v0.10.0";
       inputs.nixpkgs.follows = "devenv/nixpkgs";
     };
 
