@@ -712,7 +712,7 @@ in
     ];
   };
 
-  # Optional shared btrfs data drive (HDD). nofail = won't block boot if
+  # Optional shared btrfs data drive (SATA SSD). nofail = won't block boot if
   # absent. Mount by label: mkfs sets the label, but each format makes a new UUID.
   # zstd skips data that does not compress, such as model weights.
   fileSystems."/mnt/shared" = {
