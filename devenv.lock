@@ -53,36 +53,10 @@
         "type": "github"
       }
     },
-    "repoman": {
-      "flake": false,
-      "locked": {
-        "dir": "modules",
-        "type": "git",
-        "url": "file:///home/andrew/Documents/Projects/repoman"
-      },
-      "original": {
-        "dir": "modules",
-        "type": "git",
-        "url": "file:///home/andrew/Documents/Projects/repoman"
-      }
-    },
     "root": {
       "inputs": {
         "devenv": "devenv",
-        "nixpkgs": "nixpkgs",
-        "repoman": "repoman",
-        "shellij": "shellij"
-      }
-    },
-    "shellij": {
-      "flake": false,
-      "locked": {
-        "type": "git",
-        "url": "file:///home/andrew/Documents/Projects/shellij"
-      },
-      "original": {
-        "type": "git",
-        "url": "file:///home/andrew/Documents/Projects/shellij"
+        "nixpkgs": "nixpkgs"
       }
     }
   },
