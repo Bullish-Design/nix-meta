@@ -605,9 +605,15 @@ in
   #     services.zelligate = {
   #       enable = true;
   #       package = inputs.zelligate.packages.${pkgs.system}.default;
-  #       # No owned zellij pin in the fleet yet; nixpkgs-unstable ships 0.44.3,
-  #       # whose `web` subcommand has the token interface zelligate drives.
-  #       zellijPackage = pkgs.zellij;
+  #       # The fleet owns a Zellij pin in nix/zellij-pin.nix (0.45.1 release).
+  #       # Zellij 0.45.1 keeps the `zellij web` token flags of 0.44.3
+  #       # (--create-token, --token-name, --create-read-only-token,
+  #       # --revoke-token, --revoke-all-tokens, --list-tokens). Check that
+  #       # zelligate drives only those flags before you enable it.
+  #       zellijPackage = import ../nix/zellij-pin.nix {
+  #         inherit lib;
+  #         nixpkgs = import inputs.pi-nixpkgs { inherit (pkgs) system; };
+  #       };
   #       # The tower's Tailscale MagicDNS FQDN — the index builds each repo's
   #       # http://<publicHost>:<port> launcher link from this, so it must be a name
   #       # remote tailnet devices resolve. Verified reachable: a tailnet peer gets

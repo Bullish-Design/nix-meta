@@ -4,6 +4,8 @@ inputs:
 let
   system = pkgs.stdenv.hostPlatform.system;
   piPkgs = import inputs.pi-nixpkgs { inherit system; };
+  # The owned fleet Zellij pin (0.45.1). See nix/zellij-pin.nix for the reason.
+  zellijPin = import ../nix/zellij-pin.nix { inherit lib; nixpkgs = piPkgs; };
   atuinPackage = inputs.atuin.packages.${system}.atuin;
   username = config.nixos-core.base.username;
   subconsciousModels = [
@@ -39,7 +41,9 @@ in
     # zellij: terminal multiplexer so long agent runs survive an SSH drop
     # (network switch / laptop sleep) — reattach with `zellij attach`. Also the
     # fleet-standard multiplexer, a precursor to the zelligate workspace daemon.
-    zellij
+    # The owned 0.45.1 pin replaces the nixpkgs-unstable build (0.44.3).
+    # pyllij needs Zellij 0.45.0 or newer.
+    zellijPin
   ];
 
   # The binaries live read-only in the Nix store, so their self-updaters can
