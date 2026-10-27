@@ -444,8 +444,8 @@
     },
     "fornix-host": {
       "locked": {
-        "lastModified": 1785628244,
-        "narHash": "sha256-PUB2IcgBsZHqNf2JHv7YwfhlXRrp78Vlp2Ex8E0Kyi4=",
+        "lastModified": 1792764253,
+        "narHash": "sha256-Ip88Ab34LYzF0GkhA4UaOBcBAy2EFhnLucOqpQHN2fA=",
         "path": "/home/andrew/Documents/Projects/fornix/nix/fornix-host",
         "type": "path"
       },
