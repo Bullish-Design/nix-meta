@@ -22,29 +22,53 @@ let
   # about 15 seconds. This setting is not expected to fix prefill on its own.
   powerProfile = 2;
 
-  # Default board power cap, in watts, applied to every configured GPU.
+  # Board power cap modes, in watts, applied to every configured GPU.
   #
-  # The owner chose 160 W on 2026-10-09, after inferference project 032
-  # phase 4a swept 250 W down to 120 W on card 0 (fans at flat maximum,
-  # `experiments/032-v620-board-power-cap/`). 160 W is the lowest cap that
-  # leaves single-stream decode unchanged, about 20 tok/s, because decode is
-  # memory bound. It is also the highest cap at which every run finished its
-  # 300 second soak under the 75 C arm bound: peak junction 66 C, peak memory
-  # 73 C. Against stock, prefill drops from 355 to 294 tok/s (-17%). Against
-  # 200 W, 8-lane aggregate speed drops from 66 to 60 tok/s (-10%).
+  # The owner chose these on 2026-10-28. The default mode, quiet, is 120 W. It
+  # is the lowest cap the patched kernel allows. The owner switches mode by
+  # hand with `sudo gpu-power-mode MODE`. No timer and no schedule changes it.
   #
-  # 180 W kept 7% more prefill, but its memory sensor reached 75 C after 4 to
-  # 5 minutes of continuous load. Below 160 W the losses grow quickly: at
-  # 140 W decode is -6% and prefill -12%; at 120 W decode is -29%.
+  # Inferference project 032 phase 4a swept 250 W down to 120 W on card 0 (fans
+  # at flat maximum, `experiments/032-v620-board-power-cap/`). Single-stream
+  # decode is memory bound. At 160 W decode is unchanged, about 20 tok/s, and
+  # every 300 second soak stayed under the 75 C arm bound: peak junction 66 C,
+  # peak memory 73 C. Against stock, prefill drops from 355 to 294 tok/s (-17%).
+  # At 140 W decode is -6% and prefill -12%. At 120 W decode is -29%. 180 W kept
+  # 7% more prefill, but its memory sensor reached 75 C after 4 to 5 minutes of
+  # continuous load, so loud stops at 160 W.
   #
-  # The stock kernel sets power1_cap_min above this target. The patched kernel
-  # (profiles/patches/v620-powercap-min-120w.patch) lowers power1_cap_min to
-  # 120 W. A power1_cap write does not survive a reboot or a GPU reset. A reset
-  # restores 250 W. The five-minute timer re-asserts the cap.
-  powerCapWatts = 160;
+  # The stock kernel sets power1_cap_min above these targets. The patched
+  # kernel (profiles/patches/v620-powercap-min-120w.patch) lowers power1_cap_min
+  # to 120 W. A power1_cap write does not survive a reboot or a GPU reset. A
+  # reset restores 250 W. The five-minute timer re-applies the current mode.
+  powerModes = {
+    quiet = 120;
+    day = 140;
+    loud = 160;
+  };
+  defaultPowerMode = "quiet";
+  powerCapWatts = powerModes.${defaultPowerMode};
+
+  # The current mode lives on tmpfs, so a reboot returns to the default mode.
+  # The file holds one mode name. The applier and gpu-power-mode both read it.
+  # Both take the lock file before they touch a cap.
+  powerModeFile = "/run/nix-meta/amdgpu-power-mode";
+  powerModeLockFile = "/run/nix-meta/amdgpu-power-mode.lock";
+
+  # Shell function that maps a mode name to watts. It fails for an unknown mode.
+  modeWattsShell = ''
+    mode_watts() {
+      case "$1" in
+    ${lib.concatStringsSep "
+" (lib.mapAttrsToList (name: watts: "    ${name}) echo ${toString watts} ;;") powerModes)}
+        *) return 1 ;;
+      esac
+    }
+  '';
 
   # An experiment creates this file to hold a different cap. While it exists,
-  # the applier leaves power1_cap alone. The first line names the owner.
+  # the applier and gpu-power-mode leave power1_cap alone. The first line names
+  # the owner.
   powerCapHoldFile = "/run/nix-meta/amdgpu-power-cap-hold";
   powerProfileName = "POWER_SAVING";
   performanceLevel = "manual";
@@ -77,8 +101,33 @@ let
 
     failures=0
 
-    # Apply the default power cap to one card. Run it after the profile is
-    # verified. It counts one failure per card in "failures" and never reverts.
+    # Take the lock that gpu-power-mode also takes, so the two never write a
+    # cap at the same time.
+    exec 9> "${powerModeLockFile}"
+    if ! ${pkgs.util-linux}/bin/flock -w 120 9; then
+      echo "amdgpu-power-profile: could not take ${powerModeLockFile} within 120 seconds" >&2
+      exit 1
+    fi
+
+    ${modeWattsShell}
+    # The current mode comes from the mode file. No file means the default
+    # mode. An unreadable or unknown mode falls back to the default mode and
+    # fails the unit, so the problem is visible.
+    mode="${defaultPowerMode}"
+    if [ -e "${powerModeFile}" ]; then
+      mode="$(${pkgs.coreutils}/bin/head -n 1 "${powerModeFile}" 2>/dev/null)"
+    fi
+    if ! target_w="$(mode_watts "$mode")"; then
+      echo "amdgpu-power-profile: unknown mode '$mode' in ${powerModeFile};" \
+        "using ${defaultPowerMode}" >&2
+      failures=$((failures + 1))
+      mode="${defaultPowerMode}"
+      target_w="$(mode_watts "$mode")"
+    fi
+    echo "amdgpu-power-profile: mode=$mode power_cap=$target_w W"
+
+    # Apply the current mode's power cap to one card. Run it after the profile
+    # is verified. It counts one failure per card in "failures" and never reverts.
     apply_power_cap() {
       local bdf="$1" dev="$2" hwmon_dir="" candidate name_now
       local cap_file cap_min cap_max cap_now target_uw
@@ -108,7 +157,7 @@ let
         return
       fi
 
-      target_uw=$(( ${toString powerCapWatts} * 1000000 ))
+      target_uw=$(( target_w * 1000000 ))
       cap_min="$(sysfs_read "$hwmon_dir/power1_cap_min")"
       cap_max="$(sysfs_read "$hwmon_dir/power1_cap_max")"
       case "$cap_min$cap_max$cap_now" in
@@ -122,24 +171,24 @@ let
 
       if [ "$cap_min" -gt "$target_uw" ]; then
         echo "amdgpu-power-profile: $bdf power1_cap_min is $(( cap_min / 1000000 )) W," \
-          "above the ${toString powerCapWatts} W target. The patched kernel is not running." >&2
+          "above the $target_w W target. The patched kernel is not running." >&2
         failures=$((failures + 1))
         return
       fi
       if [ "$cap_max" -lt "$target_uw" ]; then
         echo "amdgpu-power-profile: $bdf power1_cap_max is $(( cap_max / 1000000 )) W," \
-          "below the ${toString powerCapWatts} W target" >&2
+          "below the $target_w W target" >&2
         failures=$((failures + 1))
         return
       fi
 
       if [ "$cap_now" = "$target_uw" ]; then
-        echo "amdgpu-power-profile: $bdf power1_cap=${toString powerCapWatts} W verified"
+        echo "amdgpu-power-profile: $bdf power1_cap=$target_w W verified"
         return
       fi
 
       if ! ${pkgs.coreutils}/bin/printf '%s\n' "$target_uw" > "$cap_file"; then
-        echo "amdgpu-power-profile: $bdf could not write power1_cap ${toString powerCapWatts} W" >&2
+        echo "amdgpu-power-profile: $bdf could not write power1_cap $target_w W" >&2
         failures=$((failures + 1))
         return
       fi
@@ -149,7 +198,7 @@ let
         failures=$((failures + 1))
         return
       fi
-      echo "amdgpu-power-profile: $bdf power1_cap=${toString powerCapWatts} W verified"
+      echo "amdgpu-power-profile: $bdf power1_cap=$target_w W verified"
     }
 
     for bdf in ${gpuPciDevicesForShell}; do
@@ -254,13 +303,227 @@ ACCEPTED_PP_TABLE_HASHES
       exit 1
     fi
   '';
+  # Manual power mode command. It needs root to write a cap. `status` needs no
+  # root. It never writes a value outside power1_cap_min and power1_cap_max.
+  gpuPowerMode = pkgs.writeShellScriptBin "gpu-power-mode" ''
+    set -uo pipefail
+
+    cards=(${gpuPciDevicesForShell})
+    mode_file="${powerModeFile}"
+    hold_file="${powerCapHoldFile}"
+    lock_file="${powerModeLockFile}"
+    default_mode="${defaultPowerMode}"
+
+    ${modeWattsShell}
+    usage() {
+      cat <<'USAGE'
+    Usage: gpu-power-mode MODE | status
+
+    Modes:
+      quiet   ${toString powerModes.quiet} W board power cap. This is the default and the way back.
+      day     ${toString powerModes.day} W board power cap.
+      loud    ${toString powerModes.loud} W board power cap.
+      status  Print the mode and the live power1_cap of every card.
+
+    A mode change needs root: sudo gpu-power-mode day
+    The mode lasts until the next reboot. A reboot returns to quiet.
+    The applier re-applies the mode every five minutes and after a GPU reset.
+    A mode change refuses to run while the experiment hold file exists.
+
+    Exit codes: 0 ok, 1 failure or mismatch, 2 usage error.
+    USAGE
+    }
+
+    # Print the amdgpu hwmon directory of a card. Fail when there is none.
+    hwmon_of() {
+      local dev="/sys/bus/pci/devices/$1" candidate name_now
+      for candidate in "$dev"/hwmon/hwmon*; do
+        [ -d "$candidate" ] || continue
+        if [ -r "$candidate/name" ]; then
+          name_now="$(${pkgs.coreutils}/bin/cat "$candidate/name" 2>/dev/null)"
+          [ "$name_now" = "amdgpu" ] || continue
+        fi
+        echo "$candidate"
+        return 0
+      done
+      return 1
+    }
+
+    read_file() { ${pkgs.coreutils}/bin/cat "$1" 2>/dev/null; }
+
+    # Print the stored mode, or the default mode when no file exists.
+    current_mode() {
+      if [ -e "$mode_file" ]; then
+        ${pkgs.coreutils}/bin/head -n 1 "$mode_file" 2>/dev/null
+      else
+        echo "$default_mode"
+      fi
+    }
+
+    hold_owner() { ${pkgs.coreutils}/bin/head -n 1 "$hold_file" 2>/dev/null; }
+
+    do_status() {
+      local mode watts bdf hwmon cap bad=0 note
+      mode="$(current_mode)"
+      if watts="$(mode_watts "$mode")"; then
+        echo "mode: $mode ($watts W)"
+      else
+        echo "mode: unknown '$mode' in $mode_file" >&2
+        watts=""
+        bad=1
+      fi
+      if [ -e "$hold_file" ]; then
+        echo "hold: an experiment holds the cap ($(hold_owner)); the applier writes nothing"
+      else
+        echo "hold: none"
+      fi
+      for bdf in "''${cards[@]}"; do
+        if ! hwmon="$(hwmon_of "$bdf")"; then
+          echo "card $bdf: missing (no amdgpu hwmon directory)" >&2
+          bad=1
+          continue
+        fi
+        cap="$(read_file "$hwmon/power1_cap")"
+        case "$cap" in
+          "" | *[!0-9]*)
+            echo "card $bdf: power1_cap unreadable ('$cap')" >&2
+            bad=1
+            continue
+            ;;
+        esac
+        note=""
+        if [ -n "$watts" ] && [ "$cap" != "$(( watts * 1000000 ))" ]; then
+          note=" (differs from the mode; the applier re-applies within five minutes)"
+        fi
+        echo "card $bdf: power1_cap $(( cap / 1000000 )) W$note"
+      done
+      return "$bad"
+    }
+
+    do_set() {
+      local mode="$1" watts target_uw bdf hwmon cap_min cap_max cap_now bad=0
+      local -a dirs=()
+      watts="$(mode_watts "$mode")"
+      target_uw=$(( watts * 1000000 ))
+
+      if [ "$(${pkgs.coreutils}/bin/id -u)" -ne 0 ]; then
+        echo "gpu-power-mode: changing the cap needs root. Run: sudo gpu-power-mode $mode" >&2
+        return 1
+      fi
+
+      if [ -e "$hold_file" ]; then
+        echo "gpu-power-mode: refused. An experiment holds the cap ($(hold_owner))." >&2
+        echo "gpu-power-mode: the experiment tool clears the hold, for example set-power-cap.sh --revert." >&2
+        echo "gpu-power-mode: if the hold is stale, remove it as root: rm $hold_file" >&2
+        return 1
+      fi
+
+      exec 9> "$lock_file"
+      if ! ${pkgs.util-linux}/bin/flock -w 30 9; then
+        echo "gpu-power-mode: could not take $lock_file within 30 seconds" >&2
+        return 1
+      fi
+
+      # Check every card before the first write, so a bad card changes nothing.
+      for bdf in "''${cards[@]}"; do
+        if ! hwmon="$(hwmon_of "$bdf")"; then
+          echo "gpu-power-mode: card $bdf has no amdgpu hwmon directory" >&2
+          bad=1
+          continue
+        fi
+        cap_min="$(read_file "$hwmon/power1_cap_min")"
+        cap_max="$(read_file "$hwmon/power1_cap_max")"
+        case "$cap_min$cap_max" in
+          "" | *[!0-9]*)
+            echo "gpu-power-mode: card $bdf power1_cap_min or power1_cap_max is unreadable" \
+              "(min='$cap_min' max='$cap_max')" >&2
+            bad=1
+            continue
+            ;;
+        esac
+        if [ -z "$cap_min" ] || [ -z "$cap_max" ]; then
+          echo "gpu-power-mode: card $bdf power1_cap_min or power1_cap_max is empty" >&2
+          bad=1
+          continue
+        fi
+        if [ "$target_uw" -lt "$cap_min" ]; then
+          echo "gpu-power-mode: card $bdf power1_cap_min is $(( cap_min / 1000000 )) W," \
+            "above the $watts W target. The patched kernel may not be running." >&2
+          bad=1
+          continue
+        fi
+        if [ "$target_uw" -gt "$cap_max" ]; then
+          echo "gpu-power-mode: card $bdf power1_cap_max is $(( cap_max / 1000000 )) W," \
+            "below the $watts W target" >&2
+          bad=1
+          continue
+        fi
+        dirs+=("$bdf=$hwmon")
+      done
+      if [ "$bad" -ne 0 ]; then
+        echo "gpu-power-mode: no cap changed" >&2
+        return 1
+      fi
+
+      for entry in "''${dirs[@]}"; do
+        bdf="''${entry%%=*}"
+        hwmon="''${entry#*=}"
+        if ! ${pkgs.coreutils}/bin/printf '%s\n' "$target_uw" > "$hwmon/power1_cap"; then
+          echo "gpu-power-mode: card $bdf could not write power1_cap $watts W" >&2
+          bad=1
+          continue
+        fi
+        cap_now="$(read_file "$hwmon/power1_cap")"
+        if [ "$cap_now" != "$target_uw" ]; then
+          echo "gpu-power-mode: card $bdf readback is '$cap_now', expected $target_uw" >&2
+          bad=1
+          continue
+        fi
+        echo "gpu-power-mode: card $bdf power1_cap=$watts W verified"
+      done
+      if [ "$bad" -ne 0 ]; then
+        echo "gpu-power-mode: mode not stored. The applier re-applies the previous mode within five minutes." >&2
+        return 1
+      fi
+
+      # Store the mode last, through a temporary file, so the applier never
+      # reads a partial name.
+      if ! { ${pkgs.coreutils}/bin/printf '%s\n' "$mode" > "$mode_file.tmp" \
+        && ${pkgs.coreutils}/bin/mv "$mode_file.tmp" "$mode_file"; }; then
+        echo "gpu-power-mode: could not store the mode in $mode_file" >&2
+        return 1
+      fi
+      echo "gpu-power-mode: mode=$mode ($watts W) on ''${#cards[@]} card(s); lasts until reboot"
+    }
+
+    case "''${1:-}" in
+      status)
+        [ "$#" -eq 1 ] || { usage >&2; exit 2; }
+        do_status
+        exit $?
+        ;;
+      ${lib.concatStringsSep " | " (builtins.attrNames powerModes)})
+        [ "$#" -eq 1 ] || { usage >&2; exit 2; }
+        do_set "$1"
+        exit $?
+        ;;
+      -h | --help | help)
+        usage
+        exit 0
+        ;;
+      *)
+        usage >&2
+        exit 2
+        ;;
+    esac
+  '';
 in
 {
-  # The profile and the ${toString powerCapWatts} W power cap are measured
-  # settings, applied at the system level so that every benchmark sees the same
-  # controls. Nothing else here changes clocks, the voltage offset, or the
-  # PowerPlay table. An experiment can hold a different cap with
-  # ${powerCapHoldFile}.
+  # The profile and the power cap are measured settings, applied at the system
+  # level so that every benchmark sees the same controls. The cap follows the
+  # current mode (default ${defaultPowerMode}, ${toString powerCapWatts} W). Nothing else here changes
+  # clocks, the voltage offset, or the PowerPlay table. An experiment can hold a
+  # different cap with ${powerCapHoldFile}.
   assertions = [
     {
       assertion = config.nix-meta.gpu-compute.amd.enable && gpuPciDevices != [ ];
@@ -273,14 +536,21 @@ in
     power_profile_mode=${toString powerProfile}
     power_profile_name=${powerProfileName}
     power_cap_w=${toString powerCapWatts}
+    power_cap_default_mode=${defaultPowerMode}
+    power_cap_mode_file=${powerModeFile}
+    power_cap_mode_quiet_w=${toString powerModes.quiet}
+    power_cap_mode_day_w=${toString powerModes.day}
+    power_cap_mode_loud_w=${toString powerModes.loud}
     power_cap_hold_file=${powerCapHoldFile}
   '';
 
-  # Tools create the hold file here. Nothing else creates this directory.
+  environment.systemPackages = [ gpuPowerMode ];
+
+  # Tools create the hold file and the mode file here. Nothing else creates this directory.
   systemd.tmpfiles.rules = [ "d /run/nix-meta 0755 root root -" ];
 
   systemd.services.amdgpu-power-profile = {
-    description = "Select the measured AMD GPU power profile (${toString powerProfile} ${powerProfileName}) and ${toString powerCapWatts} W power cap";
+    description = "Select the measured AMD GPU power profile (${toString powerProfile} ${powerProfileName}) and the current-mode power cap (default ${toString powerCapWatts} W)";
     wantedBy = [ "multi-user.target" ];
     after = [ "systemd-modules-load.service" ];
 

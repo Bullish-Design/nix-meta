@@ -1,0 +1,247 @@
+#!/usr/bin/env bash
+
+# Sandboxed scenarios for gpu-power-mode and the AMD power profile applier.
+#
+# The script builds both from this flake, rewrites their sysfs and /run paths
+# into a temporary directory, and runs them against a fake sysfs tree. It needs
+# no root and writes no real hardware. Run it from any directory:
+#
+#   scripts/gpu-power-mode-sim [COMMAND_SCRIPT APPLIER_SCRIPT]
+#
+# With no argument, it builds both from nixosConfigurations.server.
+# Exit 0 means every check passed. Exit 1 means a check failed. Exit 2 means
+# the sim could not run.
+
+set -u
+
+repo_dir="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
+command_script="${1:-}"
+applier="${2:-}"
+cfg="path:$repo_dir#nixosConfigurations.server.config"
+
+if [ -z "$applier" ]; then
+  applier="$(nix build --no-link --print-out-paths \
+    "$cfg.systemd.services.amdgpu-power-profile.serviceConfig.ExecStart")" \
+    || { echo "FAIL: could not build the applier" >&2; exit 2; }
+fi
+if [ -z "$command_script" ]; then
+  drv="$(nix eval --raw "$cfg.environment.systemPackages" --apply \
+    'ps: (builtins.head (builtins.filter (p: (p.name or "") == "gpu-power-mode") ps)).drvPath')" \
+    || { echo "FAIL: gpu-power-mode is not in systemPackages" >&2; exit 2; }
+  out="$(nix build --no-link --print-out-paths "$drv^out")" \
+    || { echo "FAIL: could not build gpu-power-mode" >&2; exit 2; }
+  command_script="$out/bin/gpu-power-mode"
+fi
+[ -r "$applier" ] || { echo "FAIL: applier is not readable: $applier" >&2; exit 2; }
+[ -r "$command_script" ] || { echo "FAIL: command is not readable: $command_script" >&2; exit 2; }
+
+work="$(mktemp -d)"
+trap 'rm -rf "$work"' EXIT
+FAKE="$work/root"
+export FAKE
+
+# Rewrite real paths into the sandbox. The fake id reports root.
+mkdir -p "$work/bin"
+cat > "$work/bin/id" <<'FAKE_ID'
+#!/usr/bin/env bash
+echo "${FAKE_UID:-0}"
+FAKE_ID
+chmod +x "$work/bin/id"
+rewrite() {
+  sed \
+    -e "s#/sys/bus/pci/devices/#\$FAKE/pci/#g" \
+    -e "s#/run/nix-meta/#\$FAKE/run/#g" \
+    -e "s#/nix/store/[^ \"]*-coreutils-[^ \"]*/bin/id#$work/bin/id#g" \
+    -e "s#/nix/store/[^ \"]*-coreutils-[^ \"]*/bin/sleep#/bin/true#g" \
+    "$1"
+}
+rewrite "$command_script" > "$work/gpu-power-mode"
+chmod +x "$work/gpu-power-mode"
+gpm="$work/gpu-power-mode"
+
+# The applier checks the PowerPlay table hash. Swap the stock hash for the hash
+# of the fake table. The real profile file is a menu that sysfs keeps. A write
+# to the fake file would replace the menu, so the sim discards that one write.
+fake_table="fake pp_table"
+fake_hash="$(printf '%s' "$fake_table" | sha256sum | cut -d' ' -f1)"
+rewrite "$applier" \
+  | sed -e 's#> "\$profile_file"#> /dev/null#' \
+        -e "s#a6fc019fdada096422629293bee778e8857af3330fd2dc2de42dd9d9d921b1c8#$fake_hash#" \
+  > "$work/applier.sh"
+chmod +x "$work/applier.sh"
+
+pass=0
+fail=0
+check() {
+  local what="$1" want="$2" got="$3"
+  if [ "$want" = "$got" ]; then
+    pass=$((pass + 1))
+  else
+    fail=$((fail + 1))
+    echo "FAIL: $what: expected '$want', got '$got'"
+  fi
+}
+check_match() {
+  local what="$1" pattern="$2" got="$3"
+  if [[ "$got" == *"$pattern"* ]]; then
+    pass=$((pass + 1))
+  else
+    fail=$((fail + 1))
+    echo "FAIL: $what: expected output to contain '$pattern', got:"
+    echo "$got"
+  fi
+}
+
+A="0000:19:00.0"
+B="0000:67:00.0"
+hwa="$FAKE/pci/$A/hwmon/hwmon5"
+hwb="$FAKE/pci/$B/hwmon/hwmon6"
+capw() { echo $(( $(cat "$1/power1_cap") / 1000000 )); }
+
+reset_fake() {
+  rm -rf "$FAKE"
+  local bdf hw
+  mkdir -p "$FAKE/run"
+  for bdf in "$A" "$B"; do
+    hw="$FAKE/pci/$bdf/hwmon/hwmon$([ "$bdf" = "$A" ] && echo 5 || echo 6)"
+    mkdir -p "$hw"
+    echo amdgpu > "$hw/name"
+    echo 250000000 > "$hw/power1_cap"
+    echo 120000000 > "$hw/power1_cap_min"
+    echo 250000000 > "$hw/power1_cap_max"
+    echo 0x1002 > "$FAKE/pci/$bdf/vendor"
+    echo 0x73a1 > "$FAKE/pci/$bdf/device"
+    echo 0x1002 > "$FAKE/pci/$bdf/subsystem_vendor"
+    echo 0x0e34 > "$FAKE/pci/$bdf/subsystem_device"
+    printf '%s' "$fake_table" > "$FAKE/pci/$bdf/pp_table"
+    echo auto > "$FAKE/pci/$bdf/power_dpm_force_performance_level"
+    echo " 2 POWER_SAVING*:" > "$FAKE/pci/$bdf/pp_power_profile_mode"
+  done
+}
+
+run() { OUT="$("$@" 2>&1)"; RC=$?; }
+
+# --- command scenarios ---
+
+reset_fake
+run "$gpm" status
+check "status unprivileged: exit" 0 "$RC"
+check_match "status default mode" "mode: quiet (120 W)" "$OUT"
+check_match "status shows cards" "card $A: power1_cap 250 W (differs" "$OUT"
+
+run "$gpm" day
+check "day: exit" 0 "$RC"
+check "day: card 0 cap" 140 "$(capw "$hwa")"
+check "day: card 1 cap" 140 "$(capw "$hwb")"
+check "day: mode file" day "$(cat "$FAKE/run/amdgpu-power-mode")"
+run "$gpm" status
+check_match "status after day" "mode: day (140 W)" "$OUT"
+check_match "status after day, card 1" "card $B: power1_cap 140 W" "$OUT"
+
+run "$gpm" loud
+check "loud: exit" 0 "$RC"
+check "loud: cap" 160 "$(capw "$hwa")"
+run "$gpm" quiet
+check "quiet: exit" 0 "$RC"
+check "quiet: cap a" 120 "$(capw "$hwa")"
+check "quiet: cap b" 120 "$(capw "$hwb")"
+
+run "$gpm" bogus
+check "bad mode: exit" 2 "$RC"
+run "$gpm"
+check "no argument: exit" 2 "$RC"
+
+FAKE_UID=1000 run env FAKE_UID=1000 "$gpm" day
+check "non-root: exit" 1 "$RC"
+check_match "non-root: sudo hint" "sudo gpu-power-mode day" "$OUT"
+
+# Hold file: refuse and write nothing.
+reset_fake
+printf 'experiment-032\n' > "$FAKE/run/amdgpu-power-cap-hold"
+run "$gpm" day
+check "hold: exit" 1 "$RC"
+check_match "hold: names owner" "experiment-032" "$OUT"
+check_match "hold: says how to clear" "set-power-cap.sh --revert" "$OUT"
+check "hold: cap untouched" 250 "$(capw "$hwa")"
+check "hold: no mode file" no "$([ -e "$FAKE/run/amdgpu-power-mode" ] && echo yes || echo no)"
+run "$gpm" status
+check "hold: status exit" 0 "$RC"
+check_match "hold: status shows hold" "hold: an experiment holds the cap (experiment-032)" "$OUT"
+
+# Missing card: fail, and write nothing to the other card.
+reset_fake
+rm -rf "$FAKE/pci/$B"
+run "$gpm" day
+check "missing card: exit" 1 "$RC"
+check "missing card: other card untouched" 250 "$(capw "$hwa")"
+check_match "missing card: names card" "$B" "$OUT"
+run "$gpm" status
+check "missing card: status exit" 1 "$RC"
+
+# Bounds: refuse a target below min or above max.
+reset_fake
+echo 130000000 > "$hwa/power1_cap_min"
+run "$gpm" quiet
+check "below min: exit" 1 "$RC"
+check "below min: no write on card 0" 250 "$(capw "$hwa")"
+check "below min: no write on card 1" 250 "$(capw "$hwb")"
+reset_fake
+echo 150000000 > "$hwb/power1_cap_max"
+run "$gpm" loud
+check "above max: exit" 1 "$RC"
+check "above max: no write on card 0" 250 "$(capw "$hwa")"
+
+# Readback mismatch: a read-only cap file cannot take the write.
+reset_fake
+chmod 444 "$hwb/power1_cap"
+run "$gpm" day
+check "write failure: exit" 1 "$RC"
+check "write failure: no mode file" no "$([ -e "$FAKE/run/amdgpu-power-mode" ] && echo yes || echo no)"
+check_match "write failure: names card" "$B" "$OUT"
+chmod 644 "$hwb/power1_cap"
+
+# --- applier scenarios ---
+
+# No mode file: the default mode applies.
+reset_fake
+run "$work/applier.sh"
+check "applier default: exit" 0 "$RC"
+check "applier default: cap a" 120 "$(capw "$hwa")"
+check "applier default: cap b" 120 "$(capw "$hwb")"
+check_match "applier default: mode line" "mode=quiet power_cap=120 W" "$OUT"
+
+# A chosen mode survives the applier. A GPU reset returns 250 W; the applier
+# re-applies the current mode.
+"$gpm" day > /dev/null 2>&1
+run "$work/applier.sh"
+check "applier keeps day: exit" 0 "$RC"
+check "applier keeps day: cap" 140 "$(capw "$hwa")"
+echo 250000000 > "$hwa/power1_cap"
+echo 250000000 > "$hwb/power1_cap"
+run "$work/applier.sh"
+check "applier after reset: exit" 0 "$RC"
+check "applier after reset: cap a" 140 "$(capw "$hwa")"
+check "applier after reset: cap b" 140 "$(capw "$hwb")"
+
+# A reboot clears /run. The default mode returns.
+rm -f "$FAKE/run/amdgpu-power-mode"
+run "$work/applier.sh"
+check "applier after reboot: cap" 120 "$(capw "$hwa")"
+
+# Hold file: the applier writes nothing.
+reset_fake
+printf 'experiment-032\n' > "$FAKE/run/amdgpu-power-cap-hold"
+run "$work/applier.sh"
+check "applier hold: exit" 0 "$RC"
+check "applier hold: cap untouched" 250 "$(capw "$hwa")"
+
+# Unknown mode: default applies and the unit fails loudly.
+reset_fake
+echo turbo > "$FAKE/run/amdgpu-power-mode"
+run "$work/applier.sh"
+check "applier bad mode: exit" 1 "$RC"
+check "applier bad mode: default cap" 120 "$(capw "$hwa")"
+
+[ -n "${SIM_DEBUG:-}" ] && echo "last output: $OUT"
+echo "passed: $pass, failed: $fail"
+[ "$fail" -eq 0 ] || exit 1
