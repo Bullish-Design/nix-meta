@@ -117,6 +117,11 @@ in
   systemd.user.services.inferference-router.environment = {
     GPU_THERMAL_FAN_STATUS_FILE = "/run/arctic-fan/status";
     GPU_THERMAL_FAN_WATCHDOG_UNIT = "arctic-fan-watchdog.service";
+    # Router thermal limit, in C. Owner decision 2026-10-28: 85 C. The warm fan
+    # curve peaks at 76 C at 160 W. The memory throttle is 98 C and the
+    # junction throttle is 100 C. This overrides the guard default of 80 C in
+    # inferference ci/runner/gpu-thermal-guard.sh.
+    GPU_THERMAL_MAX_C = "85";
   };
 
   # The launcher uses /usr/bin/env bash. User units do not inherit the
