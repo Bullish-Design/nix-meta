@@ -420,11 +420,11 @@ warm_steps() {
 }
 run_case warm-steps warm_steps
 
-# The warm override is 77 C. At 77 C raw the command jumps (the default curve
+# The warm override is 82 C. At 82 C raw the command jumps (the default curve
 # floor gives 255). At 78 C it is 255 on the warm curve too.
-warm_77() { lease curve-warm; sleep 1.5; set_mem 77000 20000; sleep 0.7; }
-run_case warm-77 warm_77
-check "curve-warm, raw 77 C: every channel 255" "255 255 255 255 255 255 255 255 255 255" "$SNAP_PWM"
+warm_82() { lease curve-warm; sleep 1.5; set_mem 82000 20000; sleep 0.7; }
+run_case warm-82 warm_82
+check "curve-warm, raw 82 C: every channel 255" "255 255 255 255 255 255 255 255 255 255" "$SNAP_PWM"
 warm_78() { lease curve-warm; sleep 1.5; set_mem 78000 20000; sleep 0.7; }
 run_case warm-78 warm_78
 check "curve-warm, raw 78 C: gpu 255" 255 "${SNAP_PWM%% *}"
@@ -440,12 +440,16 @@ PRE=pre_cool WD="$work/wd-smooth.sh" run_case warm-no-override-72 warm_72
 default_72() { sleep 1; set_junction 72000 30000; sleep 0.7; }
 PRE=pre_cool WD="$work/wd-smooth.sh" run_case default-override-72 default_72
 check "curve-default, raw 72 C: override gives 235 at once" 235 "${SNAP_PWM%% *}"
-warm_77s() { lease curve-warm; sleep 1; set_junction 77000 30000; sleep 0.7; }
-PRE=pre_cool WD="$work/wd-smooth.sh" run_case warm-override-77 warm_77s
-check "curve-warm, raw 77 C, smoothing on: 255 at once" 255 "${SNAP_PWM%% *}"
-warm_76s() { lease curve-warm; sleep 1; set_junction 76900 30000; sleep 0.7; }
-PRE=pre_cool WD="$work/wd-smooth.sh" run_case warm-under-77 warm_76s
-[ "${SNAP_PWM%% *}" -lt 100 ] && pass=$((pass + 1)) || { fail=$((fail + 1)); echo "FAIL: curve-warm 76.9 C was not smoothed: $SNAP_PWM"; }
+warm_82s() { lease curve-warm; sleep 1; set_junction 82000 30000; sleep 0.7; }
+PRE=pre_cool WD="$work/wd-smooth.sh" run_case warm-override-82 warm_82s
+check "curve-warm, raw 82 C, smoothing on: 255 at once" 255 "${SNAP_PWM%% *}"
+[[ "$SNAP_STATUS" == *max_gpu_hottest_avg_mC=82000 ]] \
+  && pass=$((pass + 1)) || { fail=$((fail + 1)); echo "FAIL: curve-warm 82 C average reset: $SNAP_STATUS"; }
+warm_80s() { lease curve-warm; sleep 1; set_junction 80000 30000; sleep 0.7; }
+PRE=pre_cool WD="$work/wd-smooth.sh" run_case warm-under-82 warm_80s
+[ "${SNAP_PWM%% *}" -lt 100 ] && pass=$((pass + 1)) || { fail=$((fail + 1)); echo "FAIL: curve-warm 80 C was not smoothed: $SNAP_PWM"; }
+[[ "$SNAP_STATUS" != *max_gpu_hottest_avg_mC=80000 ]] \
+  && pass=$((pass + 1)) || { fail=$((fail + 1)); echo "FAIL: curve-warm 80 C average: $SNAP_STATUS"; }
 
 # A fault beats the warm profile.
 warm_fault() { lease curve-warm; sleep 1.5; echo 0 > "$(hw)/fan3_input"; sleep 3; }

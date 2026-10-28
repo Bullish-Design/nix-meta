@@ -95,7 +95,7 @@ let
 
     # Warm curve. It lets the sensors run about 5 C hotter than the default
     # at the same PWM, for quieter fans. It reaches full duty at 78 C. The
-    # lease profile "curve-warm" uses a raw override at 77 C (see fanProfiles).
+    # lease profile "curve-warm" uses a raw override at 82 C (see fanProfiles).
     # Keyed on the hottest of junction and memory.
     warm = [
       { minC = 78000; pwm = 255; }
@@ -171,7 +171,11 @@ let
     "curve-steep" = { gpu = "steep"; fast = "aggressive"; };
     # The raw override temperature is per profile, in milli-degrees C. A
     # profile with no overrideMilliC uses defaultOverrideMilliC.
-    "curve-warm" = { gpu = "warm"; fast = "aggressive"; overrideMilliC = 77000; };
+    # curve-warm: the warm curve settles near 73-75 C with 3-4 C of raw jitter,
+    # so 77 C fired on normal load. 82 C is above that, 16 C under the memory
+    # throttle (98 C), 18 C under the junction throttle (100 C), and under the
+    # 85 C machine guard.
+    "curve-warm" = { gpu = "warm"; fast = "aggressive"; overrideMilliC = 82000; };
     "cooldown" = { gpu = "cooldown"; fast = "cooldown"; };
   };
   # Profiles that go straight to 255 with no rate limit (and "full-duty-fault").
