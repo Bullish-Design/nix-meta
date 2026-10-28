@@ -82,6 +82,9 @@ fi
 if ! load_fast_ramp_curve; then
   exit 2
 fi
+if ! load_curve_constants; then
+  exit 2
+fi
 
 required_commands=(
   awk cat date find grep journalctl kill ls lsmod modinfo readlink
@@ -573,8 +576,21 @@ test_gpu_fan_response() {
   require_all_high
 }
 
+# Read one key of the watchdog status file. The file holds one line of
+# key=value words.
+status_value() {
+  local state
+  state="$(cat /run/arctic-fan/status 2>/dev/null)" || return 1
+  state=" $state"
+  [[ "$state" == *" $1="* ]] || return 1
+  state="${state#* "$1"=}"
+  printf '%s\n' "${state%% *}"
+}
+
 test_curve_hold() {
-  local h bdf pci sensor sensor_name value max_junction ch pwm i expected expected_fast match
+  local h bdf pci sensor sensor_name value max_hottest ch i match
+  local control profile range pwm
+  local low="?" high="?" fast_low="?" fast_high="?" fast_range
   echo "=== curve hold test ==="
   force_all_high || return 1
   if ! systemctl is-active --quiet arctic-fan-watchdog.service; then
@@ -584,8 +600,8 @@ test_curve_hold() {
   fi
 
   h="$(find_arctic_hwmon)" || return 1
-  # The control input is the hottest of junction and memory over both cards.
-  max_junction=0
+  # Show the raw hottest reading over junction and memory of both cards.
+  max_hottest=0
   for bdf in "${AMD_GPU_BDFS[@]}"; do
     pci="/sys/bus/pci/devices/$bdf"
     for sensor_name in junction mem; do
@@ -594,48 +610,54 @@ test_curve_hold() {
       case "$value" in
         ""|*[!0-9]*) fail "$sensor_name value is invalid: $sensor=$value"; return 1 ;;
       esac
-      [ "$value" -gt "$max_junction" ] && max_junction="$value"
+      [ "$value" -gt "$max_hottest" ] && max_hottest="$value"
     done
   done
-  echo "max_gpu_hottest_mC=$max_junction"
+  echo "max_gpu_hottest_mC=$max_hottest"
 
-  # The expected PWM comes from the exported watchdog curve.
-  expected="$(expected_pwm "$max_junction")"
-  expected_fast="$(curve_expected_fast_ramp_pwm "$max_junction")"
-  echo "expected_pwm=$expected expected_fast_ramp_pwm=$expected_fast"
-
-  # The watchdog ramps down after five cool samples. Allow about 15 s.
+  # The watchdog interpolates its curve. It drives the curve with the smoothed
+  # hottest temperature that it publishes in the status file, and it holds a
+  # value between the curve at that temperature and the curve at that
+  # temperature plus the hysteresis. The curve files and constants come from the
+  # same Nix values as the watchdog. The status file gives the temperature.
+  # The watchdog ramps down after startup. Allow about 16 s.
   for i in $(seq 1 8); do
-    for ch in "${GPU_FAN_CHANNELS[@]}"; do
-      pwm="$(cat "$h/pwm$ch")" || return 1
-      echo "curve_sample=$i pwm$ch=$pwm expected=$expected"
-    done
-    for ch in "${FAST_RAMP_CHANNELS[@]}"; do
-      echo "curve_sample=$i pwm$ch=$(cat "$h/pwm$ch") expected=$expected_fast"
-    done
+    if ! control="$(status_value max_gpu_hottest_avg_mC)" || ! profile="$(status_value profile)" \
+      || ! [[ "$control" =~ ^[0-9]+$ ]]; then
+      echo "curve_sample=$i status not readable yet"
+      sleep 2
+      continue
+    fi
+    if [ "$profile" != curve-default ]; then
+      echo "CURVE HOLD NOT TESTED: profile is $profile, not curve-default"
+      required_unverified=1
+      return 0
+    fi
+    range="$(curve_expected_range "$control")" || return 1
+    fast_range="$(curve_expected_fast_ramp_range "$control")" || return 1
+    read -r low high <<< "$range"
+    read -r fast_low fast_high <<< "$fast_range"
+    echo "curve_sample=$i control_mC=$control expected_pwm=$low..$high expected_fast_ramp_pwm=$fast_low..$fast_high"
     match=1
     for ch in "${GPU_FAN_CHANNELS[@]}"; do
-      [ "$(cat "$h/pwm$ch")" = "$expected" ] || match=0
+      pwm="$(cat "$h/pwm$ch")" || return 1
+      echo "curve_sample=$i pwm$ch=$pwm"
+      if [ "$pwm" -lt "$low" ] || [ "$pwm" -gt "$high" ]; then match=0; fi
     done
     for ch in "${FAST_RAMP_CHANNELS[@]}"; do
-      [ "$(cat "$h/pwm$ch")" = "$expected_fast" ] || match=0
+      pwm="$(cat "$h/pwm$ch")" || return 1
+      echo "curve_sample=$i pwm$ch=$pwm"
+      if [ "$pwm" -lt "$fast_low" ] || [ "$pwm" -gt "$fast_high" ]; then match=0; fi
     done
     if [ "$match" -eq 1 ]; then
-      echo "Curve hold result: PASS; GPU duct channels match the curve at $expected and the fast-ramp channels at $expected_fast"
+      echo "Curve hold result: PASS; GPU duct channels are within $low..$high and the fast-ramp channels within $fast_low..$fast_high"
       return 0
     fi
     sleep 2
   done
-  fail "fan channels did not reach the expected curve values (GPU duct $expected, fast-ramp $expected_fast)"
+  fail "fan channels did not reach the expected curve range (GPU duct $low..$high, fast-ramp $fast_low..$fast_high)"
   force_all_high || true
   return 1
-}
-
-# The expected PWM comes from the curve the NixOS module exported, which is the
-# same value the watchdog's generated curve_pwm uses. Do not restate the table
-# here; a second copy drifts.
-expected_pwm() {
-  curve_expected_pwm "$1"
 }
 
 restore_service_state() {

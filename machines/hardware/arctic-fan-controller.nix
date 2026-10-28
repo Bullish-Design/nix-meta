@@ -218,6 +218,9 @@ let
   # floor (the minC = 0 entry) moves to this distance below the next point, so
   # the curve ramps from the floor PWM to that point instead of jumping.
   leadInMilliC = 5000;
+  # The watchdog falls to the curve only once the smoothed temperature is this
+  # far below the point that set the command, in milli-degrees C.
+  hysteresisMilliC = 3000;
   interpPoints = curve:
     let n = lib.length curve; in
     if n < 2 then curve
@@ -457,7 +460,7 @@ ${curveDispatchFunctions}
     #     smoothing, the rate limit, and the hysteresis.
     ema_div=12
     rate_step=6
-    hysteresis_mC=3000
+    hysteresis_mC=${toString hysteresisMilliC}
     raw_override_mC=${toString defaultOverrideMilliC}
     raw_override_default_mC="$raw_override_mC"
     full_duty_profiles=" ${fullDutyProfilesForShell} "
@@ -957,6 +960,11 @@ in
     lib.concatMapStrings (e: "${toString e.minC} ${toString e.pwm}\n") selectedFanCurve;
   environment.etc."nix-meta/arctic-fan/fast-ramp-curve".text =
     lib.concatMapStrings (e: "${toString e.minC} ${toString e.pwm}\n") fastRampCurves.aggressive;
+
+  # The curve files hold the curve points. The watchdog interpolates between
+  # them with these two constants, so the test scripts read the constants too.
+  environment.etc."nix-meta/arctic-fan/lead-in-milli-c".text = "${toString leadInMilliC}\n";
+  environment.etc."nix-meta/arctic-fan/hysteresis-milli-c".text = "${toString hysteresisMilliC}\n";
 
   systemd.services.arctic-fan-module-load = {
     description = "Load the kernel-matched ARCTIC Fan Controller module";
