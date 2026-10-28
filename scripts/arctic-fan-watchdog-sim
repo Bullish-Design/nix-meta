@@ -1,0 +1,245 @@
+#!/usr/bin/env bash
+
+# Sandboxed scenarios for the generated ARCTIC fan watchdog.
+#
+# The script builds the watchdog from this flake, rewrites its sysfs and
+# /run paths into a temporary directory, and runs it against fake sensors.
+# It needs no root and writes no real hardware. Run it from any directory:
+#
+#   scripts/arctic-fan-watchdog-sim [WATCHDOG_SCRIPT]
+#
+# With no argument, it builds the watchdog from nixosConfigurations.server.
+# Exit 0 means every check passed. Exit 1 means a check failed. Exit 2 means
+# the sim could not run.
+
+set -u
+
+repo_dir="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
+watchdog="${1:-}"
+if [ -z "$watchdog" ]; then
+  watchdog="$(nix build --no-link --print-out-paths \
+    "path:$repo_dir#nixosConfigurations.server.config.systemd.services.arctic-fan-watchdog.serviceConfig.ExecStart")" \
+    || { echo "FAIL: could not build the watchdog" >&2; exit 2; }
+fi
+[ -r "$watchdog" ] || { echo "FAIL: watchdog script is not readable: $watchdog" >&2; exit 2; }
+
+safe_high_bin="$(grep -o '/nix/store/[^ "]*-arctic-fans-100/bin/arctic-fans-100' "$watchdog" | head -n1)"
+[ -r "$safe_high_bin" ] || { echo "FAIL: arctic-fans-100 not found from the watchdog" >&2; exit 2; }
+
+work="$(mktemp -d)"
+trap 'rm -rf "$work"' EXIT
+FAKE="$work/root"
+export FAKE
+
+mkdir -p "$work/bin"
+cat > "$work/bin/systemctl" <<'FAKE_SYSTEMCTL'
+#!/usr/bin/env bash
+[ -e "$FAKE/cc_active" ]
+FAKE_SYSTEMCTL
+cat > "$work/bin/systemd-notify" <<'FAKE_NOTIFY'
+#!/usr/bin/env bash
+exit 0
+FAKE_NOTIFY
+chmod +x "$work/bin/systemctl" "$work/bin/systemd-notify"
+
+# Rewrite real paths into the sandbox. The loop sleep drops from 2 s to 0.2 s.
+rewrite() {
+  sed \
+    -e "s#/sys/class/hwmon/#\$FAKE/sys/class/hwmon/#g" \
+    -e "s#/sys/bus/pci/devices/#\$FAKE/pci/#g" \
+    -e "s#/run/arctic-fan/#\$FAKE/run/#g" \
+    -e "s#/nix/store/[^ \"]*/bin/systemctl#$work/bin/systemctl#g" \
+    -e "s#/nix/store/[^ \"]*/bin/systemd-notify#$work/bin/systemd-notify#g" \
+    -e "s#/nix/store/[^ \"]*-arctic-fans-100/bin/arctic-fans-100#$work/bin/arctic-fans-100#g" \
+    -e "s#\(/bin/sleep\) 2\$#\1 0.2#" \
+    "$1"
+}
+rewrite "$watchdog" > "$work/watchdog.sh"
+rewrite "$safe_high_bin" > "$work/bin/arctic-fans-100"
+chmod +x "$work/bin/arctic-fans-100" "$work/watchdog.sh"
+
+pass=0
+fail=0
+check() {
+  local what="$1" want="$2" got="$3"
+  if [ "$want" = "$got" ]; then
+    pass=$((pass + 1))
+  else
+    fail=$((fail + 1))
+    echo "FAIL: $what: expected '$want', got '$got'"
+  fi
+}
+
+hw() { printf '%s\n' "$FAKE/sys/class/hwmon/hwmon2"; }
+pwm() { cat "$(hw)/pwm$1"; }
+set_junction() {
+  echo "$1" > "$FAKE/pci/0000:19:00.0/hwmon/hwmon5/temp2_input"
+  echo "${2:-$1}" > "$FAKE/pci/0000:67:00.0/hwmon/hwmon6/temp2_input"
+}
+
+reset_fake() {
+  rm -rf "$FAKE"
+  mkdir -p "$FAKE/sys/class/hwmon/hwmon2" "$FAKE/run" \
+    "$FAKE/pci/0000:19:00.0/hwmon/hwmon5" "$FAKE/pci/0000:67:00.0/hwmon/hwmon6"
+  touch "$FAKE/cc_active"
+  local h c d
+  h="$(hw)"
+  echo arctic_fan > "$h/name"
+  for c in 1 2 3 4 5 6 7 8 9 10; do
+    echo 255 > "$h/pwm$c"
+    echo 0 > "$h/fan${c}_input"
+  done
+  for c in 1 2 3 4 5; do echo 4400 > "$h/fan${c}_input"; done
+  echo 1000 > "$h/fan10_input"
+  for d in "$FAKE/pci/0000:19:00.0/hwmon/hwmon5" "$FAKE/pci/0000:67:00.0/hwmon/hwmon6"; do
+    echo amdgpu > "$d/name"
+    echo junction > "$d/temp2_label"
+  done
+  set_junction 21000 23000
+}
+
+all_pwm() {
+  local c out=""
+  for c in 1 2 3 4 5 6 7 8 9 10; do out="$out $(pwm "$c")"; done
+  echo "${out# }"
+}
+
+# Start the watchdog, run the scenario function, then stop it with SIGTERM.
+# Sets WD_EXIT (exit code) and WD_RUNNING (1 if it ran until the TERM).
+run_case() {
+  local name="$1"
+  shift
+  reset_fake
+  "$work/watchdog.sh" > "$work/$name.log" 2>&1 &
+  local pid=$!
+  "$@"
+  SNAP_PWM="$(all_pwm)"
+  SNAP_STATUS="$(cat "$FAKE/run/status" 2>/dev/null)"
+  if kill -0 "$pid" 2>/dev/null; then
+    WD_RUNNING=1
+    kill -TERM "$pid" 2>/dev/null
+  else
+    WD_RUNNING=0
+  fi
+  wait "$pid" 2>/dev/null
+  WD_EXIT=$?
+  CASE_LOG="$work/$name.log"
+}
+
+# --- scenarios ---
+
+idle() { sleep 3; }
+run_case idle idle
+check "idle: still running" 1 "$WD_RUNNING"
+check "idle: pwm1..5 / 6..9 / 10" "25 25 25 25 25 255 255 255 255 80" "$SNAP_PWM"
+status="$SNAP_STATUS"
+echo "idle status: $status"
+if [[ "$status" =~ ^state=OK\ target_pwm=25\ max_gpu_junction_mC=23000\ profile=curve-default\ exhaust_pwm=80$ ]]; then
+  pass=$((pass + 1))
+else
+  fail=$((fail + 1)); echo "FAIL: idle status line shape: $status"
+fi
+# The inferference runner reads the first four keys with this expression.
+if python3 -I - "$status" <<'PY'
+import re, sys
+text = sys.argv[1]
+m = re.search(r"state=(\S+)\s+target_pwm=(\d+)\s+max_gpu_junction_mC=(\d+)", text)
+p = re.search(r"profile=(\S+)", text)
+sys.exit(0 if m and p and m.groups() == ("OK", "25", "23000") and p.group(1) == "curve-default" else 1)
+PY
+then pass=$((pass + 1)); else fail=$((fail + 1)); echo "FAIL: telemetry regex does not parse the status"; fi
+grep -q 'channel1(pwm=25 rpm=4400 failed=0).*channel5(pwm=25 rpm=4400 failed=0) exhaust10(target=80 pwm=80 rpm=1000 failed=0)' "$CASE_LOG" \
+  && pass=$((pass + 1)) || { fail=$((fail + 1)); echo "FAIL: journal line lacks all channels"; tail -2 "$CASE_LOG"; }
+
+hot50() { sleep 1.5; set_junction 50000 41000; sleep 1.5; }
+run_case hot50 hot50
+check "50 C: pwm1..5 125, exhaust 255, unused 255" "125 125 125 125 125 255 255 255 255 255" "$SNAP_PWM"
+
+hot75() { sleep 1; set_junction 75000 30000; sleep 1.5; }
+run_case hot75 hot75
+check "hottest card drives the curve (75 C): pwm1..5 255, exhaust 255" "255 255 255 255 255 255 255 255 255 255" "$SNAP_PWM"
+
+mid40() { sleep 1; set_junction 40000 36000; sleep 3; }
+run_case mid40 mid40
+check "40 C after cooldown: gpu 75, exhaust 180" "75 75 75 75 75 255 255 255 255 180" "$SNAP_PWM"
+
+stall_one() { sleep 1.5; echo 0 > "$(hw)/fan3_input"; sleep 3; }
+run_case stall-one stall_one
+check "one GPU fan stall: all channels forced 255" "255 255 255 255 255 255 255 255 255 255" "$SNAP_PWM"
+status="$SNAP_STATUS"
+[[ "$status" == state=DEGRADED\ *profile=full-duty-fault* ]] && pass=$((pass + 1)) || { fail=$((fail + 1)); echo "FAIL: one-stall status: $status"; }
+
+stall_all() { sleep 1.5; for c in 1 2 3 4 5; do echo 0 > "$(hw)/fan${c}_input"; done; sleep 3; }
+run_case stall-all stall_all
+status="$SNAP_STATUS"
+[[ "$status" == state=NO_AIRFLOW\ *profile=full-duty-fault* ]] && pass=$((pass + 1)) || { fail=$((fail + 1)); echo "FAIL: all-stall status: $status"; }
+
+stall_exhaust() { sleep 1.5; echo 100 > "$(hw)/fan10_input"; sleep 3; }
+run_case stall-exhaust stall_exhaust
+check "exhaust stall: all channels forced 255" "255 255 255 255 255 255 255 255 255 255" "$SNAP_PWM"
+status="$SNAP_STATUS"
+[[ "$status" == state=DEGRADED\ *profile=full-duty-fault* ]] && pass=$((pass + 1)) || { fail=$((fail + 1)); echo "FAIL: exhaust-stall status: $status"; }
+
+slow_exhaust_ok() { sleep 1.5; echo 600 > "$(hw)/fan10_input"; sleep 2.5; }
+run_case slow-exhaust slow_exhaust_ok
+status="$SNAP_STATUS"
+[[ "$status" == state=OK\ * ]] && pass=$((pass + 1)) || { fail=$((fail + 1)); echo "FAIL: 600 RPM exhaust must be healthy: $status"; }
+
+unused_not_high() { sleep 1; echo 180 > "$(hw)/pwm7"; sleep 1; }
+run_case unused-pwm unused_not_high
+check "unused channel not 255: watchdog exits" 0 "$WD_RUNNING"
+check "unused channel not 255: all forced 255" "255 255 255 255 255 255 255 255 255 255" "$SNAP_PWM"
+
+zero_gpu() { sleep 1; echo 0 > "$(hw)/pwm4"; sleep 1; }
+run_case zero-gpu zero_gpu
+check "zero PWM on GPU channel: watchdog exits" 0 "$WD_RUNNING"
+check "zero PWM on GPU channel: all forced 255" "255 255 255 255 255 255 255 255 255 255" "$SNAP_PWM"
+
+zero_exhaust() { sleep 1; echo 0 > "$(hw)/pwm10"; sleep 1; }
+run_case zero-exhaust zero_exhaust
+check "zero PWM on exhaust: watchdog exits" 0 "$WD_RUNNING"
+check "zero PWM on exhaust: all forced 255" "255 255 255 255 255 255 255 255 255 255" "$SNAP_PWM"
+
+tach_missing() { sleep 1; rm -f "$(hw)/fan5_input"; sleep 1; }
+run_case tach-missing tach_missing
+check "GPU tach missing: watchdog exits" 0 "$WD_RUNNING"
+check "GPU tach missing: all forced 255" "255 255 255 255 255 255 255 255 255 255" "$SNAP_PWM"
+
+tach_garbage() { sleep 1; echo abc > "$(hw)/fan10_input"; sleep 1; }
+run_case tach-garbage tach_garbage
+check "exhaust tach garbage: watchdog exits" 0 "$WD_RUNNING"
+
+cc_inactive() { sleep 1; rm -f "$FAKE/cc_active"; sleep 1; }
+run_case cc-inactive cc_inactive
+check "CoolerControl inactive: watchdog exits" 0 "$WD_RUNNING"
+check "CoolerControl inactive: all forced 255" "255 255 255 255 255 255 255 255 255 255" "$SNAP_PWM"
+
+lease() {
+  local profile="$1"
+  printf 'profile=%s\nexpires=%s\nowner_pid=%s\n' "$profile" "$(date -u -d '+10 min' +%Y-%m-%dT%H:%M:%SZ)" "$$" \
+    > "$FAKE/run/request"
+}
+flat_max() { lease flat-max; sleep 1; }
+run_case lease-flat-max flat_max
+check "flat-max lease: every channel 255" "255 255 255 255 255 255 255 255 255 255" "$SNAP_PWM"
+[[ "$SNAP_STATUS" == *profile=flat-max* ]] && pass=$((pass + 1)) || { fail=$((fail + 1)); echo "FAIL: flat-max status"; }
+
+steep() { lease curve-steep; sleep 1.5; set_junction 55000 40000; sleep 1.5; }
+run_case lease-steep steep
+check "curve-steep at 55 C: gpu 255, exhaust 255" "255 255 255 255 255 255 255 255 255 255" "$SNAP_PWM"
+
+default_55() { sleep 1.5; set_junction 55000 40000; sleep 1.5; }
+run_case default-55 default_55
+check "curve-default at 55 C: gpu 150, exhaust 255" "150 150 150 150 150 255 255 255 255 255" "$SNAP_PWM"
+
+bad_profile() { printf 'profile=bogus\nexpires=%s\nowner_pid=%s\n' "$(date -u -d '+10 min' +%Y-%m-%dT%H:%M:%SZ)" "$$" > "$FAKE/run/request"; sleep 3; }
+run_case unknown-profile bad_profile
+[[ "$SNAP_STATUS" == *profile=curve-default* ]] && pass=$((pass + 1)) || { fail=$((fail + 1)); echo "FAIL: unknown profile must fall back to curve-default"; }
+
+term() { sleep 2.5; }
+run_case term term
+check "SIGTERM: exit code" 143 "$WD_EXIT"
+check "SIGTERM: all forced 255 by the trap" "255 255 255 255 255 255 255 255 255 255" "$(all_pwm)"
+
+echo "passed=$pass failed=$fail"
+[ "$fail" -eq 0 ]

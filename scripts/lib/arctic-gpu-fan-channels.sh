@@ -1,8 +1,8 @@
 #!/usr/bin/env bash
 
-# Source this file. It loads the ARCTIC channels that drive the GPU duct fans.
-# The NixOS module writes the list to this file from the same Nix value that
-# the watchdog uses.
+# Source this file. It loads the ARCTIC channels that drive the GPU duct fans
+# and the exhaust fan. The NixOS module writes the lists to files from the same
+# Nix values that the watchdog uses.
 
 load_gpu_fan_channels() {
   local file="/etc/nix-meta/arctic-fan/gpu-duct-channels" ch
@@ -19,11 +19,34 @@ load_gpu_fan_channels() {
     fi
     GPU_FAN_CHANNELS+=("$ch")
   done < "$file"
-  if [ "${#GPU_FAN_CHANNELS[@]}" -ne 2 ]; then
-    echo "FAIL: expected two GPU duct channels in $file, found ${#GPU_FAN_CHANNELS[@]}" >&2
+  if [ "${#GPU_FAN_CHANNELS[@]}" -eq 0 ]; then
+    echo "FAIL: no GPU duct channels in $file" >&2
     return 1
   fi
   echo "gpu_duct_channels=${GPU_FAN_CHANNELS[*]}"
+}
+
+# Load the exhaust fan channel into EXHAUST_FAN_CHANNEL.
+load_exhaust_channel() {
+  local file="/etc/nix-meta/arctic-fan/exhaust-channel"
+  EXHAUST_FAN_CHANNEL=""
+  if [ ! -r "$file" ]; then
+    echo "FAIL: exhaust channel file is not readable: $file" >&2
+    return 1
+  fi
+  EXHAUST_FAN_CHANNEL="$(head -n1 "$file")"
+  if ! [[ "$EXHAUST_FAN_CHANNEL" =~ ^[0-9]+$ ]]; then
+    echo "FAIL: invalid exhaust channel in $file: $EXHAUST_FAN_CHANNEL" >&2
+    return 1
+  fi
+  echo "exhaust_channel=$EXHAUST_FAN_CHANNEL"
+}
+
+# True for a channel that the watchdog drives: a GPU duct channel or the
+# exhaust channel. Every other channel has no fan and stays at 255.
+is_managed_channel() {
+  [ "$1" = "${EXHAUST_FAN_CHANNEL:-}" ] && return 0
+  is_gpu_channel "$1"
 }
 
 is_gpu_channel() {
@@ -34,15 +57,17 @@ is_gpu_channel() {
   return 1
 }
 
-# Load the active GPU duct fan curve. The NixOS module writes this file from
-# the same Nix value that generates the watchdog's curve_pwm function, so the
-# test scripts and the watchdog cannot drift apart. Each line is
-# "<minJunctionMilliC> <pwm>", ordered from the hottest step to the coolest.
-load_gpu_fan_curve() {
-  local file="/etc/nix-meta/arctic-fan/gpu-curve" line min pwm
-  GPU_FAN_CURVE=()
+# Load a fan curve. The NixOS module writes each curve file from the same Nix
+# value that generates the watchdog's curve functions, so the test scripts and
+# the watchdog cannot drift apart. Each line is "<minJunctionMilliC> <pwm>",
+# ordered from the hottest step to the coolest.
+# Arguments: file, name of the array to fill, label for messages.
+load_curve_file() {
+  local file="$1" label="$3" line min pwm
+  local -n curve="$2"
+  curve=()
   if [ ! -r "$file" ]; then
-    echo "FAIL: GPU duct fan curve is not readable: $file" >&2
+    echo "FAIL: $label fan curve is not readable: $file" >&2
     return 1
   fi
   while IFS= read -r line || [ -n "$line" ]; do
@@ -53,19 +78,29 @@ load_gpu_fan_curve() {
       echo "FAIL: invalid curve step in $file: $line" >&2
       return 1
     fi
-    GPU_FAN_CURVE+=("$min $pwm")
+    curve+=("$min $pwm")
   done < "$file"
-  if [ "${#GPU_FAN_CURVE[@]}" -eq 0 ]; then
-    echo "FAIL: GPU duct fan curve in $file is empty" >&2
+  if [ "${#curve[@]}" -eq 0 ]; then
+    echo "FAIL: $label fan curve in $file is empty" >&2
     return 1
   fi
-  echo "gpu_fan_curve_steps=${#GPU_FAN_CURVE[@]}"
+  echo "${label// /_}_fan_curve_steps=${#curve[@]}"
 }
 
-# Expected PWM for a maximum junction reading, from the loaded curve.
-curve_expected_pwm() {
+load_gpu_fan_curve() {
+  load_curve_file /etc/nix-meta/arctic-fan/gpu-curve GPU_FAN_CURVE "GPU duct"
+}
+
+load_exhaust_fan_curve() {
+  load_curve_file /etc/nix-meta/arctic-fan/exhaust-curve EXHAUST_FAN_CURVE "exhaust"
+}
+
+# Expected PWM for a maximum junction reading from a loaded curve.
+# Arguments: junction, name of the curve array.
+curve_expected_pwm_in() {
   local junction="$1" step min pwm
-  for step in "${GPU_FAN_CURVE[@]}"; do
+  local -n curve="$2"
+  for step in "${curve[@]}"; do
     min="${step%% *}"
     pwm="${step##* }"
     if [ "$junction" -ge "$min" ]; then
@@ -75,4 +110,12 @@ curve_expected_pwm() {
   done
   echo "FAIL: no curve step matched junction $junction" >&2
   return 1
+}
+
+curve_expected_pwm() {
+  curve_expected_pwm_in "$1" GPU_FAN_CURVE
+}
+
+curve_expected_exhaust_pwm() {
+  curve_expected_pwm_in "$1" EXHAUST_FAN_CURVE
 }
