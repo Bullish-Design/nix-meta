@@ -43,8 +43,17 @@ FAKE_NOTIFY
 chmod +x "$work/bin/systemctl" "$work/bin/systemd-notify"
 
 # Rewrite real paths into the sandbox. The loop sleep drops from 2 s to 0.2 s.
+# Arguments: script, ema_div, rate_step. The sim builds four variants, because
+# the real smoothing and rate limit are slow at a 0.2 s loop:
+#   watchdog.sh   ema_div=1  rate_step=255  no smoothing, no rate limit
+#                                           (curve, hysteresis, lease checks)
+#   wd-smooth.sh  ema_div=12 rate_step=255  smoothing only
+#   wd-rate.sh    ema_div=1  rate_step=6    rate limit only
+#   wd-real.sh    ema_div=12 rate_step=6    the shipped constants
 rewrite() {
   sed \
+    -e "s#^\( *\)ema_div=12\$#\1ema_div=${2:-12}#" \
+    -e "s#^\( *\)rate_step=6\$#\1rate_step=${3:-6}#" \
     -e "s#/sys/class/hwmon/#\$FAKE/sys/class/hwmon/#g" \
     -e "s#/sys/bus/pci/devices/#\$FAKE/pci/#g" \
     -e "s#/run/arctic-fan/#\$FAKE/run/#g" \
@@ -54,9 +63,14 @@ rewrite() {
     -e "s#\(/bin/sleep\) 2\$#\1 0.2#" \
     "$1"
 }
-rewrite "$watchdog" > "$work/watchdog.sh"
+rewrite "$watchdog" 1 255 > "$work/watchdog.sh"
+rewrite "$watchdog" 12 255 > "$work/wd-smooth.sh"
+rewrite "$watchdog" 1 6 > "$work/wd-rate.sh"
+rewrite "$watchdog" 12 6 > "$work/wd-real.sh"
 rewrite "$safe_high_bin" > "$work/bin/arctic-fans-100"
-chmod +x "$work/bin/arctic-fans-100" "$work/watchdog.sh"
+chmod +x "$work/bin/arctic-fans-100" "$work"/*.sh
+grep -q '^ *ema_div=1$' "$work/watchdog.sh" && grep -q '^ *rate_step=6$' "$work/wd-real.sh" \
+  || { echo "FAIL: could not rewrite the anti-hunting constants" >&2; exit 2; }
 
 pass=0
 fail=0
@@ -114,11 +128,16 @@ all_pwm() {
 
 # Start the watchdog, run the scenario function, then stop it with SIGTERM.
 # Sets WD_EXIT (exit code) and WD_RUNNING (1 if it ran until the TERM).
+# WD picks the watchdog variant. PRE names a function that sets the sensors
+# before the first sample. Both reset after each case.
+WD="$work/watchdog.sh"
+PRE=""
 run_case() {
   local name="$1"
   shift
   reset_fake
-  "$work/watchdog.sh" > "$work/$name.log" 2>&1 &
+  [ -n "$PRE" ] && "$PRE"
+  "$WD" > "$work/$name.log" 2>&1 &
   local pid=$!
   "$@"
   SNAP_PWM="$(all_pwm)"
@@ -132,17 +151,25 @@ run_case() {
   wait "$pid" 2>/dev/null
   WD_EXIT=$?
   CASE_LOG="$work/$name.log"
+  WD="$work/watchdog.sh"
+  PRE=""
 }
+
+# The commanded PWM of channel 1 in every journal line, in order.
+log_pwm1() { sed -n 's/.* channel1(pwm=\([0-9]*\) .*/\1/p' "$1"; }
 
 # --- scenarios ---
 
+# The fast-ramp command falls from safe high to curve(23 C + 3 C hysteresis)=86,
+# not to the 80 idle floor: the command holds until the temperature is 3 C
+# below the point that set it. The duct floor (25) lasts to 40 C, so it is exact.
 idle() { sleep 3; }
 run_case idle idle
 check "idle: still running" 1 "$WD_RUNNING"
-check "idle: pwm1..5 / 6 / 7..9 / 10" "25 25 25 25 25 80 255 255 255 80" "$SNAP_PWM"
+check "idle: pwm1..5 / 6 / 7..9 / 10" "25 25 25 25 25 86 255 255 255 86" "$SNAP_PWM"
 status="$SNAP_STATUS"
 echo "idle status: $status"
-if [[ "$status" =~ ^state=OK\ target_pwm=25\ max_gpu_junction_mC=23000\ profile=curve-default\ exhaust_pwm=80\ max_gpu_hottest_mC=23000$ ]]; then
+if [[ "$status" =~ ^state=OK\ target_pwm=25\ max_gpu_junction_mC=23000\ profile=curve-default\ exhaust_pwm=86\ max_gpu_hottest_mC=23000\ max_gpu_hottest_avg_mC=23000$ ]]; then
   pass=$((pass + 1))
 else
   fail=$((fail + 1)); echo "FAIL: idle status line shape: $status"
@@ -156,7 +183,7 @@ p = re.search(r"profile=(\S+)", text)
 sys.exit(0 if m and p and m.groups() == ("OK", "25", "23000") and p.group(1) == "curve-default" else 1)
 PY
 then pass=$((pass + 1)); else fail=$((fail + 1)); echo "FAIL: telemetry regex does not parse the status"; fi
-grep -q 'channel1(pwm=25 rpm=4400 failed=0).*channel5(pwm=25 rpm=4400 failed=0) fast6(target=80 pwm=80 rpm=960 failed=0) fast10(target=80 pwm=80 rpm=1000 failed=0)' "$CASE_LOG" \
+grep -q 'channel1(pwm=25 rpm=4400 failed=0).*channel5(pwm=25 rpm=4400 failed=0) fast6(target=80 pwm=86 rpm=960 failed=0) fast10(target=80 pwm=86 rpm=1000 failed=0)' "$CASE_LOG" \
   && pass=$((pass + 1)) || { fail=$((fail + 1)); echo "FAIL: journal line lacks all channels"; tail -2 "$CASE_LOG"; }
 
 hot50() { sleep 1.5; set_junction 50000 41000; sleep 1.5; }
@@ -171,21 +198,31 @@ mid40() { sleep 1; set_junction 40000 36000; sleep 3; }
 run_case mid40 mid40
 check "40 C after cooldown: gpu 25, ch6 and exhaust 180" "25 25 25 25 25 180 255 255 255 180" "$SNAP_PWM"
 
-cooldown_hold() { sleep 0.15; set_junction 75000; sleep 1; set_junction 50000; sleep 0.5; SNAP_EARLY="$(all_pwm)"; sleep 3; }
-run_case cooldown-hold cooldown_hold
-check "ramp down waits for 5 cool samples (gpu stays 255)" "255 255 255 255 255 255 255 255 255 255" "$SNAP_EARLY"
-check "ramp down after cooldown: 50 C gives gpu 70" "70 70 70 70 70 255 255 255 255 255" "$SNAP_PWM"
+# Hysteresis: after 66 C (PWM 155), the command holds until the temperature
+# is 3 C lower. At 64 C the curve gives 138, but 64 + 3 = 67 C gives 167, so
+# the command holds. At 62 C, 62 + 3 = 65 C gives 146, so it falls to 146.
+hyst() {
+  sleep 0.8; set_junction 66000 30000; sleep 0.8; H_66="$(pwm 1)"
+  set_junction 64000 30000; sleep 0.8; H_64="$(pwm 1)"
+  set_junction 62000 30000; sleep 0.8; H_62="$(pwm 1)"
+  set_junction 50000 30000; sleep 0.8
+}
+run_case hysteresis hyst
+check "hysteresis: 66 C gives 155" 155 "$H_66"
+check "hysteresis: holds 155 at 64 C (needs 3 C below)" 155 "$H_64"
+check "hysteresis: falls to curve(65 C)=146 at 62 C" 146 "$H_62"
+check "hysteresis: falls to curve(53 C)=82 at 50 C" "82 82 82 82 82 255 255 255 255 255" "$SNAP_PWM"
 
 ramp46() { sleep 1; set_junction 46000 30000; sleep 1.5; }
 run_case ramp46 ramp46
-check "46 C ramp up: gpu 50, ch6 and exhaust 220" "50 50 50 50 50 220 255 255 255 220" "$SNAP_PWM"
+check "46 C ramp up (interpolated): gpu 54, ch6 and exhaust 227" "54 54 54 54 54 227 255 255 255 227" "$SNAP_PWM"
 
 # The memory sensor drives the fans when it is hotter than the junction.
 mem_hot() { sleep 1.5; set_junction 50000 48000; set_mem 40000 66000; sleep 1.5; }
 run_case mem-hot mem_hot
 check "memory 66 C above junction 50 C: gpu 155, ch6 and exhaust 255" "155 155 155 155 155 255 255 255 255 255" "$SNAP_PWM"
 status="$SNAP_STATUS"
-[[ "$status" =~ ^state=OK\ target_pwm=155\ max_gpu_junction_mC=50000\ profile=curve-default\ exhaust_pwm=255\ max_gpu_hottest_mC=66000$ ]] \
+[[ "$status" =~ ^state=OK\ target_pwm=155\ max_gpu_junction_mC=50000\ profile=curve-default\ exhaust_pwm=255\ max_gpu_hottest_mC=66000\ max_gpu_hottest_avg_mC=66000$ ]] \
   && pass=$((pass + 1)) || { fail=$((fail + 1)); echo "FAIL: memory-hot status line: $status"; }
 grep -q 'max_gpu_junction_mC=50000 max_gpu_hottest_mC=66000 ' "$CASE_LOG" \
   && pass=$((pass + 1)) || { fail=$((fail + 1)); echo "FAIL: journal line lacks both temperatures"; tail -2 "$CASE_LOG"; }
@@ -194,24 +231,28 @@ grep -q 'max_gpu_junction_mC=50000 max_gpu_hottest_mC=66000 ' "$CASE_LOG" \
 junction_hot() { sleep 1.5; set_junction 60000 40000; set_mem 50000 45000; sleep 1.5; }
 run_case junction-hot junction_hot
 check "junction 60 C above memory 50 C: gpu 110" "110 110 110 110 110 255 255 255 255 255" "$SNAP_PWM"
-[[ "$SNAP_STATUS" == *max_gpu_junction_mC=60000\ *max_gpu_hottest_mC=60000 ]] \
+[[ "$SNAP_STATUS" == *max_gpu_junction_mC=60000\ *max_gpu_hottest_mC=60000\ max_gpu_hottest_avg_mC=60000 ]] \
   && pass=$((pass + 1)) || { fail=$((fail + 1)); echo "FAIL: junction-hot status: $SNAP_STATUS"; }
 
-# Each step of the curve-default duct curve, driven by the memory sensor so the
-# run also proves that memory alone selects every step. Temperatures rise, so
-# every change is an immediate ramp up. Each entry is "milli-C expected-pwm".
+# The curve-default duct curve, driven by the memory sensor so the run also
+# proves that memory alone selects every value. Temperatures rise, so every
+# change is an immediate ramp up. Points give exact values. Between points the
+# value is linear: 44999 mC is 49, 47500 mC is 60, 64500 mC is 142. The
+# idle floor (25) ramps up from 40 C to the 45 C point. Each entry is
+# "milli-C expected-pwm".
 curve_steps() {
   local step t want
   sleep 1.5
-  for step in "44999 25" "45000 50" "49999 50" "50000 70" "55000 90" "60000 110" \
-              "62999 110" "63000 130" "66000 155" "68000 180" "70000 205" \
-              "72000 235" "72999 235" "73000 255"; do
+  for step in "39999 25" "40000 25" "42500 37" "44999 49" "45000 50" "47500 60" "49999 69" \
+              "50000 70" "52500 80" "55000 90" "60000 110" "61500 120" "62999 129" \
+              "63000 130" "64500 142" "66000 155" "68000 180" "70000 205" "71000 220" \
+              "72000 235" "72999 254" "73000 255"; do
     t="${step% *}"
     want="${step#* }"
     set_mem "$t" 20000
     sleep 0.7
-    check "curve-default step at $t mC (memory): gpu $want" "$want" "$(pwm 1)"
-    check "curve-default step at $t mC (memory): gpu channels agree" "$want" "$(pwm 5)"
+    check "curve-default at $t mC (memory): gpu $want" "$want" "$(pwm 1)"
+    check "curve-default at $t mC (memory): gpu channels agree" "$want" "$(pwm 5)"
   done
 }
 run_case curve-steps curve_steps
@@ -337,9 +378,108 @@ default_55() { sleep 1.5; set_junction 55000 40000; sleep 1.5; }
 run_case default-55 default_55
 check "curve-default at 55 C: gpu 90, ch6 and exhaust 255" "90 90 90 90 90 255 255 255 255 255" "$SNAP_PWM"
 
+cooldown_profile() { lease cooldown; sleep 1.5; set_junction 55000 40000; sleep 1.5; }
+run_case lease-cooldown cooldown_profile
+check "cooldown lease at 55 C: every managed channel 128" "128 128 128 128 128 128 255 255 255 128" "$SNAP_PWM"
+[[ "$SNAP_STATUS" == *profile=cooldown* ]] && pass=$((pass + 1)) || { fail=$((fail + 1)); echo "FAIL: cooldown status: $SNAP_STATUS"; }
+
+# The raw override beats the cooldown profile: 72 C raw gives the default curve.
+cooldown_override() { lease cooldown; sleep 1.5; set_junction 73000 40000; sleep 1.5; }
+run_case lease-cooldown-override cooldown_override
+check "cooldown lease, raw 73 C: override gives 255" "255 255 255 255 255 255 255 255 255 255" "$SNAP_PWM"
+
+# A fault beats the cooldown profile.
+cooldown_fault() { lease cooldown; sleep 1.5; echo 0 > "$(hw)/fan3_input"; sleep 3; }
+run_case lease-cooldown-fault cooldown_fault
+check "cooldown lease, fan stall: all 255" "255 255 255 255 255 255 255 255 255 255" "$SNAP_PWM"
+[[ "$SNAP_STATUS" == *profile=full-duty-fault* ]] && pass=$((pass + 1)) || { fail=$((fail + 1)); echo "FAIL: cooldown fault status: $SNAP_STATUS"; }
+
 bad_profile() { printf 'profile=bogus\nexpires=%s\nowner_pid=%s\n' "$(date -u -d '+10 min' +%Y-%m-%dT%H:%M:%SZ)" "$$" > "$FAKE/run/request"; sleep 3; }
 run_case unknown-profile bad_profile
 [[ "$SNAP_STATUS" == *profile=curve-default* ]] && pass=$((pass + 1)) || { fail=$((fail + 1)); echo "FAIL: unknown profile must fall back to curve-default"; }
+
+# --- anti-hunting: smoothing, rate limit, raw override ---
+
+# Steady 45 C from the first sample. The command settles at curve(48 C)=62
+# (the hysteresis offset after the fall from safe high). A 0.5 s spike to 65 C
+# (under the 72 C override) must move the command only a little, where a raw
+# reading would command 140. After the spike the raw reading is 45 C again.
+pre_45() { set_junction 45000 45000; set_mem 40000 40000; }
+spike_smooth() {
+  sleep 1.5
+  SP_BASE="$(pwm 1)"
+  set_junction 65000 45000; sleep 0.5; set_junction 45000 45000
+  sleep 1
+}
+PRE=pre_45 WD="$work/wd-smooth.sh" run_case smooth-spike spike_smooth
+SP_MAX="$(log_pwm1 "$CASE_LOG" | sort -n | tail -1)"
+check "smoothing: steady 45 C settles at 62" 62 "$SP_BASE"
+[ "$SP_MAX" -le 85 ] && pass=$((pass + 1)) || { fail=$((fail + 1)); echo "FAIL: 0.5 s spike moved PWM to $SP_MAX (raw would give 140)"; }
+
+# A sustained step does move the command (the average follows).
+step_smooth() { sleep 1.5; set_junction 65000 45000; sleep 5; }
+PRE=pre_45 WD="$work/wd-smooth.sh" run_case smooth-step step_smooth
+[ "${SNAP_PWM%% *}" -gt 95 ] && pass=$((pass + 1)) || { fail=$((fail + 1)); echo "FAIL: sustained 65 C step did not raise PWM: $SNAP_PWM"; }
+[[ "$SNAP_STATUS" =~ max_gpu_hottest_mC=65000\ max_gpu_hottest_avg_mC=([0-9]+)$ ]] \
+  && [ "${BASH_REMATCH[1]}" -gt 45000 ] && [ "${BASH_REMATCH[1]}" -lt 65000 ] \
+  && pass=$((pass + 1)) || { fail=$((fail + 1)); echo "FAIL: smoothed value not between 45 C and 65 C: $SNAP_STATUS"; }
+
+# The raw override: at 72 C raw there is no smoothing, so the command jumps
+# straight to the curve at 72 C (235) in the same loop. Below 72 C it does not.
+pre_cool() { set_junction 30000 30000; set_mem 30000 30000; }
+override_72() { sleep 1; set_junction 72000 30000; sleep 0.7; }
+PRE=pre_cool WD="$work/wd-smooth.sh" run_case override-72 override_72
+check "raw 72 C override: gpu 235 at once" 235 "${SNAP_PWM%% *}"
+[[ "$SNAP_STATUS" == *max_gpu_hottest_mC=72000\ max_gpu_hottest_avg_mC=72000 ]] \
+  && pass=$((pass + 1)) || { fail=$((fail + 1)); echo "FAIL: override status: $SNAP_STATUS"; }
+under_72() { sleep 1; set_junction 71900 30000; sleep 0.7; }
+PRE=pre_cool WD="$work/wd-smooth.sh" run_case under-72 under_72
+[ "$(log_pwm1 "$CASE_LOG" | sort -n | tail -1)" -lt 100 ] && pass=$((pass + 1)) || { fail=$((fail + 1)); echo "FAIL: 71.9 C was not smoothed"; }
+
+# The rate limit: from safe high down to idle, then up on a hot step. Channel 1
+# never changes by more than 6 between two journal lines, in either direction.
+rate_walk() { sleep 4; set_junction 70000 30000; sleep 2; set_junction 30000 30000; sleep 1.2; }
+WD="$work/wd-rate.sh" run_case rate-limit rate_walk
+rate_ok=1; rate_prev=""; rate_down=0; rate_up=0
+for v in $(log_pwm1 "$CASE_LOG"); do
+  if [ -n "$rate_prev" ]; then
+    d=$((v - rate_prev))
+    [ "${d#-}" -le 6 ] || rate_ok=0
+    [ "$d" -lt 0 ] && rate_down=1
+    [ "$d" -gt 0 ] && rate_up=1
+  fi
+  rate_prev="$v"
+done
+check "rate limit: no change above 6 per loop" 1 "$rate_ok"
+check "rate limit: the walk went down" 1 "$rate_down"
+check "rate limit: the walk went up" 1 "$rate_up"
+
+# Exceptions to the rate limit, after the command fell below 255: a lease for
+# flat-max, a raw 72 C reading and a fan fault each go to 255 within a loop or two.
+rate_exc_flat() { sleep 2; R_BEFORE="$(pwm 1)"; lease flat-max; sleep 0.8; }
+WD="$work/wd-rate.sh" run_case rate-exc-flat rate_exc_flat
+[ "$R_BEFORE" -lt 255 ] && pass=$((pass + 1)) || { fail=$((fail + 1)); echo "FAIL: rate sim never fell below 255"; }
+check "rate limit exception: flat-max jumps to 255" "255 255 255 255 255 255 255 255 255 255" "$SNAP_PWM"
+rate_exc_hot() { sleep 2; set_junction 73000 30000; sleep 0.8; }
+WD="$work/wd-rate.sh" run_case rate-exc-hot rate_exc_hot
+check "rate limit exception: raw 73 C jumps to 255" "255 255 255 255 255 255 255 255 255 255" "$SNAP_PWM"
+rate_exc_fault() { sleep 1.2; echo 0 > "$(hw)/fan2_input"; sleep 3; }
+WD="$work/wd-rate.sh" run_case rate-exc-fault rate_exc_fault
+check "rate limit exception: fault jumps to 255" "255 255 255 255 255 255 255 255 255 255" "$SNAP_PWM"
+
+# The shipped constants together: no change above 6 per loop, and the status
+# line carries a smoothed value that lags a step.
+real_walk() { sleep 1; set_junction 60000 30000; sleep 1.5; }
+WD="$work/wd-real.sh" run_case real-constants real_walk
+rate_ok=1; rate_prev=""
+for v in $(log_pwm1 "$CASE_LOG"); do
+  [ -n "$rate_prev" ] && { d=$((v - rate_prev)); [ "${d#-}" -le 6 ] || rate_ok=0; }
+  rate_prev="$v"
+done
+check "real constants: no change above 6 per loop" 1 "$rate_ok"
+[[ "$SNAP_STATUS" =~ max_gpu_hottest_mC=60000\ max_gpu_hottest_avg_mC=([0-9]+)$ ]] \
+  && [ "${BASH_REMATCH[1]}" -gt 30000 ] && [ "${BASH_REMATCH[1]}" -lt 60000 ] \
+  && pass=$((pass + 1)) || { fail=$((fail + 1)); echo "FAIL: real-constants average does not lag: $SNAP_STATUS"; }
 
 # Startup removes a stale status file but keeps the lease request file
 # (RuntimeDirectoryPreserve keeps the runtime directory across a restart).
@@ -352,13 +492,13 @@ run_case restart-1 restart_keeps_lease
 check "exit removes the status file" "no" "$([ -e "$FAKE/run/status" ] && echo yes || echo no)"
 check "exit keeps the lease request file" "yes" "$([ -e "$FAKE/run/request" ] && echo yes || echo no)"
 # Start again on the same directory with a stale status file in place.
-echo "state=OK target_pwm=1 max_gpu_junction_mC=1 profile=stale exhaust_pwm=1 max_gpu_hottest_mC=1" > "$FAKE/run/status"
+echo "state=OK target_pwm=1 max_gpu_junction_mC=1 profile=stale exhaust_pwm=1 max_gpu_hottest_mC=1 max_gpu_hottest_avg_mC=1" > "$FAKE/run/status"
 "$work/watchdog.sh" > "$work/restart-2.log" 2>&1 &
 restart_pid=$!
 sleep 0.4
 check "start removes a stale status file" "no" "$(grep -q 'profile=stale' "$FAKE/run/status" 2>/dev/null && echo yes || echo no)"
 sleep 1.5
-[[ "$(cat "$FAKE/run/status" 2>/dev/null)" == *profile=flat-max*max_gpu_hottest_mC=* ]] \
+[[ "$(cat "$FAKE/run/status" 2>/dev/null)" == *profile=flat-max*max_gpu_hottest_mC=*max_gpu_hottest_avg_mC=* ]] \
   && pass=$((pass + 1)) || { fail=$((fail + 1)); echo "FAIL: restart did not write a fresh status that honours the kept lease"; cat "$FAKE/run/status" 2>/dev/null; }
 kill -TERM "$restart_pid" 2>/dev/null; wait "$restart_pid" 2>/dev/null
 

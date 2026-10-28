@@ -30,12 +30,14 @@ let
   # PWM 255 and fails high if one reads anything else.
   managedChannelsForShell = "${gpuFanChannelsForShell} ${fastRampChannelsForShell}";
 
-  # Named GPU duct fan curves. Each entry maps a minimum hottest-sensor
+  # Named GPU duct fan curves. Each entry is a curve point: a hottest-sensor
   # temperature (the hottest of junction and memory over both cards), in
-  # milli-degrees C, to a commanded PWM value. Order each list
-  # from the hottest step to the coolest, and end it with a 0 entry so every
-  # temperature maps to a value. PWM-to-RPM values come from the project 03
-  # calibration sweep.
+  # milli-degrees C, and a PWM value. The watchdog interpolates linearly
+  # between points. Order each list from the hottest point to the coolest, and
+  # end it with a 0 entry. The 0 entry is the idle floor: the curve holds its
+  # PWM below the lead-in point (see leadInMilliC) and ramps from there to the
+  # next point. At or above the hottest point, the curve gives that point's
+  # PWM. PWM-to-RPM values come from the project 03 calibration sweep.
   fanCurves = {
     # Shipped default (owner goal 2026-10-28): quiet duct fans, with the
     # hottest sensor at or below about 70 C when it holds. Measured on card 0
@@ -56,6 +58,14 @@ let
       { minC = 50000; pwm = 70; }
       { minC = 45000; pwm = 50; }
       { minC = 0; pwm = 25; }
+    ];
+
+    # Fixed 50% duty for the wait between experiment runs. Reachable at
+    # runtime as fan-profile lease "cooldown". The curve does not depend on
+    # the temperature. A fault or a raw reading at or above the safety
+    # override temperature still drives the fans higher.
+    cooldown = [
+      { minC = 0; pwm = 128; }
     ];
 
     # Project 024 arm 1 (C-FULL). Flat maximum duty at every temperature. This
@@ -103,6 +113,9 @@ let
     full = [
       { minC = 0; pwm = 255; }
     ];
+    cooldown = [
+      { minC = 0; pwm = 128; }
+    ];
   };
 
   # The active GPU curve when no fan-profile lease is held. Change this one
@@ -138,7 +151,11 @@ let
     "flat-max" = { gpu = "full"; fast = "full"; };
     "curve-default" = { gpu = selectedFanCurveName; fast = "aggressive"; };
     "curve-steep" = { gpu = "steep"; fast = "aggressive"; };
+    "cooldown" = { gpu = "cooldown"; fast = "cooldown"; };
   };
+  # Profiles that go straight to 255 with no rate limit (and "full-duty-fault").
+  fullDutyProfiles = lib.filter (n: fanProfiles.${n}.gpu == "full") (builtins.attrNames fanProfiles);
+  fullDutyProfilesForShell = lib.concatStringsSep " " ([ "full-duty-fault" ] ++ fullDutyProfiles);
   allowedProfiles = builtins.attrNames fanProfiles;
   allowedProfilesForShell = lib.concatStringsSep " " allowedProfiles;
   defaultProfile = "curve-default";
@@ -148,23 +165,43 @@ let
   curveNamesNeeded = kind: lib.unique (map (p: p.${kind}) (builtins.attrValues fanProfiles));
   curveSets = { gpu = fanCurves; fast = fastRampCurves; };
 
+  # Lead-in below the first real curve point, in milli-degrees C. The idle
+  # floor (the minC = 0 entry) moves to this distance below the next point, so
+  # the curve ramps from the floor PWM to that point instead of jumping.
+  leadInMilliC = 5000;
+  interpPoints = curve:
+    let n = lib.length curve; in
+    if n < 2 then curve
+    else lib.init curve ++ [{
+      minC = lib.max 0 ((lib.elemAt curve (n - 2)).minC - leadInMilliC);
+      pwm = (lib.last curve).pwm;
+    }];
+
   # Render one shell function per curve actually reachable through a lease
   # profile, named by group and curve rather than by profile so two profile
-  # names that share a curve do not duplicate work. Every entry becomes a
-  # comparison, so no branch tests a constant. The final `else` is unreachable
-  # for a valid sensor reading and fails high rather than guessing.
-  mkCurveFunction = kind: name: curve: ''
+  # names that share a curve do not duplicate work. Each function maps a
+  # temperature in milli-degrees C to a PWM value by linear interpolation
+  # between the two points that surround it (integer math). Below the lowest
+  # point it gives the floor PWM. At or above the hottest point it gives that
+  # point's PWM.
+  mkCurveFunction = kind: name: curve:
+    let pts = interpPoints curve; in
+    ''
     curve_${kind}_${name}() {
-      hottest="$1"
+      local t="$1"
   '' + lib.concatImapStrings
-    (i: e: ''
-      ${if i == 1 then "    if" else "    elif"} [ "$hottest" -ge ${toString e.minC} ]; then
-        printf '%s\n' ${toString e.pwm}
+    (i: e:
+      let hi = if i == 1 then null else lib.elemAt pts (i - 2); in
+      ''
+      ${if i == 1 then "    if" else "    elif"} [ "$t" -ge ${toString e.minC} ]; then
+        ${if hi == null
+          then "printf '%s\\n' ${toString e.pwm}"
+          else "printf '%s\\n' $(( ${toString e.pwm} + (${toString hi.pwm} - ${toString e.pwm}) * (t - ${toString e.minC}) / (${toString hi.minC} - ${toString e.minC}) ))"}
     '')
-    curve
+    pts
   + ''
       else
-        printf '%s\n' 255
+        printf '%s\n' ${toString (lib.last pts).pwm}
       fi
     }
   '';
@@ -338,7 +375,7 @@ let
     # Fan curves for the GPU duct fans and the fast-ramp fans, one shell function
     # per curve reachable through a fan-profile lease, generated from
     # `fanCurves`, `fastRampCurves` and `fanProfiles` in this module's `let`
-    # block. Each step applies from its lower bound up to the next bound.
+    # block. Each function interpolates linearly between curve points.
     # Values are PWM. The test scripts read the same curves from
     # /etc/nix-meta/arctic-fan/, so the two cannot drift apart.
 ${allCurveFunctions}
@@ -360,7 +397,22 @@ ${curveDispatchFunctions}
     gpu_channel_list="${gpuFanChannelsForShell}"
     managed_channel_list="${managedChannelsForShell}"
 
-    declare -A pwm_now=() fan_rpm=() strikes=() failed=() min_rpm=() cooldown=()
+    # Anti-hunting controls. The sim rewrites ema_div and rate_step.
+    #   ema_div: the smoothed temperature moves 1/ema_div of the way to the raw
+    #     reading each loop (12 gives a time constant of about 24 s at 2 s).
+    #   rate_step: the largest PWM change per loop, up or down.
+    #   hysteresis_mC: the command follows the curve down only once the
+    #     smoothed temperature is this far below the point that set it.
+    #   raw_override_mC: at or above this raw reading, the watchdog skips
+    #     smoothing, the rate limit, and the hysteresis.
+    ema_div=12
+    rate_step=6
+    hysteresis_mC=3000
+    raw_override_mC=72000
+    full_duty_profiles=" ${fullDutyProfilesForShell} "
+    avg_hottest=""
+
+    declare -A pwm_now=() fan_rpm=() strikes=() failed=() min_rpm=()
     gpu_channel_count=0
     for ch in $managed_channel_list; do
       strikes[$ch]=0
@@ -371,8 +423,6 @@ ${curveDispatchFunctions}
       min_rpm[$ch]=$gpu_min_running_rpm
       gpu_channel_count=$((gpu_channel_count + 1))
     done
-    cooldown[gpu]=0
-    cooldown[fast]=0
 
     channel_label() {
       case " $gpu_channel_list " in
@@ -398,30 +448,33 @@ ${curveDispatchFunctions}
       done
     }
 
-    # Move one fan group to its target. Ramp up without delay. Ramp down only
-    # after five consecutive cool samples. Each group keeps its own counter.
+    # Move one fan group toward its curve. Arguments: hwmon path, group name
+    # (unused label), up target, down target, jump flag, then the channels.
+    #   up target: the curve value at the control temperature. The command
+    #     rises to it.
+    #   down target: the curve value at the control temperature plus the
+    #     hysteresis. The command falls to it, and only when it is lower.
+    # Both moves are limited to rate_step per loop, unless the jump flag is 1.
+    # A jump goes straight up.
     ramp_group() {
-      local arctic="$1" group="$2" target="$3" ch needs_up=0 needs_down=0
-      shift 3
+      local arctic="$1" up="$2" down="$3" jump="$4" ch cur_min=255 cur_max=0 new
+      shift 5
       for ch in "$@"; do
-        if [ "$target" -gt "''${pwm_now[$ch]}" ]; then
-          needs_up=1
-        fi
-        if [ "$target" -lt "''${pwm_now[$ch]}" ]; then
-          needs_down=1
-        fi
+        [ "''${pwm_now[$ch]}" -lt "$cur_min" ] && cur_min="''${pwm_now[$ch]}"
+        [ "''${pwm_now[$ch]}" -gt "$cur_max" ] && cur_max="''${pwm_now[$ch]}"
       done
-      if [ "$needs_up" -eq 1 ]; then
-        cooldown[$group]=0
-        write_group_pwm "$arctic" "$target" "$@"
-      elif [ "$needs_down" -eq 1 ]; then
-        cooldown[$group]=$((cooldown[$group] + 1))
-        if [ "''${cooldown[$group]}" -ge 5 ]; then
-          write_group_pwm "$arctic" "$target" "$@"
-          cooldown[$group]=0
+      if [ "$up" -gt "$cur_min" ]; then
+        new="$up"
+        if [ "$jump" -ne 1 ] && [ "$new" -gt $((cur_min + rate_step)) ]; then
+          new=$((cur_min + rate_step))
         fi
-      else
-        cooldown[$group]=0
+        write_group_pwm "$arctic" "$new" "$@"
+      elif [ "$down" -lt "$cur_max" ]; then
+        new="$down"
+        if [ "$new" -lt $((cur_max - rate_step)) ]; then
+          new=$((cur_max - rate_step))
+        fi
+        write_group_pwm "$arctic" "$new" "$@"
       fi
     }
 
@@ -630,11 +683,46 @@ ${curveDispatchFunctions}
         fi
       fi
 
-      target_pwm="$(curve_gpu_for_profile "$active_profile" "$max_hottest")"
-      fast_target_pwm="$(curve_fast_for_profile "$active_profile" "$max_hottest")"
+      # Smooth the control temperature. The average starts at the first raw
+      # reading. At or above raw_override_mC the raw reading drives the curves
+      # at once, and the average resets to it.
+      if [ -z "$avg_hottest" ]; then
+        avg_hottest="$max_hottest"
+      else
+        avg_hottest=$((avg_hottest + (max_hottest - avg_hottest) / ema_div))
+      fi
+      override=0
+      control_mC="$avg_hottest"
+      if [ "$max_hottest" -ge "$raw_override_mC" ]; then
+        override=1
+        avg_hottest="$max_hottest"
+        control_mC="$max_hottest"
+      fi
 
-      ramp_group "$arctic" gpu "$target_pwm" $gpu_channel_list
-      ramp_group "$arctic" fast "$fast_target_pwm" $fast_channel_list
+      # A full-duty profile (a fault or flat-max) and the override jump
+      # straight to their target. Everything else is rate limited.
+      jump="$override"
+      case "$full_duty_profiles" in
+        *" $active_profile "*) jump=1 ;;
+      esac
+
+      target_pwm="$(curve_gpu_for_profile "$active_profile" "$control_mC")"
+      down_pwm="$(curve_gpu_for_profile "$active_profile" "$((control_mC + hysteresis_mC))")"
+      fast_target_pwm="$(curve_fast_for_profile "$active_profile" "$control_mC")"
+      fast_down_pwm="$(curve_fast_for_profile "$active_profile" "$((control_mC + hysteresis_mC))")"
+      if [ "$override" -eq 1 ]; then
+        # The override demands at least the default curve at the raw reading,
+        # even under a profile that holds a low fixed duty.
+        floor_pwm="$(curve_gpu_for_profile "${defaultProfile}" "$max_hottest")"
+        [ "$floor_pwm" -gt "$target_pwm" ] && target_pwm="$floor_pwm"
+        floor_pwm="$(curve_fast_for_profile "${defaultProfile}" "$max_hottest")"
+        [ "$floor_pwm" -gt "$fast_target_pwm" ] && fast_target_pwm="$floor_pwm"
+      fi
+      [ "$down_pwm" -lt "$target_pwm" ] && down_pwm="$target_pwm"
+      [ "$fast_down_pwm" -lt "$fast_target_pwm" ] && fast_down_pwm="$fast_target_pwm"
+
+      ramp_group "$arctic" "$target_pwm" "$down_pwm" "$jump" gpu $gpu_channel_list
+      ramp_group "$arctic" "$fast_target_pwm" "$fast_down_pwm" "$jump" fast $fast_channel_list
 
       detail=""
       for ch in $gpu_channel_list; do
@@ -651,11 +739,15 @@ ${curveDispatchFunctions}
       # both curves. exhaust_pwm is the commanded PWM of the fast-ramp group
       # (channel 6 and the exhaust move together). The key keeps its old name
       # for parsers.
-      printf 'state=%s target_pwm=%s max_gpu_junction_mC=%s profile=%s exhaust_pwm=%s max_gpu_hottest_mC=%s\n' \
-        "$state" "$target_pwm" "$max_junction" "$active_profile" "''${pwm_now[''${fast_channel_list%% *}]}" "$max_hottest" \
+      # max_gpu_hottest_avg_mC is the smoothed value that drives the curves
+      # (the raw value at or above the safety override). target_pwm is the
+      # commanded PWM of the GPU duct group, after the rate limit and the
+      # hysteresis. The curve value it moves toward is in the journal.
+      printf 'state=%s target_pwm=%s max_gpu_junction_mC=%s profile=%s exhaust_pwm=%s max_gpu_hottest_mC=%s max_gpu_hottest_avg_mC=%s\n' \
+        "$state" "''${pwm_now[''${gpu_channel_list%% *}]}" "$max_junction" "$active_profile" "''${pwm_now[''${fast_channel_list%% *}]}" "$max_hottest" "$avg_hottest" \
         > /run/arctic-fan/status || echo "could not write /run/arctic-fan/status" >&2
-      ${pkgs.systemd}/bin/systemd-notify --status="$state target_pwm=$target_pwm profile=$active_profile" || true
-      echo "ARCTIC watchdog: state=$state max_gpu_junction_mC=$max_junction max_gpu_hottest_mC=$max_hottest target_pwm=$target_pwm active_profile=$active_profile reason=\"$active_reason\" cooldown_samples=''${cooldown[gpu]}$detail"
+      ${pkgs.systemd}/bin/systemd-notify --status="$state target_pwm=''${pwm_now[''${gpu_channel_list%% *}]} profile=$active_profile" || true
+      echo "ARCTIC watchdog: state=$state max_gpu_junction_mC=$max_junction max_gpu_hottest_mC=$max_hottest max_gpu_hottest_avg_mC=$avg_hottest target_pwm=$target_pwm active_profile=$active_profile reason=\"$active_reason\" override=$override$detail"
       ${pkgs.coreutils}/bin/sleep 2
     done
   '';
