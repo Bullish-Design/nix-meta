@@ -17,7 +17,7 @@ if [ "${#AMD_GPU_BDFS[@]}" -ne 2 ]; then
 fi
 source "$script_dir/lib/arctic-gpu-fan-channels.sh"
 load_gpu_fan_channels || exit 2
-load_exhaust_channel || exit 2
+load_fast_ramp_channels || exit 2
 
 # Junction stop in millidegrees C. The production limit is 80 C. An experiment
 # can set a lower limit, for example ARCTIC_GPU_STOP_MC=72000.

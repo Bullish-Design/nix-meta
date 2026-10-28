@@ -90,6 +90,7 @@ reset_fake() {
     echo 0 > "$h/fan${c}_input"
   done
   for c in 1 2 3 4 5; do echo 4400 > "$h/fan${c}_input"; done
+  echo 960 > "$h/fan6_input"
   echo 1000 > "$h/fan10_input"
   for d in "$FAKE/pci/0000:19:00.0/hwmon/hwmon5" "$FAKE/pci/0000:67:00.0/hwmon/hwmon6"; do
     echo amdgpu > "$d/name"
@@ -131,7 +132,7 @@ run_case() {
 idle() { sleep 3; }
 run_case idle idle
 check "idle: still running" 1 "$WD_RUNNING"
-check "idle: pwm1..5 / 6..9 / 10" "25 25 25 25 25 255 255 255 255 80" "$SNAP_PWM"
+check "idle: pwm1..5 / 6 / 7..9 / 10" "25 25 25 25 25 80 255 255 255 80" "$SNAP_PWM"
 status="$SNAP_STATUS"
 echo "idle status: $status"
 if [[ "$status" =~ ^state=OK\ target_pwm=25\ max_gpu_junction_mC=23000\ profile=curve-default\ exhaust_pwm=80$ ]]; then
@@ -148,20 +149,24 @@ p = re.search(r"profile=(\S+)", text)
 sys.exit(0 if m and p and m.groups() == ("OK", "25", "23000") and p.group(1) == "curve-default" else 1)
 PY
 then pass=$((pass + 1)); else fail=$((fail + 1)); echo "FAIL: telemetry regex does not parse the status"; fi
-grep -q 'channel1(pwm=25 rpm=4400 failed=0).*channel5(pwm=25 rpm=4400 failed=0) exhaust10(target=80 pwm=80 rpm=1000 failed=0)' "$CASE_LOG" \
+grep -q 'channel1(pwm=25 rpm=4400 failed=0).*channel5(pwm=25 rpm=4400 failed=0) fast6(target=80 pwm=80 rpm=960 failed=0) fast10(target=80 pwm=80 rpm=1000 failed=0)' "$CASE_LOG" \
   && pass=$((pass + 1)) || { fail=$((fail + 1)); echo "FAIL: journal line lacks all channels"; tail -2 "$CASE_LOG"; }
 
 hot50() { sleep 1.5; set_junction 50000 41000; sleep 1.5; }
 run_case hot50 hot50
-check "50 C: pwm1..5 125, exhaust 255, unused 255" "125 125 125 125 125 255 255 255 255 255" "$SNAP_PWM"
+check "50 C: pwm1..5 125, ch6 and exhaust 255, unused 255" "125 125 125 125 125 255 255 255 255 255" "$SNAP_PWM"
 
 hot75() { sleep 1; set_junction 75000 30000; sleep 1.5; }
 run_case hot75 hot75
-check "hottest card drives the curve (75 C): pwm1..5 255, exhaust 255" "255 255 255 255 255 255 255 255 255 255" "$SNAP_PWM"
+check "hottest card drives the curve (75 C): pwm1..5 255, ch6 and exhaust 255" "255 255 255 255 255 255 255 255 255 255" "$SNAP_PWM"
 
 mid40() { sleep 1; set_junction 40000 36000; sleep 3; }
 run_case mid40 mid40
-check "40 C after cooldown: gpu 75, exhaust 180" "75 75 75 75 75 255 255 255 255 180" "$SNAP_PWM"
+check "40 C after cooldown: gpu 75, ch6 and exhaust 180" "75 75 75 75 75 180 255 255 255 180" "$SNAP_PWM"
+
+ramp35() { sleep 1; set_junction 35000 30000; sleep 1.5; }
+run_case ramp35 ramp35
+check "35 C ramp up: gpu 50, ch6 and exhaust 140" "50 50 50 50 50 140 255 255 255 140" "$SNAP_PWM"
 
 stall_one() { sleep 1.5; echo 0 > "$(hw)/fan3_input"; sleep 3; }
 run_case stall-one stall_one
@@ -180,6 +185,17 @@ check "exhaust stall: all channels forced 255" "255 255 255 255 255 255 255 255 
 status="$SNAP_STATUS"
 [[ "$status" == state=DEGRADED\ *profile=full-duty-fault* ]] && pass=$((pass + 1)) || { fail=$((fail + 1)); echo "FAIL: exhaust-stall status: $status"; }
 
+stall_ch6() { sleep 1.5; echo 100 > "$(hw)/fan6_input"; sleep 3; }
+run_case stall-ch6 stall_ch6
+check "channel 6 stall: all channels forced 255" "255 255 255 255 255 255 255 255 255 255" "$SNAP_PWM"
+status="$SNAP_STATUS"
+[[ "$status" == state=DEGRADED\ *profile=full-duty-fault* ]] && pass=$((pass + 1)) || { fail=$((fail + 1)); echo "FAIL: ch6-stall status: $status"; }
+
+slow_ch6_ok() { sleep 1.5; echo 600 > "$(hw)/fan6_input"; sleep 2.5; }
+run_case slow-ch6 slow_ch6_ok
+status="$SNAP_STATUS"
+[[ "$status" == state=OK\ * ]] && pass=$((pass + 1)) || { fail=$((fail + 1)); echo "FAIL: 600 RPM channel 6 must be healthy: $status"; }
+
 slow_exhaust_ok() { sleep 1.5; echo 600 > "$(hw)/fan10_input"; sleep 2.5; }
 run_case slow-exhaust slow_exhaust_ok
 status="$SNAP_STATUS"
@@ -195,6 +211,11 @@ run_case zero-gpu zero_gpu
 check "zero PWM on GPU channel: watchdog exits" 0 "$WD_RUNNING"
 check "zero PWM on GPU channel: all forced 255" "255 255 255 255 255 255 255 255 255 255" "$SNAP_PWM"
 
+zero_ch6() { sleep 1; echo 0 > "$(hw)/pwm6"; sleep 1; }
+run_case zero-ch6 zero_ch6
+check "zero PWM on channel 6: watchdog exits" 0 "$WD_RUNNING"
+check "zero PWM on channel 6: all forced 255" "255 255 255 255 255 255 255 255 255 255" "$SNAP_PWM"
+
 zero_exhaust() { sleep 1; echo 0 > "$(hw)/pwm10"; sleep 1; }
 run_case zero-exhaust zero_exhaust
 check "zero PWM on exhaust: watchdog exits" 0 "$WD_RUNNING"
@@ -204,6 +225,10 @@ tach_missing() { sleep 1; rm -f "$(hw)/fan5_input"; sleep 1; }
 run_case tach-missing tach_missing
 check "GPU tach missing: watchdog exits" 0 "$WD_RUNNING"
 check "GPU tach missing: all forced 255" "255 255 255 255 255 255 255 255 255 255" "$SNAP_PWM"
+
+tach_missing6() { sleep 1; rm -f "$(hw)/fan6_input"; sleep 1; }
+run_case tach-missing6 tach_missing6
+check "channel 6 tach missing: watchdog exits" 0 "$WD_RUNNING"
 
 tach_garbage() { sleep 1; echo abc > "$(hw)/fan10_input"; sleep 1; }
 run_case tach-garbage tach_garbage
@@ -219,18 +244,18 @@ lease() {
   printf 'profile=%s\nexpires=%s\nowner_pid=%s\n' "$profile" "$(date -u -d '+10 min' +%Y-%m-%dT%H:%M:%SZ)" "$$" \
     > "$FAKE/run/request"
 }
-flat_max() { lease flat-max; sleep 1; }
+flat_max() { sleep 2.5; lease flat-max; sleep 1; }
 run_case lease-flat-max flat_max
 check "flat-max lease: every channel 255" "255 255 255 255 255 255 255 255 255 255" "$SNAP_PWM"
 [[ "$SNAP_STATUS" == *profile=flat-max* ]] && pass=$((pass + 1)) || { fail=$((fail + 1)); echo "FAIL: flat-max status"; }
 
 steep() { lease curve-steep; sleep 1.5; set_junction 55000 40000; sleep 1.5; }
 run_case lease-steep steep
-check "curve-steep at 55 C: gpu 255, exhaust 255" "255 255 255 255 255 255 255 255 255 255" "$SNAP_PWM"
+check "curve-steep at 55 C: gpu 255, ch6 and exhaust 255" "255 255 255 255 255 255 255 255 255 255" "$SNAP_PWM"
 
 default_55() { sleep 1.5; set_junction 55000 40000; sleep 1.5; }
 run_case default-55 default_55
-check "curve-default at 55 C: gpu 150, exhaust 255" "150 150 150 150 150 255 255 255 255 255" "$SNAP_PWM"
+check "curve-default at 55 C: gpu 150, ch6 and exhaust 255" "150 150 150 150 150 255 255 255 255 255" "$SNAP_PWM"
 
 bad_profile() { printf 'profile=bogus\nexpires=%s\nowner_pid=%s\n' "$(date -u -d '+10 min' +%Y-%m-%dT%H:%M:%SZ)" "$$" > "$FAKE/run/request"; sleep 3; }
 run_case unknown-profile bad_profile

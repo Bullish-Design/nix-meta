@@ -12,13 +12,23 @@ let
   gpuFanChannels = [ 1 2 3 4 5 ];
   gpuFanChannelsForShell = lib.concatMapStringsSep " " toString gpuFanChannels;
 
-  # ARCTIC port of the rear case exhaust fan (about 2,900 RPM at PWM 255). It
-  # is quiet, so it follows its own aggressive curve.
-  exhaustFanChannel = 10;
+  # Fast-ramp channels. These fans are quiet, so they follow one aggressive
+  # curve and reach full duty before the GPUs get hot.
+  #   6:  front fan, ducted over the outside of the two GPUs. About 3,058 RPM
+  #       at PWM 255 (measured 2026-10-28).
+  #   10: rear case exhaust fan. About 2,900 RPM at PWM 255.
+  # The Dell exhaust fan is not here. The BIOS controls it.
+  fastRampChannels = [ 6 10 ];
+  fastRampChannelsForShell = lib.concatMapStringsSep " " toString fastRampChannels;
 
-  # Every other ARCTIC channel (6 to 9) has no fan. The watchdog holds them at
+  # Measured RPM at PWM 255, one entry per fast-ramp channel. The module
+  # estimates the RPM at the lowest curve PWM by linear scaling and refuses to
+  # build if the estimate is below twice the stall latch (see assertions).
+  fastRampRpmAt255 = { "6" = 3058; "10" = 2900; };
+
+  # Every other ARCTIC channel (7 to 9) has no fan. The watchdog holds them at
   # PWM 255 and fails high if one reads anything else.
-  managedChannelsForShell = "${gpuFanChannelsForShell} ${toString exhaustFanChannel}";
+  managedChannelsForShell = "${gpuFanChannelsForShell} ${fastRampChannelsForShell}";
 
   # Named GPU duct fan curves. Each entry maps a minimum maximum-junction
   # temperature, in milli-degrees C, to a commanded PWM value. Order each list
@@ -62,11 +72,14 @@ let
     ];
   };
 
-  # Rear exhaust fan curves. Same format as fanCurves. The exhaust fan is not
-  # noisy, so the aggressive curve idles at PWM 80 (about 1,000 RPM, well above
-  # a stall) and reaches full duty at 50 C, before the GPUs get hot.
-  exhaustCurves = {
-    fast = [
+  # Fast-ramp fan curves (channels 6 and 10). Same format as fanCurves. These
+  # fans are not noisy, so the aggressive curve idles at PWM 80 and reaches full
+  # duty at 50 C, before the GPUs get hot. At PWM 80 the estimate is about
+  # 960 RPM on channel 6 (3,058 x 80 / 255) and about 910 RPM on channel 10.
+  # Both are well above the 300 RPM stall latch, so no channel needs a higher
+  # minimum PWM.
+  fastRampCurves = {
+    aggressive = [
       { minC = 50000; pwm = 255; }
       { minC = 45000; pwm = 220; }
       { minC = 40000; pwm = 180; }
@@ -106,11 +119,12 @@ let
   # always resolves to whatever `selectedFanCurveName` names above, so a
   # request that is absent, expired, dead-owner, or unknown falls back to
   # exactly the shipped behaviour. Each profile names one curve for each of the
-  # two fan groups: the five GPU duct fans and the exhaust fan.
+  # two fan groups: the five GPU duct fans ("gpu") and the fast-ramp fans
+  # ("fast": channel 6 and the exhaust).
   fanProfiles = {
-    "flat-max" = { gpu = "full"; exhaust = "full"; };
-    "curve-default" = { gpu = selectedFanCurveName; exhaust = "fast"; };
-    "curve-steep" = { gpu = "steep"; exhaust = "fast"; };
+    "flat-max" = { gpu = "full"; fast = "full"; };
+    "curve-default" = { gpu = selectedFanCurveName; fast = "aggressive"; };
+    "curve-steep" = { gpu = "steep"; fast = "aggressive"; };
   };
   allowedProfiles = builtins.attrNames fanProfiles;
   allowedProfilesForShell = lib.concatStringsSep " " allowedProfiles;
@@ -119,7 +133,7 @@ let
   # Every curve a lease profile can select must exist and be valid, not only
   # the one selected by default -- a lease can reach any of them at runtime.
   curveNamesNeeded = kind: lib.unique (map (p: p.${kind}) (builtins.attrValues fanProfiles));
-  curveSets = { gpu = fanCurves; exhaust = exhaustCurves; };
+  curveSets = { gpu = fanCurves; fast = fastRampCurves; };
 
   # Render one shell function per curve actually reachable through a lease
   # profile, named by group and curve rather than by profile so two profile
@@ -163,12 +177,12 @@ let
     (profile: p: "      ${profile}) curve_${kind}_${p.${kind}} \"$junction\" ;;\n")
     fanProfiles)
   + ''
-        *) curve_${kind}_${if kind == "gpu" then selectedFanCurveName else "fast"} "$junction" ;;
+        *) curve_${kind}_${if kind == "gpu" then selectedFanCurveName else "aggressive"} "$junction" ;;
       esac
     }
   '';
 
-  curveDispatchFunctions = lib.concatMapStrings mkDispatchFunction [ "gpu" "exhaust" ];
+  curveDispatchFunctions = lib.concatMapStrings mkDispatchFunction [ "gpu" "fast" ];
 
   # Keep the system kernel unchanged. The driver source is taken from the
   # nixpkgs testing source where it is currently available, but compiled and
@@ -241,8 +255,8 @@ let
   '';
 
   # This watchdog is the normal controller for the five GPU duct fans and the
-  # exhaust fan. It starts high, uses the configured GPU PCI paths, and returns
-  # high on every error. CoolerControl leaves the ARCTIC fans unmanaged; it
+  # fast-ramp fans (channel 6 and the exhaust). It starts high, uses the
+  # configured GPU PCI paths, and returns high on every error. CoolerControl leaves the ARCTIC fans unmanaged; it
   # remains the localhost UI and hardware monitor. The watchdog never touches
   # the Dell fans. The BIOS controls them.
   fanWatchdog = pkgs.writeShellScript "arctic-fan-watchdog" ''
@@ -297,9 +311,9 @@ let
       return 1
     }
 
-    # Fan curves for the GPU duct fans and the exhaust fan, one shell function
+    # Fan curves for the GPU duct fans and the fast-ramp fans, one shell function
     # per curve reachable through a fan-profile lease, generated from
-    # `fanCurves`, `exhaustCurves` and `fanProfiles` in this module's `let`
+    # `fanCurves`, `fastRampCurves` and `fanProfiles` in this module's `let`
     # block. Each step applies from its lower bound up to the next bound.
     # Values are PWM. The test scripts read the same curves from
     # /etc/nix-meta/arctic-fan/, so the two cannot drift apart.
@@ -310,14 +324,15 @@ ${curveDispatchFunctions}
     # for stall_samples consecutive samples is failed. Startup_grace_samples
     # skips the first samples while the fans start. The GPU duct fans reach
     # about 15,000 RPM at PWM 255 and about 1,500 RPM at their idle PWM. The
-    # exhaust fan reaches about 2,900 RPM at PWM 255 and about 1,000 RPM at
-    # its idle PWM, so it gets a lower threshold.
+    # fast-ramp fans reach about 3,000 RPM at PWM 255 and about 900 RPM at
+    # their idle PWM, so they get a lower threshold. Each channel has its own
+    # strike counter and its own latch.
     gpu_min_running_rpm=500
-    exhaust_min_running_rpm=300
+    fast_min_running_rpm=300
     stall_samples=3
     startup_grace_samples=5
 
-    exhaust_channel=${toString exhaustFanChannel}
+    fast_channel_list="${fastRampChannelsForShell}"
     gpu_channel_list="${gpuFanChannelsForShell}"
     managed_channel_list="${managedChannelsForShell}"
 
@@ -326,19 +341,19 @@ ${curveDispatchFunctions}
     for ch in $managed_channel_list; do
       strikes[$ch]=0
       failed[$ch]=0
-      min_rpm[$ch]=$exhaust_min_running_rpm
+      min_rpm[$ch]=$fast_min_running_rpm
     done
     for ch in $gpu_channel_list; do
       min_rpm[$ch]=$gpu_min_running_rpm
       gpu_channel_count=$((gpu_channel_count + 1))
     done
     cooldown[gpu]=0
-    cooldown[exhaust]=0
+    cooldown[fast]=0
 
     channel_label() {
       case " $gpu_channel_list " in
         *" $1 "*) printf 'GPU duct channel %s\n' "$1" ;;
-        *) printf 'exhaust channel %s\n' "$1" ;;
+        *) printf 'fast-ramp channel %s\n' "$1" ;;
       esac
     }
 
@@ -416,8 +431,8 @@ ${curveDispatchFunctions}
         exit 1
       fi
 
-      # Read every PWM channel. Managed channels (GPU duct and exhaust) must
-      # hold a valid nonzero value. Every other channel (6 to 9, no fan) must
+      # Read every PWM channel. Managed channels (GPU duct and fast-ramp) must
+      # hold a valid nonzero value. Every other channel (7 to 9, no fan) must
       # stay at 255.
       pwm_count=0
       for pwm in "$arctic"/pwm[0-9] "$arctic"/pwm[0-9][0-9]; do
@@ -494,17 +509,22 @@ ${curveDispatchFunctions}
       done
 
       # State: NO_AIRFLOW when every GPU duct fan is failed. DEGRADED when
-      # any GPU duct fan or the exhaust fan is failed. Otherwise OK.
+      # any GPU duct fan or any fast-ramp fan is failed. Otherwise OK.
       failed_count=0
       for ch in $gpu_channel_list; do
         if [ "''${failed[$ch]}" -ne 0 ]; then
           failed_count=$((failed_count + 1))
         fi
       done
-      exhaust_failed="''${failed[$exhaust_channel]}"
+      fast_failed_count=0
+      for ch in $fast_channel_list; do
+        if [ "''${failed[$ch]}" -ne 0 ]; then
+          fast_failed_count=$((fast_failed_count + 1))
+        fi
+      done
       if [ "$failed_count" -ge "$gpu_channel_count" ]; then
         state=NO_AIRFLOW
-      elif [ "$failed_count" -gt 0 ] || [ "$exhaust_failed" -ne 0 ]; then
+      elif [ "$failed_count" -gt 0 ] || [ "$fast_failed_count" -gt 0 ]; then
         state=DEGRADED
       else
         state=OK
@@ -536,10 +556,10 @@ ${curveDispatchFunctions}
       # Mirrors inferference.experiment.control.arbitrate() exactly. This
       # watchdog is the sole authority over the actuator: the request file
       # only ever NAMES a wish. A fault always wins, even over a live lease.
-      # Any failed fan, GPU duct or exhaust, is a fault.
+      # Any failed fan, GPU duct or fast-ramp, is a fault.
       active_profile="${defaultProfile}"
       active_reason="no request"
-      if [ "$failed_count" -gt 0 ] || [ "$exhaust_failed" -ne 0 ]; then
+      if [ "$failed_count" -gt 0 ] || [ "$fast_failed_count" -gt 0 ]; then
         active_profile="full-duty-fault"
         active_reason="fault override"
       elif [ -r /run/arctic-fan/request ]; then
@@ -575,21 +595,25 @@ ${curveDispatchFunctions}
       fi
 
       target_pwm="$(curve_gpu_for_profile "$active_profile" "$max_junction")"
-      exhaust_target_pwm="$(curve_exhaust_for_profile "$active_profile" "$max_junction")"
+      fast_target_pwm="$(curve_fast_for_profile "$active_profile" "$max_junction")"
 
       ramp_group "$arctic" gpu "$target_pwm" $gpu_channel_list
-      ramp_group "$arctic" exhaust "$exhaust_target_pwm" "$exhaust_channel"
+      ramp_group "$arctic" fast "$fast_target_pwm" $fast_channel_list
 
       detail=""
       for ch in $gpu_channel_list; do
         detail="$detail channel$ch(pwm=''${pwm_now[$ch]} rpm=''${fan_rpm[$ch]} failed=''${failed[$ch]})"
       done
-      detail="$detail exhaust$exhaust_channel(target=$exhaust_target_pwm pwm=''${pwm_now[$exhaust_channel]} rpm=''${fan_rpm[$exhaust_channel]} failed=$exhaust_failed)"
+      for ch in $fast_channel_list; do
+        detail="$detail fast$ch(target=$fast_target_pwm pwm=''${pwm_now[$ch]} rpm=''${fan_rpm[$ch]} failed=''${failed[$ch]})"
+      done
 
       # The first four keys are an API: the inferference experiment runner
       # parses them. Add new keys only after them, never before or between.
+      # exhaust_pwm is the commanded PWM of the fast-ramp group (channel 6 and
+      # the exhaust move together). The key keeps its old name for parsers.
       printf 'state=%s target_pwm=%s max_gpu_junction_mC=%s profile=%s exhaust_pwm=%s\n' \
-        "$state" "$target_pwm" "$max_junction" "$active_profile" "''${pwm_now[$exhaust_channel]}" \
+        "$state" "$target_pwm" "$max_junction" "$active_profile" "''${pwm_now[''${fast_channel_list%% *}]}" \
         > /run/arctic-fan/status || echo "could not write /run/arctic-fan/status" >&2
       ${pkgs.systemd}/bin/systemd-notify --status="$state target_pwm=$target_pwm profile=$active_profile" || true
       echo "ARCTIC watchdog: state=$state max_gpu_junction_mC=$max_junction target_pwm=$target_pwm active_profile=$active_profile reason=\"$active_reason\" cooldown_samples=''${cooldown[gpu]}$detail"
@@ -632,11 +656,24 @@ in
     }
     {
       assertion =
-        let all = gpuFanChannels ++ [ exhaustFanChannel ];
-        in gpuFanChannels != [ ]
+        let all = gpuFanChannels ++ fastRampChannels;
+        in gpuFanChannels != [ ] && fastRampChannels != [ ]
           && lib.length (lib.unique all) == lib.length all
           && lib.all (c: c >= 1 && c <= 10) all;
-      message = "The ARCTIC GPU duct channels and the exhaust channel must be distinct and in 1 to 10.";
+      message = "The ARCTIC GPU duct channels and the fast-ramp channels must be distinct and in 1 to 10.";
+    }
+    {
+      # Estimate each fast-ramp fan at the lowest PWM on every fast-ramp curve
+      # by linear scaling from its RPM at PWM 255. Keep it at or above twice
+      # the 300 RPM stall latch, so an idle fan never reads as stalled.
+      assertion = lib.all
+        (ch: lib.all
+          (curve: lib.all
+            (e: (fastRampRpmAt255.${toString ch} * e.pwm) / 255 >= 600)
+            curve)
+          (builtins.attrValues fastRampCurves))
+        fastRampChannels;
+      message = "A fast-ramp curve idles a fan below about 600 RPM, too close to the 300 RPM stall latch. Raise its minimum PWM.";
     }
     {
       assertion = fanCurves ? ${selectedFanCurveName};
@@ -670,14 +707,15 @@ in
   # Test scripts read the same channel lists as the watchdog.
   environment.etc."nix-meta/arctic-fan/gpu-duct-channels".text =
     lib.concatMapStrings (channel: "${toString channel}\n") gpuFanChannels;
-  environment.etc."nix-meta/arctic-fan/exhaust-channel".text = "${toString exhaustFanChannel}\n";
+  environment.etc."nix-meta/arctic-fan/fast-ramp-channels".text =
+    lib.concatMapStrings (channel: "${toString channel}\n") fastRampChannels;
 
   # Test scripts read the same curve as the watchdog. One line per step,
   # "<minJunctionMilliC> <pwm>", hottest step first.
   environment.etc."nix-meta/arctic-fan/gpu-curve".text =
     lib.concatMapStrings (e: "${toString e.minC} ${toString e.pwm}\n") selectedFanCurve;
-  environment.etc."nix-meta/arctic-fan/exhaust-curve".text =
-    lib.concatMapStrings (e: "${toString e.minC} ${toString e.pwm}\n") exhaustCurves.fast;
+  environment.etc."nix-meta/arctic-fan/fast-ramp-curve".text =
+    lib.concatMapStrings (e: "${toString e.minC} ${toString e.pwm}\n") fastRampCurves.aggressive;
 
   systemd.services.arctic-fan-module-load = {
     description = "Load the kernel-matched ARCTIC Fan Controller module";
@@ -718,7 +756,7 @@ in
   };
 
   systemd.services.arctic-fan-watchdog = {
-    description = "Independent fail-high watchdog for ARCTIC GPU duct and exhaust cooling";
+    description = "Independent fail-high watchdog for ARCTIC GPU duct, front, and exhaust cooling";
     wantedBy = [ "multi-user.target" ];
     requires = [ "arctic-fan-safe-high.service" ];
     after = [ "arctic-fan-safe-high.service" ];

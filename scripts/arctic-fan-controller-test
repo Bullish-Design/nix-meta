@@ -76,10 +76,10 @@ fi
 if ! load_gpu_fan_curve; then
   exit 2
 fi
-if ! load_exhaust_channel; then
+if ! load_fast_ramp_channels; then
   exit 2
 fi
-if ! load_exhaust_fan_curve; then
+if ! load_fast_ramp_curve; then
   exit 2
 fi
 
@@ -308,14 +308,16 @@ check_physical_mapping() {
       echo "mapping evidence: GPU duct channel $ch reports $value RPM at PWM 255"
     fi
   done
-  tach="$h/fan${EXHAUST_FAN_CHANNEL}_input"
-  if ! value="$(cat "$tach" 2>/dev/null)"; then
-    fail "exhaust tachometer cannot be read: $tach"
-  elif ! [[ "$value" =~ ^[0-9]+$ ]] || [ "$value" -le 0 ]; then
-    fail "exhaust channel $EXHAUST_FAN_CHANNEL has no tach response at PWM 255: $tach=$value"
-  else
-    echo "mapping evidence: exhaust channel $EXHAUST_FAN_CHANNEL reports $value RPM at PWM 255"
-  fi
+  for ch in "${FAST_RAMP_CHANNELS[@]}"; do
+    tach="$h/fan${ch}_input"
+    if ! value="$(cat "$tach" 2>/dev/null)"; then
+      fail "fast-ramp tachometer cannot be read: $tach"
+    elif ! [[ "$value" =~ ^[0-9]+$ ]] || [ "$value" -le 0 ]; then
+      fail "fast-ramp channel $ch has no tach response at PWM 255: $tach=$value"
+    else
+      echo "mapping evidence: fast-ramp channel $ch reports $value RPM at PWM 255"
+    fi
+  done
   for index in 1 2 3 4 5 6 7 8 9 10; do
     is_managed_channel "$index" && continue
     tach="$h/fan${index}_input"
@@ -350,7 +352,7 @@ check_watchdog_status() {
   elif [[ ! "$state" =~ (^|[[:space:]])profile=[A-Za-z0-9-]+([[:space:]]|$) ]]; then
     fail "watchdog status has no profile readback: $state"
   else
-    echo "WATCHDOG STATUS PASS: all GPU duct fans and the exhaust fan are running; profile readback is present"
+    echo "WATCHDOG STATUS PASS: all GPU duct fans and the fast-ramp fans are running; profile readback is present"
   fi
 }
 
@@ -572,7 +574,7 @@ test_gpu_fan_response() {
 }
 
 test_curve_hold() {
-  local h bdf pci sensor value max_junction ch pwm i expected expected_exhaust match
+  local h bdf pci sensor value max_junction ch pwm i expected expected_fast match
   echo "=== curve hold test ==="
   force_all_high || return 1
   if ! systemctl is-active --quiet arctic-fan-watchdog.service; then
@@ -596,8 +598,8 @@ test_curve_hold() {
 
   # The expected PWM comes from the exported watchdog curve.
   expected="$(expected_pwm "$max_junction")"
-  expected_exhaust="$(curve_expected_exhaust_pwm "$max_junction")"
-  echo "expected_pwm=$expected expected_exhaust_pwm=$expected_exhaust"
+  expected_fast="$(curve_expected_fast_ramp_pwm "$max_junction")"
+  echo "expected_pwm=$expected expected_fast_ramp_pwm=$expected_fast"
 
   # The watchdog ramps down after five cool samples. Allow about 15 s.
   for i in $(seq 1 8); do
@@ -605,19 +607,23 @@ test_curve_hold() {
       pwm="$(cat "$h/pwm$ch")" || return 1
       echo "curve_sample=$i pwm$ch=$pwm expected=$expected"
     done
-    echo "curve_sample=$i pwm${EXHAUST_FAN_CHANNEL}=$(cat "$h/pwm$EXHAUST_FAN_CHANNEL") expected=$expected_exhaust"
+    for ch in "${FAST_RAMP_CHANNELS[@]}"; do
+      echo "curve_sample=$i pwm$ch=$(cat "$h/pwm$ch") expected=$expected_fast"
+    done
     match=1
     for ch in "${GPU_FAN_CHANNELS[@]}"; do
       [ "$(cat "$h/pwm$ch")" = "$expected" ] || match=0
     done
-    [ "$(cat "$h/pwm$EXHAUST_FAN_CHANNEL")" = "$expected_exhaust" ] || match=0
+    for ch in "${FAST_RAMP_CHANNELS[@]}"; do
+      [ "$(cat "$h/pwm$ch")" = "$expected_fast" ] || match=0
+    done
     if [ "$match" -eq 1 ]; then
-      echo "Curve hold result: PASS; GPU duct channels match the curve at $expected and the exhaust channel at $expected_exhaust"
+      echo "Curve hold result: PASS; GPU duct channels match the curve at $expected and the fast-ramp channels at $expected_fast"
       return 0
     fi
     sleep 2
   done
-  fail "fan channels did not reach the expected curve values (GPU duct $expected, exhaust $expected_exhaust)"
+  fail "fan channels did not reach the expected curve values (GPU duct $expected, fast-ramp $expected_fast)"
   force_all_high || true
   return 1
 }

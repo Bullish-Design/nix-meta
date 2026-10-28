@@ -1,8 +1,8 @@
 #!/usr/bin/env bash
 
 # Source this file. It loads the ARCTIC channels that drive the GPU duct fans
-# and the exhaust fan. The NixOS module writes the lists to files from the same
-# Nix values that the watchdog uses.
+# and the fast-ramp fans (channel 6 and the exhaust). The NixOS module writes
+# the lists to files from the same Nix values that the watchdog uses.
 
 load_gpu_fan_channels() {
   local file="/etc/nix-meta/arctic-fan/gpu-duct-channels" ch
@@ -26,27 +26,43 @@ load_gpu_fan_channels() {
   echo "gpu_duct_channels=${GPU_FAN_CHANNELS[*]}"
 }
 
-# Load the exhaust fan channel into EXHAUST_FAN_CHANNEL.
-load_exhaust_channel() {
-  local file="/etc/nix-meta/arctic-fan/exhaust-channel"
-  EXHAUST_FAN_CHANNEL=""
+# Load the fast-ramp fan channels (channel 6 and the exhaust) into
+# FAST_RAMP_CHANNELS.
+load_fast_ramp_channels() {
+  local file="/etc/nix-meta/arctic-fan/fast-ramp-channels" ch
+  FAST_RAMP_CHANNELS=()
   if [ ! -r "$file" ]; then
-    echo "FAIL: exhaust channel file is not readable: $file" >&2
+    echo "FAIL: fast-ramp channel list is not readable: $file" >&2
     return 1
   fi
-  EXHAUST_FAN_CHANNEL="$(head -n1 "$file")"
-  if ! [[ "$EXHAUST_FAN_CHANNEL" =~ ^[0-9]+$ ]]; then
-    echo "FAIL: invalid exhaust channel in $file: $EXHAUST_FAN_CHANNEL" >&2
+  while IFS= read -r ch || [ -n "$ch" ]; do
+    [ -n "$ch" ] || continue
+    if ! [[ "$ch" =~ ^[0-9]+$ ]]; then
+      echo "FAIL: invalid fast-ramp channel in $file: $ch" >&2
+      return 1
+    fi
+    FAST_RAMP_CHANNELS+=("$ch")
+  done < "$file"
+  if [ "${#FAST_RAMP_CHANNELS[@]}" -eq 0 ]; then
+    echo "FAIL: no fast-ramp channels in $file" >&2
     return 1
   fi
-  echo "exhaust_channel=$EXHAUST_FAN_CHANNEL"
+  echo "fast_ramp_channels=${FAST_RAMP_CHANNELS[*]}"
 }
 
-# True for a channel that the watchdog drives: a GPU duct channel or the
-# exhaust channel. Every other channel has no fan and stays at 255.
+# True for a channel that the watchdog drives: a GPU duct channel or a
+# fast-ramp channel. Every other channel has no fan and stays at 255.
 is_managed_channel() {
-  [ "$1" = "${EXHAUST_FAN_CHANNEL:-}" ] && return 0
+  is_fast_ramp_channel "$1" && return 0
   is_gpu_channel "$1"
+}
+
+is_fast_ramp_channel() {
+  local ch
+  for ch in "${FAST_RAMP_CHANNELS[@]}"; do
+    [ "$1" = "$ch" ] && return 0
+  done
+  return 1
 }
 
 is_gpu_channel() {
@@ -91,8 +107,8 @@ load_gpu_fan_curve() {
   load_curve_file /etc/nix-meta/arctic-fan/gpu-curve GPU_FAN_CURVE "GPU duct"
 }
 
-load_exhaust_fan_curve() {
-  load_curve_file /etc/nix-meta/arctic-fan/exhaust-curve EXHAUST_FAN_CURVE "exhaust"
+load_fast_ramp_curve() {
+  load_curve_file /etc/nix-meta/arctic-fan/fast-ramp-curve FAST_RAMP_CURVE "fast-ramp"
 }
 
 # Expected PWM for a maximum junction reading from a loaded curve.
@@ -116,6 +132,6 @@ curve_expected_pwm() {
   curve_expected_pwm_in "$1" GPU_FAN_CURVE
 }
 
-curve_expected_exhaust_pwm() {
-  curve_expected_pwm_in "$1" EXHAUST_FAN_CURVE
+curve_expected_fast_ramp_pwm() {
+  curve_expected_pwm_in "$1" FAST_RAMP_CURVE
 }
