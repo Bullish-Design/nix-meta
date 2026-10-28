@@ -7,8 +7,8 @@ let
   # ARCTIC ports that carry the five GPU duct fans (ARCTIC S4028-15K, ducted
   # into the two AMD V620 cards). Channel N drives pwmN and reports fanN_input.
   # These are the loudest fans in the case. They run slow while the GPUs are
-  # cool and ramp with the hottest GPU junction. Change this list only after
-  # the physical channel map is verified with scripts/arctic-fan-controller-test.
+  # cool and ramp with the hottest GPU sensor (junction or memory). Change
+  # this list only after the physical channel map is verified with scripts/arctic-fan-controller-test.
   gpuFanChannels = [ 1 2 3 4 5 ];
   gpuFanChannelsForShell = lib.concatMapStringsSep " " toString gpuFanChannels;
 
@@ -30,23 +30,31 @@ let
   # PWM 255 and fails high if one reads anything else.
   managedChannelsForShell = "${gpuFanChannelsForShell} ${fastRampChannelsForShell}";
 
-  # Named GPU duct fan curves. Each entry maps a minimum maximum-junction
-  # temperature, in milli-degrees C, to a commanded PWM value. Order each list
+  # Named GPU duct fan curves. Each entry maps a minimum hottest-sensor
+  # temperature (the hottest of junction and memory over both cards), in
+  # milli-degrees C, to a commanded PWM value. Order each list
   # from the hottest step to the coolest, and end it with a 0 entry so every
   # temperature maps to a value. PWM-to-RPM values come from the project 03
   # calibration sweep.
   fanCurves = {
-    # Installed production curve. This is the shipped default.
-    stepped = [
-      { minC = 75000; pwm = 255; }
-      { minC = 70000; pwm = 225; }
-      { minC = 65000; pwm = 200; }
-      { minC = 60000; pwm = 175; }
-      { minC = 55000; pwm = 150; }
-      { minC = 50000; pwm = 125; }
-      { minC = 45000; pwm = 100; }
-      { minC = 40000; pwm = 75; }
-      { minC = 30000; pwm = 50; }
+    # Shipped default (owner goal 2026-10-28): quiet duct fans, with the
+    # hottest sensor at or below about 70 C when it holds. Measured on card 0
+    # at 8 lanes: 140 W gives junction 63 C and memory 68 C. 160 W gives
+    # junction 67 C and memory 70 C. The curve is keyed on the hottest of
+    # junction and memory, so the memory sensor sets the speed when it leads.
+    # It reaches full duty at 73 C, under the 75 C experiment arm bound and
+    # the 80 C machine guard.
+    quiet = [
+      { minC = 73000; pwm = 255; }
+      { minC = 72000; pwm = 235; }
+      { minC = 70000; pwm = 205; }
+      { minC = 68000; pwm = 180; }
+      { minC = 66000; pwm = 155; }
+      { minC = 63000; pwm = 130; }
+      { minC = 60000; pwm = 110; }
+      { minC = 55000; pwm = 90; }
+      { minC = 50000; pwm = 70; }
+      { minC = 45000; pwm = 50; }
       { minC = 0; pwm = 25; }
     ];
 
@@ -59,22 +67,27 @@ let
       { minC = 0; pwm = 255; }
     ];
 
-    # Project 024 arm 2 candidate (C-STEEP). Reaches full duty at 55 C instead
-    # of 75 C, so the fans are already at maximum before the hot window.
-    # Reachable at runtime as fan-profile lease "curve-steep".
+    # Project 024 arm 2 candidate (C-STEEP). Steeper than the default at every
+    # step. It reaches full duty at 68 C instead of 73 C, so the fans are at
+    # maximum before the hottest sensor nears 70 C. Keyed on the hottest of
+    # junction and memory. Reachable at runtime as fan-profile lease
+    # "curve-steep".
     steep = [
-      { minC = 55000; pwm = 255; }
-      { minC = 50000; pwm = 125; }
-      { minC = 45000; pwm = 100; }
-      { minC = 40000; pwm = 75; }
-      { minC = 30000; pwm = 50; }
+      { minC = 68000; pwm = 255; }
+      { minC = 64000; pwm = 225; }
+      { minC = 60000; pwm = 190; }
+      { minC = 55000; pwm = 155; }
+      { minC = 50000; pwm = 120; }
+      { minC = 45000; pwm = 90; }
+      { minC = 40000; pwm = 60; }
       { minC = 0; pwm = 25; }
     ];
   };
 
   # Fast-ramp fan curves (channels 6 and 10). Same format as fanCurves. These
   # fans are not noisy, so the aggressive curve idles at PWM 80 and reaches full
-  # duty at 50 C, before the GPUs get hot. At PWM 80 the estimate is about
+  # duty at 50 C, before the GPUs get hot. They follow the hottest of junction
+  # and memory, like the duct fans. At PWM 80 the estimate is about
   # 960 RPM on channel 6 (3,058 x 80 / 255) and about 910 RPM on channel 10.
   # Both are well above the 300 RPM stall latch, so no channel needs a higher
   # minimum PWM.
@@ -94,7 +107,7 @@ let
 
   # The active GPU curve when no fan-profile lease is held. Change this one
   # name to switch the default.
-  selectedFanCurveName = "stepped";
+  selectedFanCurveName = "quiet";
   selectedFanCurve = fanCurves.${selectedFanCurveName};
 
   # Fail at evaluation time rather than shipping a curve that cannot answer
@@ -142,10 +155,10 @@ let
   # for a valid sensor reading and fails high rather than guessing.
   mkCurveFunction = kind: name: curve: ''
     curve_${kind}_${name}() {
-      junction="$1"
+      hottest="$1"
   '' + lib.concatImapStrings
     (i: e: ''
-      ${if i == 1 then "    if" else "    elif"} [ "$junction" -ge ${toString e.minC} ]; then
+      ${if i == 1 then "    if" else "    elif"} [ "$hottest" -ge ${toString e.minC} ]; then
         printf '%s\n' ${toString e.pwm}
     '')
     curve
@@ -170,14 +183,14 @@ let
   mkDispatchFunction = kind: ''
     curve_${kind}_for_profile() {
       profile="$1"
-      junction="$2"
+      hottest="$2"
       case "$profile" in
         full-duty-fault) printf '%s\n' 255 ;;
   '' + lib.concatStrings (lib.mapAttrsToList
-    (profile: p: "      ${profile}) curve_${kind}_${p.${kind}} \"$junction\" ;;\n")
+    (profile: p: "      ${profile}) curve_${kind}_${p.${kind}} \"$hottest\" ;;\n")
     fanProfiles)
   + ''
-        *) curve_${kind}_${if kind == "gpu" then selectedFanCurveName else "aggressive"} "$junction" ;;
+        *) curve_${kind}_${if kind == "gpu" then selectedFanCurveName else "aggressive"} "$hottest" ;;
       esac
     }
   '';
@@ -273,11 +286,19 @@ let
       status=$?
       trap - EXIT HUP INT TERM
       safe_high || true
+      # RuntimeDirectoryPreserve keeps the directory, so remove the status
+      # file here. A reader then never sees the status of a dead watchdog.
+      rm -f /run/arctic-fan/status
       exit "$status"
     }
 
     trap on_exit EXIT
     trap 'exit 143' HUP INT TERM
+
+    # The runtime directory survives a restart (RuntimeDirectoryPreserve), so
+    # drop a stale status file from the previous run. The first sample writes
+    # a fresh one. Keep the request file: it is a fan lease.
+    rm -f /run/arctic-fan/status
 
     if ! safe_high; then
       exit 1
@@ -293,15 +314,18 @@ let
       return 1
     }
 
-    find_junction_sensor() {
+    # Find the amdgpu temperature input with the given label ("junction" or
+    # "mem") in the hwmon directory of one PCI device.
+    find_gpu_sensor() {
       pci="$1"
+      want="$2"
       for h in "$pci"/hwmon/hwmon*; do
         [ -d "$h" ] || continue
         [ -r "$h/name" ] || continue
         [ "$(cat "$h/name")" = amdgpu ] || continue
         for label in "$h"/temp*_label; do
           [ -r "$label" ] || continue
-          [ "$(cat "$label")" = junction ] || continue
+          [ "$(cat "$label")" = "$want" ] || continue
           sensor="''${label%_label}_input"
           [ -r "$sensor" ] || continue
           printf '%s\n' "$sensor"
@@ -530,26 +554,38 @@ ${curveDispatchFunctions}
         state=OK
       fi
 
+      # Read the junction and the memory sensor of every GPU. A missing,
+      # unreadable, or non-numeric sensor forces safe high. The control input
+      # is the hottest of all these values. max_junction (the hottest
+      # junction) stays in the status line because the inferference runner
+      # records it.
       max_junction=""
+      max_hottest=""
       for bdf in ${gpuPciDevicesForShell}; do
         pci="/sys/bus/pci/devices/$bdf"
-        if ! sensor="$(find_junction_sensor "$pci")"; then
-          echo "GPU junction sensor missing at $pci; forcing safe high" >&2
-          exit 1
-        fi
-        if ! value="$(cat "$sensor")"; then
-          echo "GPU junction read failed at $sensor; forcing safe high" >&2
-          exit 1
-        fi
-        case "$value" in
-          ""|*[!0-9]*)
-            echo "invalid GPU junction value at $sensor: $value" >&2
+        for sensor_name in junction mem; do
+          if ! sensor="$(find_gpu_sensor "$pci" "$sensor_name")"; then
+            echo "GPU $sensor_name sensor missing at $pci; forcing safe high" >&2
             exit 1
-            ;;
-        esac
-        if [ -z "$max_junction" ] || [ "$value" -gt "$max_junction" ]; then
-          max_junction="$value"
-        fi
+          fi
+          if ! value="$(cat "$sensor")"; then
+            echo "GPU $sensor_name read failed at $sensor; forcing safe high" >&2
+            exit 1
+          fi
+          case "$value" in
+            ""|*[!0-9]*)
+              echo "invalid GPU $sensor_name value at $sensor: $value" >&2
+              exit 1
+              ;;
+          esac
+          if [ "$sensor_name" = junction ] \
+            && { [ -z "$max_junction" ] || [ "$value" -gt "$max_junction" ]; }; then
+            max_junction="$value"
+          fi
+          if [ -z "$max_hottest" ] || [ "$value" -gt "$max_hottest" ]; then
+            max_hottest="$value"
+          fi
+        done
       done
 
       # --- fan-profile lease arbitration (DESIGN.md section 5.1) ---
@@ -594,8 +630,8 @@ ${curveDispatchFunctions}
         fi
       fi
 
-      target_pwm="$(curve_gpu_for_profile "$active_profile" "$max_junction")"
-      fast_target_pwm="$(curve_fast_for_profile "$active_profile" "$max_junction")"
+      target_pwm="$(curve_gpu_for_profile "$active_profile" "$max_hottest")"
+      fast_target_pwm="$(curve_fast_for_profile "$active_profile" "$max_hottest")"
 
       ramp_group "$arctic" gpu "$target_pwm" $gpu_channel_list
       ramp_group "$arctic" fast "$fast_target_pwm" $fast_channel_list
@@ -610,13 +646,16 @@ ${curveDispatchFunctions}
 
       # The first four keys are an API: the inferference experiment runner
       # parses them. Add new keys only after them, never before or between.
-      # exhaust_pwm is the commanded PWM of the fast-ramp group (channel 6 and
-      # the exhaust move together). The key keeps its old name for parsers.
-      printf 'state=%s target_pwm=%s max_gpu_junction_mC=%s profile=%s exhaust_pwm=%s\n' \
-        "$state" "$target_pwm" "$max_junction" "$active_profile" "''${pwm_now[''${fast_channel_list%% *}]}" \
+      # max_gpu_junction_mC is the hottest junction. max_gpu_hottest_mC is the
+      # hottest of junction and memory over both cards: the control input of
+      # both curves. exhaust_pwm is the commanded PWM of the fast-ramp group
+      # (channel 6 and the exhaust move together). The key keeps its old name
+      # for parsers.
+      printf 'state=%s target_pwm=%s max_gpu_junction_mC=%s profile=%s exhaust_pwm=%s max_gpu_hottest_mC=%s\n' \
+        "$state" "$target_pwm" "$max_junction" "$active_profile" "''${pwm_now[''${fast_channel_list%% *}]}" "$max_hottest" \
         > /run/arctic-fan/status || echo "could not write /run/arctic-fan/status" >&2
       ${pkgs.systemd}/bin/systemd-notify --status="$state target_pwm=$target_pwm profile=$active_profile" || true
-      echo "ARCTIC watchdog: state=$state max_gpu_junction_mC=$max_junction target_pwm=$target_pwm active_profile=$active_profile reason=\"$active_reason\" cooldown_samples=''${cooldown[gpu]}$detail"
+      echo "ARCTIC watchdog: state=$state max_gpu_junction_mC=$max_junction max_gpu_hottest_mC=$max_hottest target_pwm=$target_pwm active_profile=$active_profile reason=\"$active_reason\" cooldown_samples=''${cooldown[gpu]}$detail"
       ${pkgs.coreutils}/bin/sleep 2
     done
   '';
@@ -711,7 +750,7 @@ in
     lib.concatMapStrings (channel: "${toString channel}\n") fastRampChannels;
 
   # Test scripts read the same curve as the watchdog. One line per step,
-  # "<minJunctionMilliC> <pwm>", hottest step first.
+  # "<minHottestMilliC> <pwm>", hottest step first.
   environment.etc."nix-meta/arctic-fan/gpu-curve".text =
     lib.concatMapStrings (e: "${toString e.minC} ${toString e.pwm}\n") selectedFanCurve;
   environment.etc."nix-meta/arctic-fan/fast-ramp-curve".text =
@@ -776,6 +815,10 @@ in
       # experiment request a fan-profile lease; the watchdog itself still runs
       # as root, so every hwmon/PWM write is unaffected by this group change.
       RuntimeDirectory = "arctic-fan";
+      # Keep /run/arctic-fan when the unit stops or restarts, so a restart
+      # does not delete the request file (a fan lease). The watchdog removes
+      # the stale status file at start and at exit.
+      RuntimeDirectoryPreserve = "yes";
       RuntimeDirectoryMode = "0775";
       Group = "users";
       ExecStart = fanWatchdog;

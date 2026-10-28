@@ -76,6 +76,11 @@ set_junction() {
   echo "$1" > "$FAKE/pci/0000:19:00.0/hwmon/hwmon5/temp2_input"
   echo "${2:-$1}" > "$FAKE/pci/0000:67:00.0/hwmon/hwmon6/temp2_input"
 }
+# Memory sensor (temp3, label mem) of card 0 and card 1.
+set_mem() {
+  echo "$1" > "$FAKE/pci/0000:19:00.0/hwmon/hwmon5/temp3_input"
+  echo "${2:-$1}" > "$FAKE/pci/0000:67:00.0/hwmon/hwmon6/temp3_input"
+}
 
 reset_fake() {
   rm -rf "$FAKE"
@@ -95,8 +100,10 @@ reset_fake() {
   for d in "$FAKE/pci/0000:19:00.0/hwmon/hwmon5" "$FAKE/pci/0000:67:00.0/hwmon/hwmon6"; do
     echo amdgpu > "$d/name"
     echo junction > "$d/temp2_label"
+    echo mem > "$d/temp3_label"
   done
   set_junction 21000 23000
+  set_mem 20000 22000
 }
 
 all_pwm() {
@@ -135,7 +142,7 @@ check "idle: still running" 1 "$WD_RUNNING"
 check "idle: pwm1..5 / 6 / 7..9 / 10" "25 25 25 25 25 80 255 255 255 80" "$SNAP_PWM"
 status="$SNAP_STATUS"
 echo "idle status: $status"
-if [[ "$status" =~ ^state=OK\ target_pwm=25\ max_gpu_junction_mC=23000\ profile=curve-default\ exhaust_pwm=80$ ]]; then
+if [[ "$status" =~ ^state=OK\ target_pwm=25\ max_gpu_junction_mC=23000\ profile=curve-default\ exhaust_pwm=80\ max_gpu_hottest_mC=23000$ ]]; then
   pass=$((pass + 1))
 else
   fail=$((fail + 1)); echo "FAIL: idle status line shape: $status"
@@ -154,7 +161,7 @@ grep -q 'channel1(pwm=25 rpm=4400 failed=0).*channel5(pwm=25 rpm=4400 failed=0) 
 
 hot50() { sleep 1.5; set_junction 50000 41000; sleep 1.5; }
 run_case hot50 hot50
-check "50 C: pwm1..5 125, ch6 and exhaust 255, unused 255" "125 125 125 125 125 255 255 255 255 255" "$SNAP_PWM"
+check "50 C: pwm1..5 70, ch6 and exhaust 255, unused 255" "70 70 70 70 70 255 255 255 255 255" "$SNAP_PWM"
 
 hot75() { sleep 1; set_junction 75000 30000; sleep 1.5; }
 run_case hot75 hot75
@@ -162,11 +169,52 @@ check "hottest card drives the curve (75 C): pwm1..5 255, ch6 and exhaust 255" "
 
 mid40() { sleep 1; set_junction 40000 36000; sleep 3; }
 run_case mid40 mid40
-check "40 C after cooldown: gpu 75, ch6 and exhaust 180" "75 75 75 75 75 180 255 255 255 180" "$SNAP_PWM"
+check "40 C after cooldown: gpu 25, ch6 and exhaust 180" "25 25 25 25 25 180 255 255 255 180" "$SNAP_PWM"
 
-ramp35() { sleep 1; set_junction 35000 30000; sleep 1.5; }
-run_case ramp35 ramp35
-check "35 C ramp up: gpu 50, ch6 and exhaust 140" "50 50 50 50 50 140 255 255 255 140" "$SNAP_PWM"
+cooldown_hold() { sleep 0.15; set_junction 75000; sleep 1; set_junction 50000; sleep 0.5; SNAP_EARLY="$(all_pwm)"; sleep 3; }
+run_case cooldown-hold cooldown_hold
+check "ramp down waits for 5 cool samples (gpu stays 255)" "255 255 255 255 255 255 255 255 255 255" "$SNAP_EARLY"
+check "ramp down after cooldown: 50 C gives gpu 70" "70 70 70 70 70 255 255 255 255 255" "$SNAP_PWM"
+
+ramp46() { sleep 1; set_junction 46000 30000; sleep 1.5; }
+run_case ramp46 ramp46
+check "46 C ramp up: gpu 50, ch6 and exhaust 220" "50 50 50 50 50 220 255 255 255 220" "$SNAP_PWM"
+
+# The memory sensor drives the fans when it is hotter than the junction.
+mem_hot() { sleep 1.5; set_junction 50000 48000; set_mem 40000 66000; sleep 1.5; }
+run_case mem-hot mem_hot
+check "memory 66 C above junction 50 C: gpu 155, ch6 and exhaust 255" "155 155 155 155 155 255 255 255 255 255" "$SNAP_PWM"
+status="$SNAP_STATUS"
+[[ "$status" =~ ^state=OK\ target_pwm=155\ max_gpu_junction_mC=50000\ profile=curve-default\ exhaust_pwm=255\ max_gpu_hottest_mC=66000$ ]] \
+  && pass=$((pass + 1)) || { fail=$((fail + 1)); echo "FAIL: memory-hot status line: $status"; }
+grep -q 'max_gpu_junction_mC=50000 max_gpu_hottest_mC=66000 ' "$CASE_LOG" \
+  && pass=$((pass + 1)) || { fail=$((fail + 1)); echo "FAIL: journal line lacks both temperatures"; tail -2 "$CASE_LOG"; }
+
+# Junction hotter than memory: junction still drives, and the status shows it.
+junction_hot() { sleep 1.5; set_junction 60000 40000; set_mem 50000 45000; sleep 1.5; }
+run_case junction-hot junction_hot
+check "junction 60 C above memory 50 C: gpu 110" "110 110 110 110 110 255 255 255 255 255" "$SNAP_PWM"
+[[ "$SNAP_STATUS" == *max_gpu_junction_mC=60000\ *max_gpu_hottest_mC=60000 ]] \
+  && pass=$((pass + 1)) || { fail=$((fail + 1)); echo "FAIL: junction-hot status: $SNAP_STATUS"; }
+
+# Each step of the curve-default duct curve, driven by the memory sensor so the
+# run also proves that memory alone selects every step. Temperatures rise, so
+# every change is an immediate ramp up. Each entry is "milli-C expected-pwm".
+curve_steps() {
+  local step t want
+  sleep 1.5
+  for step in "44999 25" "45000 50" "49999 50" "50000 70" "55000 90" "60000 110" \
+              "62999 110" "63000 130" "66000 155" "68000 180" "70000 205" \
+              "72000 235" "72999 235" "73000 255"; do
+    t="${step% *}"
+    want="${step#* }"
+    set_mem "$t" 20000
+    sleep 0.7
+    check "curve-default step at $t mC (memory): gpu $want" "$want" "$(pwm 1)"
+    check "curve-default step at $t mC (memory): gpu channels agree" "$want" "$(pwm 5)"
+  done
+}
+run_case curve-steps curve_steps
 
 stall_one() { sleep 1.5; echo 0 > "$(hw)/fan3_input"; sleep 3; }
 run_case stall-one stall_one
@@ -221,6 +269,34 @@ run_case zero-exhaust zero_exhaust
 check "zero PWM on exhaust: watchdog exits" 0 "$WD_RUNNING"
 check "zero PWM on exhaust: all forced 255" "255 255 255 255 255 255 255 255 255 255" "$SNAP_PWM"
 
+# A missing or garbage memory sensor is a fault, like a missing junction.
+mem_missing() { sleep 1; rm -f "$FAKE/pci/0000:67:00.0/hwmon/hwmon6/temp3_input"; sleep 1; }
+run_case mem-missing mem_missing
+check "memory sensor missing: watchdog exits" 0 "$WD_RUNNING"
+check "memory sensor missing: all forced 255" "255 255 255 255 255 255 255 255 255 255" "$SNAP_PWM"
+grep -q 'GPU mem sensor missing' "$CASE_LOG" \
+  && pass=$((pass + 1)) || { fail=$((fail + 1)); echo "FAIL: missing memory sensor not logged"; }
+
+mem_nolabel() { sleep 1; rm -f "$FAKE/pci/0000:19:00.0/hwmon/hwmon5/temp3_label"; sleep 1; }
+run_case mem-nolabel mem_nolabel
+check "memory label missing: watchdog exits" 0 "$WD_RUNNING"
+check "memory label missing: all forced 255" "255 255 255 255 255 255 255 255 255 255" "$SNAP_PWM"
+
+mem_garbage() { sleep 1; echo hot > "$FAKE/pci/0000:19:00.0/hwmon/hwmon5/temp3_input"; sleep 1; }
+run_case mem-garbage mem_garbage
+check "memory sensor garbage: watchdog exits" 0 "$WD_RUNNING"
+check "memory sensor garbage: all forced 255" "255 255 255 255 255 255 255 255 255 255" "$SNAP_PWM"
+
+mem_empty() { sleep 1; : > "$FAKE/pci/0000:67:00.0/hwmon/hwmon6/temp3_input"; sleep 1; }
+run_case mem-empty mem_empty
+check "memory sensor empty: watchdog exits" 0 "$WD_RUNNING"
+check "memory sensor empty: all forced 255" "255 255 255 255 255 255 255 255 255 255" "$SNAP_PWM"
+
+junction_missing() { sleep 1; rm -f "$FAKE/pci/0000:19:00.0/hwmon/hwmon5/temp2_input"; sleep 1; }
+run_case junction-missing junction_missing
+check "junction sensor missing: watchdog exits" 0 "$WD_RUNNING"
+check "junction sensor missing: all forced 255" "255 255 255 255 255 255 255 255 255 255" "$SNAP_PWM"
+
 tach_missing() { sleep 1; rm -f "$(hw)/fan5_input"; sleep 1; }
 run_case tach-missing tach_missing
 check "GPU tach missing: watchdog exits" 0 "$WD_RUNNING"
@@ -251,15 +327,48 @@ check "flat-max lease: every channel 255" "255 255 255 255 255 255 255 255 255 2
 
 steep() { lease curve-steep; sleep 1.5; set_junction 55000 40000; sleep 1.5; }
 run_case lease-steep steep
-check "curve-steep at 55 C: gpu 255, ch6 and exhaust 255" "255 255 255 255 255 255 255 255 255 255" "$SNAP_PWM"
+check "curve-steep at 55 C: gpu 155, ch6 and exhaust 255" "155 155 155 155 155 255 255 255 255 255" "$SNAP_PWM"
+
+steep_68() { lease curve-steep; sleep 1.5; set_mem 68000 20000; sleep 1.5; }
+run_case lease-steep-68 steep_68
+check "curve-steep at memory 68 C: every channel 255" "255 255 255 255 255 255 255 255 255 255" "$SNAP_PWM"
 
 default_55() { sleep 1.5; set_junction 55000 40000; sleep 1.5; }
 run_case default-55 default_55
-check "curve-default at 55 C: gpu 150, ch6 and exhaust 255" "150 150 150 150 150 255 255 255 255 255" "$SNAP_PWM"
+check "curve-default at 55 C: gpu 90, ch6 and exhaust 255" "90 90 90 90 90 255 255 255 255 255" "$SNAP_PWM"
 
 bad_profile() { printf 'profile=bogus\nexpires=%s\nowner_pid=%s\n' "$(date -u -d '+10 min' +%Y-%m-%dT%H:%M:%SZ)" "$$" > "$FAKE/run/request"; sleep 3; }
 run_case unknown-profile bad_profile
 [[ "$SNAP_STATUS" == *profile=curve-default* ]] && pass=$((pass + 1)) || { fail=$((fail + 1)); echo "FAIL: unknown profile must fall back to curve-default"; }
+
+# Startup removes a stale status file but keeps the lease request file
+# (RuntimeDirectoryPreserve keeps the runtime directory across a restart).
+restart_keeps_lease() {
+  sleep 1
+  printf 'profile=flat-max\nexpires=%s\nowner_pid=%s\n' "$(date -u -d '+10 min' +%Y-%m-%dT%H:%M:%SZ)" "$$" > "$FAKE/run/request"
+  sleep 1
+}
+run_case restart-1 restart_keeps_lease
+check "exit removes the status file" "no" "$([ -e "$FAKE/run/status" ] && echo yes || echo no)"
+check "exit keeps the lease request file" "yes" "$([ -e "$FAKE/run/request" ] && echo yes || echo no)"
+# Start again on the same directory with a stale status file in place.
+echo "state=OK target_pwm=1 max_gpu_junction_mC=1 profile=stale exhaust_pwm=1 max_gpu_hottest_mC=1" > "$FAKE/run/status"
+"$work/watchdog.sh" > "$work/restart-2.log" 2>&1 &
+restart_pid=$!
+sleep 0.4
+check "start removes a stale status file" "no" "$(grep -q 'profile=stale' "$FAKE/run/status" 2>/dev/null && echo yes || echo no)"
+sleep 1.5
+[[ "$(cat "$FAKE/run/status" 2>/dev/null)" == *profile=flat-max*max_gpu_hottest_mC=* ]] \
+  && pass=$((pass + 1)) || { fail=$((fail + 1)); echo "FAIL: restart did not write a fresh status that honours the kept lease"; cat "$FAKE/run/status" 2>/dev/null; }
+kill -TERM "$restart_pid" 2>/dev/null; wait "$restart_pid" 2>/dev/null
+
+# The generated unit must preserve the runtime directory.
+unit_text="$(nix eval --raw \
+  "path:$repo_dir#nixosConfigurations.server.config.systemd.units.\"arctic-fan-watchdog.service\".text" 2>/dev/null)" || unit_text=""
+[[ "$unit_text" == *"RuntimeDirectory=arctic-fan"* ]] \
+  && pass=$((pass + 1)) || { fail=$((fail + 1)); echo "FAIL: could not read the generated unit"; }
+[[ "$unit_text" == *"RuntimeDirectoryPreserve=yes"* ]] \
+  && pass=$((pass + 1)) || { fail=$((fail + 1)); echo "FAIL: generated unit lacks RuntimeDirectoryPreserve=yes"; }
 
 term() { sleep 2.5; }
 run_case term term

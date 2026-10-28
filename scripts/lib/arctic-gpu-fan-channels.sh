@@ -111,8 +111,8 @@ load_fast_ramp_curve() {
   load_curve_file /etc/nix-meta/arctic-fan/fast-ramp-curve FAST_RAMP_CURVE "fast-ramp"
 }
 
-# Expected PWM for a maximum junction reading from a loaded curve.
-# Arguments: junction, name of the curve array.
+# Expected PWM for a hottest-sensor reading (junction or memory) from a loaded curve.
+# Arguments: hottest temperature in milli-degrees C, name of the curve array.
 curve_expected_pwm_in() {
   local junction="$1" step min pwm
   local -n curve="$2"

@@ -574,7 +574,7 @@ test_gpu_fan_response() {
 }
 
 test_curve_hold() {
-  local h bdf pci sensor value max_junction ch pwm i expected expected_fast match
+  local h bdf pci sensor sensor_name value max_junction ch pwm i expected expected_fast match
   echo "=== curve hold test ==="
   force_all_high || return 1
   if ! systemctl is-active --quiet arctic-fan-watchdog.service; then
@@ -584,17 +584,20 @@ test_curve_hold() {
   fi
 
   h="$(find_arctic_hwmon)" || return 1
+  # The control input is the hottest of junction and memory over both cards.
   max_junction=0
   for bdf in "${AMD_GPU_BDFS[@]}"; do
     pci="/sys/bus/pci/devices/$bdf"
-    sensor="$(find_gpu_sensor "$pci" junction)" || return 1
-    value="$(cat "$sensor")" || return 1
-    case "$value" in
-      ""|*[!0-9]*) fail "junction value is invalid: $sensor=$value"; return 1 ;;
-    esac
-    [ "$value" -gt "$max_junction" ] && max_junction="$value"
+    for sensor_name in junction mem; do
+      sensor="$(find_gpu_sensor "$pci" "$sensor_name")" || return 1
+      value="$(cat "$sensor")" || return 1
+      case "$value" in
+        ""|*[!0-9]*) fail "$sensor_name value is invalid: $sensor=$value"; return 1 ;;
+      esac
+      [ "$value" -gt "$max_junction" ] && max_junction="$value"
+    done
   done
-  echo "max_gpu_junction_mC=$max_junction"
+  echo "max_gpu_hottest_mC=$max_junction"
 
   # The expected PWM comes from the exported watchdog curve.
   expected="$(expected_pwm "$max_junction")"
