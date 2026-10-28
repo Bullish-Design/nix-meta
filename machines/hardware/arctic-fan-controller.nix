@@ -39,8 +39,11 @@ let
   # next point. At or above the hottest point, the curve gives that point's
   # PWM. PWM-to-RPM values come from the project 03 calibration sweep.
   fanCurves = {
-    # Shipped default (owner goal 2026-10-28): quiet duct fans, with the
-    # hottest sensor at or below about 70 C when it holds. Measured on card 0
+    # Quiet curve. It was the shipped default until owner decision
+    # 2026-10-28, which moved the default to the warm curve. It stays as the
+    # lease profile "curve-quiet" (raw override 72 C), so the 034 and 035
+    # experiments stay reproducible. It keeps the hottest sensor at or below
+    # about 70 C when it holds. Measured on card 0
     # at 8 lanes: 140 W gives junction 63 C and memory 68 C. 160 W gives
     # junction 67 C and memory 70 C. The curve is keyed on the hottest of
     # junction and memory, so the memory sensor sets the speed when it leads.
@@ -93,10 +96,12 @@ let
       { minC = 0; pwm = 25; }
     ];
 
-    # Warm curve. It lets the sensors run about 5 C hotter than the default
-    # at the same PWM, for quieter fans. It reaches full duty at 78 C. The
-    # lease profile "curve-warm" uses a raw override at 82 C (see fanProfiles).
-    # Keyed on the hottest of junction and memory.
+    # Warm curve. Shipped default (owner decision 2026-10-28). It lets the
+    # sensors run about 5 C hotter than the quiet curve at the same PWM, for
+    # quieter fans. It peaks at 76 C at 160 W. It reaches full duty at 78 C.
+    # The profiles "curve-default" and "curve-warm" both use it with a raw
+    # override at 82 C (see fanProfiles). Keyed on the hottest of junction and
+    # memory.
     warm = [
       { minC = 78000; pwm = 255; }
       { minC = 77000; pwm = 235; }
@@ -138,7 +143,7 @@ let
 
   # The active GPU curve when no fan-profile lease is held. Change this one
   # name to switch the default.
-  selectedFanCurveName = "quiet";
+  selectedFanCurveName = "warm";
   selectedFanCurve = fanCurves.${selectedFanCurveName};
 
   # Fail at evaluation time rather than shipping a curve that cannot answer
@@ -167,23 +172,35 @@ let
   # ("fast": channel 6 and the exhaust).
   fanProfiles = {
     "flat-max" = { gpu = "full"; fast = "full"; };
-    "curve-default" = { gpu = selectedFanCurveName; fast = "aggressive"; };
     "curve-steep" = { gpu = "steep"; fast = "aggressive"; };
     # The raw override temperature is per profile, in milli-degrees C. A
     # profile with no overrideMilliC uses defaultOverrideMilliC.
-    # curve-warm: the warm curve settles near 73-75 C with 3-4 C of raw jitter,
-    # so 77 C fired on normal load. 82 C is above that, 16 C under the memory
-    # throttle (98 C), 18 C under the junction throttle (100 C), and under the
-    # 85 C machine guard.
+    # curve-default and curve-warm (owner decision 2026-10-28: the warm curve
+    # is the default): the warm curve settles near 73-75 C with 3-4 C of raw
+    # jitter, so 77 C fired on normal load. 82 C is above that, 16 C under the
+    # memory throttle (98 C), 18 C under the junction throttle (100 C), and
+    # under the 85 C machine guard. "curve-warm" stays a valid lease name with
+    # the same behaviour as "curve-default".
+    "curve-default" = { gpu = selectedFanCurveName; fast = "aggressive"; overrideMilliC = 82000; };
     "curve-warm" = { gpu = "warm"; fast = "aggressive"; overrideMilliC = 82000; };
+    # curve-quiet: the old default curve with its old 72 C raw override.
+    "curve-quiet" = { gpu = "quiet"; fast = "aggressive"; overrideMilliC = 72000; };
     "cooldown" = { gpu = "cooldown"; fast = "cooldown"; };
   };
   # Profiles that go straight to 255 with no rate limit (and "full-duty-fault").
   fullDutyProfiles = lib.filter (n: fanProfiles.${n}.gpu == "full") (builtins.attrNames fanProfiles);
   fullDutyProfilesForShell = lib.concatStringsSep " " ([ "full-duty-fault" ] ++ fullDutyProfiles);
   allowedProfiles = builtins.attrNames fanProfiles;
+  # Profiles that hold a fixed high duty. A change from one of these to a curve
+  # profile jumps straight down to the curve value (no rate limit for that one
+  # step). "full-duty-fault" is not in this list: a cleared fault keeps the
+  # slow ramp down.
+  jumpFromProfilesForShell = "flat-max cooldown";
+  curveProfilesForShell = lib.concatStringsSep " "
+    (lib.filter (n: n != "cooldown" && fanProfiles.${n}.gpu != "full") allowedProfiles);
   allowedProfilesForShell = lib.concatStringsSep " " allowedProfiles;
   defaultProfile = "curve-default";
+  # Raw override for a profile that sets none (curve-steep, cooldown, flat-max).
   defaultOverrideMilliC = 72000;
   # Shell case arms that set the raw override temperature for each profile
   # that has its own value.
@@ -436,7 +453,7 @@ ${curveDispatchFunctions}
     #   hysteresis_mC: the command follows the curve down only once the
     #     smoothed temperature is this far below the point that set it.
     #   raw_override_mC: (72 C here; a profile can set its own, see
-    #     fanProfiles) at or above this raw reading, the watchdog skips
+    #     fanProfiles. curve-default uses 82 C) at or above this raw reading, the watchdog skips
     #     smoothing, the rate limit, and the hysteresis.
     ema_div=12
     rate_step=6
@@ -444,7 +461,21 @@ ${curveDispatchFunctions}
     raw_override_mC=${toString defaultOverrideMilliC}
     raw_override_default_mC="$raw_override_mC"
     full_duty_profiles=" ${fullDutyProfilesForShell} "
+    jump_from_profiles=" ${jumpFromProfilesForShell} "
+    curve_profiles=" ${curveProfilesForShell} "
     avg_hottest=""
+
+    # Startup: the watchdog holds safe high until startup_loops consecutive
+    # loops have read every sensor and tach as valid. Then it jumps to the
+    # curve value for the reading, with no rate limit for that one step.
+    # An invalid reading exits the watchdog, so the count only grows on a
+    # clean run of loops.
+    startup_loops=3
+    startup_good=0
+    startup_done=0
+    prev_profile=""
+    # Set to 1 for one loop to let ramp_group fall straight to its target.
+    descend_jump=0
 
     declare -A pwm_now=() fan_rpm=() strikes=() failed=() min_rpm=()
     gpu_channel_count=0
@@ -489,7 +520,9 @@ ${curveDispatchFunctions}
     #   down target: the curve value at the control temperature plus the
     #     hysteresis. The command falls to it, and only when it is lower.
     # Both moves are limited to rate_step per loop, unless the jump flag is 1.
-    # A jump goes straight up.
+    # A jump goes straight up. The descend_jump variable (startup and a change
+    # from flat-max or cooldown to a curve profile) lets the fall go straight
+    # to its target for one loop.
     ramp_group() {
       local arctic="$1" up="$2" down="$3" jump="$4" ch cur_min=255 cur_max=0 new
       shift 5
@@ -505,7 +538,7 @@ ${curveDispatchFunctions}
         write_group_pwm "$arctic" "$new" "$@"
       elif [ "$down" -lt "$cur_max" ]; then
         new="$down"
-        if [ "$new" -lt $((cur_max - rate_step)) ]; then
+        if [ "$descend_jump" -ne 1 ] && [ "$new" -lt $((cur_max - rate_step)) ]; then
           new=$((cur_max - rate_step))
         fi
         write_group_pwm "$arctic" "$new" "$@"
@@ -717,10 +750,43 @@ ${curveDispatchFunctions}
         fi
       fi
 
+      # Startup. Every loop that reaches this point has read all sensors and
+      # tachs as valid (an invalid reading exits above). Hold safe high for the
+      # first startup_loops - 1 loops. On loop startup_loops, jump to the curve.
+      startup_note=""
+      hold_startup=0
+      descend_jump=0
+      if [ "$startup_done" -eq 0 ]; then
+        startup_good=$((startup_good + 1))
+        if [ "$startup_good" -ge "$startup_loops" ]; then
+          startup_done=1
+          descend_jump=1
+          startup_note=" startup=jump"
+        else
+          hold_startup=1
+          startup_note=" startup=hold"
+        fi
+      elif [ -n "$prev_profile" ]; then
+        # A change from flat-max or cooldown to a curve profile jumps to the
+        # new curve value. A cleared fault (full-duty-fault) does not.
+        case "$jump_from_profiles" in
+          *" $prev_profile "*)
+            case "$curve_profiles" in
+              *" $active_profile "*)
+                descend_jump=1
+                startup_note=" jump=profile-change"
+                ;;
+            esac
+            ;;
+        esac
+      fi
+      prev_profile="$active_profile"
+
       # Smooth the control temperature. The average starts at the first raw
-      # reading. At or above raw_override_mC the raw reading drives the curves
-      # at once, and the average resets to it.
-      if [ -z "$avg_hottest" ]; then
+      # reading, and stays at the raw reading until the startup jump. At or
+      # above raw_override_mC the raw reading drives the curves at once, and
+      # the average resets to it.
+      if [ -z "$avg_hottest" ] || [ "$startup_done" -eq 0 ] || [ "$startup_note" = " startup=jump" ]; then
         avg_hottest="$max_hottest"
       else
         avg_hottest=$((avg_hottest + (max_hottest - avg_hottest) / ema_div))
@@ -760,8 +826,13 @@ ${overrideArms}        *) ;;
       [ "$down_pwm" -lt "$target_pwm" ] && down_pwm="$target_pwm"
       [ "$fast_down_pwm" -lt "$fast_target_pwm" ] && fast_down_pwm="$fast_target_pwm"
 
-      ramp_group "$arctic" "$target_pwm" "$down_pwm" "$jump" gpu $gpu_channel_list
-      ramp_group "$arctic" "$fast_target_pwm" "$fast_down_pwm" "$jump" fast $fast_channel_list
+      # During the startup hold the fans stay at safe high, unless the loop
+      # needs a jump (override, fault, or a full-duty profile).
+      if [ "$hold_startup" -ne 1 ] || [ "$jump" -eq 1 ]; then
+        ramp_group "$arctic" "$target_pwm" "$down_pwm" "$jump" gpu $gpu_channel_list
+        ramp_group "$arctic" "$fast_target_pwm" "$fast_down_pwm" "$jump" fast $fast_channel_list
+      fi
+      descend_jump=0
 
       detail=""
       for ch in $gpu_channel_list; do
@@ -786,7 +857,7 @@ ${overrideArms}        *) ;;
         "$state" "''${pwm_now[''${gpu_channel_list%% *}]}" "$max_junction" "$active_profile" "''${pwm_now[''${fast_channel_list%% *}]}" "$max_hottest" "$avg_hottest" \
         > /run/arctic-fan/status || echo "could not write /run/arctic-fan/status" >&2
       ${pkgs.systemd}/bin/systemd-notify --status="$state target_pwm=''${pwm_now[''${gpu_channel_list%% *}]} profile=$active_profile" || true
-      echo "ARCTIC watchdog: state=$state max_gpu_junction_mC=$max_junction max_gpu_hottest_mC=$max_hottest max_gpu_hottest_avg_mC=$avg_hottest target_pwm=$target_pwm active_profile=$active_profile reason=\"$active_reason\" override=$override$detail"
+      echo "ARCTIC watchdog: state=$state max_gpu_junction_mC=$max_junction max_gpu_hottest_mC=$max_hottest max_gpu_hottest_avg_mC=$avg_hottest target_pwm=$target_pwm active_profile=$active_profile reason=\"$active_reason\" override=$override$startup_note$detail"
       ${pkgs.coreutils}/bin/sleep 2
     done
   '';
