@@ -92,6 +92,24 @@ let
       { minC = 40000; pwm = 60; }
       { minC = 0; pwm = 25; }
     ];
+
+    # Warm curve. It lets the sensors run about 5 C hotter than the default
+    # at the same PWM, for quieter fans. It reaches full duty at 78 C. The
+    # lease profile "curve-warm" uses a raw override at 77 C (see fanProfiles).
+    # Keyed on the hottest of junction and memory.
+    warm = [
+      { minC = 78000; pwm = 255; }
+      { minC = 77000; pwm = 235; }
+      { minC = 75000; pwm = 205; }
+      { minC = 73000; pwm = 180; }
+      { minC = 71000; pwm = 155; }
+      { minC = 68000; pwm = 130; }
+      { minC = 65000; pwm = 110; }
+      { minC = 60000; pwm = 90; }
+      { minC = 55000; pwm = 70; }
+      { minC = 50000; pwm = 50; }
+      { minC = 0; pwm = 25; }
+    ];
   };
 
   # Fast-ramp fan curves (channels 6 and 10). Same format as fanCurves. These
@@ -151,6 +169,9 @@ let
     "flat-max" = { gpu = "full"; fast = "full"; };
     "curve-default" = { gpu = selectedFanCurveName; fast = "aggressive"; };
     "curve-steep" = { gpu = "steep"; fast = "aggressive"; };
+    # The raw override temperature is per profile, in milli-degrees C. A
+    # profile with no overrideMilliC uses defaultOverrideMilliC.
+    "curve-warm" = { gpu = "warm"; fast = "aggressive"; overrideMilliC = 77000; };
     "cooldown" = { gpu = "cooldown"; fast = "cooldown"; };
   };
   # Profiles that go straight to 255 with no rate limit (and "full-duty-fault").
@@ -159,6 +180,13 @@ let
   allowedProfiles = builtins.attrNames fanProfiles;
   allowedProfilesForShell = lib.concatStringsSep " " allowedProfiles;
   defaultProfile = "curve-default";
+  defaultOverrideMilliC = 72000;
+  # Shell case arms that set the raw override temperature for each profile
+  # that has its own value.
+  overrideArms = lib.concatStrings (lib.mapAttrsToList
+    (profile: p: lib.optionalString (p ? overrideMilliC)
+      "        ${profile}) raw_override_mC=${toString p.overrideMilliC} ;;\n")
+    fanProfiles);
 
   # Every curve a lease profile can select must exist and be valid, not only
   # the one selected by default -- a lease can reach any of them at runtime.
@@ -403,12 +431,14 @@ ${curveDispatchFunctions}
     #   rate_step: the largest PWM change per loop, up or down.
     #   hysteresis_mC: the command follows the curve down only once the
     #     smoothed temperature is this far below the point that set it.
-    #   raw_override_mC: at or above this raw reading, the watchdog skips
+    #   raw_override_mC: (72 C here; a profile can set its own, see
+    #     fanProfiles) at or above this raw reading, the watchdog skips
     #     smoothing, the rate limit, and the hysteresis.
     ema_div=12
     rate_step=6
     hysteresis_mC=3000
-    raw_override_mC=72000
+    raw_override_mC=${toString defaultOverrideMilliC}
+    raw_override_default_mC="$raw_override_mC"
     full_duty_profiles=" ${fullDutyProfilesForShell} "
     avg_hottest=""
 
@@ -691,6 +721,11 @@ ${curveDispatchFunctions}
       else
         avg_hottest=$((avg_hottest + (max_hottest - avg_hottest) / ema_div))
       fi
+      # The override temperature belongs to the active profile.
+      raw_override_mC="$raw_override_default_mC"
+      case "$active_profile" in
+${overrideArms}        *) ;;
+      esac
       override=0
       control_mC="$avg_hottest"
       if [ "$max_hottest" -ge "$raw_override_mC" ]; then
